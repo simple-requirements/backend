@@ -1,0 +1,4 @@
+allowBuilds:
+  '@nestjs/core': set this to true or false
+  '@swc/core': true
+  unrs-resolver: set this to true or false
