@@ -4,6 +4,7 @@ import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CategoriesModule } from './categories/categories.module';
 import databaseConfig from './database/database.config';
 
 @Module({
@@ -39,6 +40,8 @@ import databaseConfig from './database/database.config';
         logging: false,
       }),
     }),
+
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
