@@ -7,19 +7,19 @@ import { loadDatabaseConfiguration } from './database.config';
 const database = loadDatabaseConfiguration();
 
 export default new DataSource({
-  type: 'postgres',
+    type: 'postgres',
 
-  host: database.host,
-  port: database.port,
-  database: database.database,
-  username: database.username,
-  password: database.password,
+    host: database.host,
+    port: database.port,
+    database: database.database,
+    username: database.username,
+    password: database.password,
 
-  entities: [join(__dirname, '..', '**', '*.entity{.ts,.js}')],
+    entities: [join(__dirname, '..', '**', '*.entity{.ts,.js}')],
 
-  migrations: [join(__dirname, 'migrations', '*{.ts,.js}')],
+    migrations: [join(__dirname, 'migrations', '*{.ts,.js}')],
 
-  migrationsTableName: 'migrations',
-  migrationsRun: false,
-  synchronize: false,
+    migrationsTableName: 'migrations',
+    migrationsRun: false,
+    synchronize: false,
 });
