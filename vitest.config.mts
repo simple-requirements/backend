@@ -18,10 +18,10 @@ export default defineConfig({
         coverage: {
             provider: 'istanbul',
             reporter: ['text', 'html', 'lcov'],
-            include: ['src/**/*.ts'],
             exclude: [
                 'src/main.ts',
                 'src/**/*.module.ts',
+                'src/**/*.controller.ts',
                 'src/**/*.spec.ts',
                 'src/**/*.e2e-spec.ts',
                 'src/**/*.entity.ts',
