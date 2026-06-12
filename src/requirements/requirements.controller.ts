@@ -4,6 +4,7 @@ import {
     ApiBody,
     ApiConflictResponse,
     ApiCreatedResponse,
+    ApiNoContentResponse,
     ApiNotFoundResponse,
     ApiOkResponse,
     ApiOperation,
@@ -12,12 +13,12 @@ import {
     ApiTags,
 } from '@nestjs/swagger';
 
-import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
-import type { MarkObsoleteRequirementDto } from '@/requirements/dto/mark-obsolete-requirement.dto';
-import type { RejectRequirementDto } from '@/requirements/dto/reject-requirement.dto';
+import { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
+import { MarkObsoleteRequirementDto } from '@/requirements/dto/mark-obsolete-requirement.dto';
+import { RejectRequirementDto } from '@/requirements/dto/reject-requirement.dto';
 import type { RequirementResponseDto } from '@/requirements/dto/requirement-response.dto';
 import type { RequirementRevisionResponseDto } from '@/requirements/dto/requirement-revision-response.dto';
-import type { UpdateRequirementDto } from '@/requirements/dto/update-requirement.dto';
+import { UpdateRequirementDto } from '@/requirements/dto/update-requirement.dto';
 import type { RequirementListQueryDto } from '@/requirements/requirements-query.dto';
 import { RequirementsService } from '@/requirements/requirements.service';
 
@@ -34,7 +35,10 @@ export class RequirementsController {
 
     @Post()
     @ApiOperation({ summary: 'Create a draft requirement.' })
-    @ApiBody({ description: 'Requirement fields used to allocate a visible key and create draft content.' })
+    @ApiBody({
+        type: CreateRequirementDto,
+        description: 'Requirement fields used to allocate a visible key and create draft content.',
+    })
     @ApiCreatedResponse({ description: 'Requirement created.' })
     @ApiBadRequestResponse({ description: 'Malformed requirement input.' })
     @ApiNotFoundResponse({ description: 'Category was not found.' })
@@ -103,7 +107,7 @@ export class RequirementsController {
     @Patch(':id')
     @ApiOperation({ summary: 'Update editable draft requirement fields.' })
     @ApiParam({ name: 'id' })
-    @ApiBody({ description: 'Editable requirement fields.' })
+    @ApiBody({ type: UpdateRequirementDto, description: 'Editable requirement fields.' })
     @ApiOkResponse({ description: 'Requirement updated.' })
     @ApiBadRequestResponse({ description: 'Malformed update input.' })
     @ApiNotFoundResponse({ description: 'Requirement was not found.' })
@@ -118,7 +122,7 @@ export class RequirementsController {
     @Patch(':id/reject')
     @ApiOperation({ summary: 'Reject a draft requirement.' })
     @ApiParam({ name: 'id' })
-    @ApiBody({ description: 'Rejection reason and reviewer.' })
+    @ApiBody({ type: RejectRequirementDto, description: 'Rejection reason and reviewer.' })
     @ApiOkResponse({ description: 'Requirement rejected.' })
     @ApiBadRequestResponse({ description: 'Malformed rejection input.' })
     @ApiNotFoundResponse({ description: 'Requirement was not found.' })
@@ -131,16 +135,35 @@ export class RequirementsController {
     }
 
     @Patch(':id/approve')
+    @ApiOperation({ summary: 'Approve a draft requirement.' })
+    @ApiParam({ name: 'id' })
+    @ApiOkResponse({ description: 'Requirement approved.' })
+    @ApiBadRequestResponse({ description: 'Invalid UUID.' })
+    @ApiNotFoundResponse({ description: 'Requirement was not found.' })
+    @ApiConflictResponse({ description: 'Requirement cannot be approved in its current state.' })
     async approve(@Param('id') id: string): Promise<RequirementResponseDto> {
         return this.requirementsService.approve(id);
     }
 
     @Patch(':id/implemented')
+    @ApiOperation({ summary: 'Mark an approved requirement implemented.' })
+    @ApiParam({ name: 'id' })
+    @ApiOkResponse({ description: 'Requirement implemented.' })
+    @ApiBadRequestResponse({ description: 'Invalid UUID.' })
+    @ApiNotFoundResponse({ description: 'Requirement was not found.' })
+    @ApiConflictResponse({ description: 'Requirement cannot be implemented in its current state.' })
     async markImplemented(@Param('id') id: string): Promise<RequirementResponseDto> {
         return this.requirementsService.markImplemented(id);
     }
 
     @Patch(':id/obsolete')
+    @ApiOperation({ summary: 'Mark an approved or rejected requirement obsolete.' })
+    @ApiParam({ name: 'id' })
+    @ApiBody({ type: MarkObsoleteRequirementDto, description: 'Obsolescence reason.' })
+    @ApiOkResponse({ description: 'Requirement obsolete.' })
+    @ApiBadRequestResponse({ description: 'Invalid UUID or malformed obsolescence input.' })
+    @ApiNotFoundResponse({ description: 'Requirement was not found.' })
+    @ApiConflictResponse({ description: 'Requirement cannot be made obsolete in its current state.' })
     async markObsolete(
         @Param('id') id: string,
         @Body() markObsoleteRequirementDto: MarkObsoleteRequirementDto,
@@ -152,7 +175,7 @@ export class RequirementsController {
     @HttpCode(204)
     @ApiOperation({ summary: 'Soft-delete a draft requirement.' })
     @ApiParam({ name: 'id' })
-    @ApiOkResponse({ description: 'Requirement deleted.' })
+    @ApiNoContentResponse({ description: 'Requirement deleted.' })
     @ApiBadRequestResponse({ description: 'Invalid UUID.' })
     @ApiNotFoundResponse({ description: 'Requirement was not found.' })
     @ApiConflictResponse({ description: 'Requirement cannot be deleted in its current state.' })

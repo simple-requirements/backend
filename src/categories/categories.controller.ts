@@ -13,7 +13,7 @@ import {
 
 import { CategoriesService } from '@/categories/categories.service';
 import type { CategoryResponseDto } from '@/categories/dto/category-response.dto';
-import type { CreateCategoryDto } from '@/categories/dto/create-category.dto';
+import { CreateCategoryDto } from '@/categories/dto/create-category.dto';
 
 /**
  * HTTP boundary for category creation and lookup.
@@ -28,7 +28,7 @@ export class CategoriesController {
 
     @Post()
     @ApiOperation({ summary: 'Create a category.' })
-    @ApiBody({ description: 'Category name and stable uppercase key.' })
+    @ApiBody({ type: CreateCategoryDto, description: 'Category name and stable uppercase key.' })
     @ApiCreatedResponse({ description: 'Category created.' })
     @ApiBadRequestResponse({ description: 'Malformed category input.' })
     @ApiConflictResponse({ description: 'Category key already exists.' })

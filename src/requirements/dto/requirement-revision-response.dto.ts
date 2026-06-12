@@ -42,8 +42,16 @@ export class RequirementRevisionResponseDto {
     reviewer!: string | null;
     @ApiProperty({ description: 'Rejected timestamp at snapshot time.', nullable: true })
     rejectedAt!: string | null;
-    @ApiProperty({ description: 'Deleted timestamp at snapshot time.', nullable: true })
+    @ApiProperty({ description: 'Deleted timestamp at snapshot time.', format: 'date-time', nullable: true })
     deletedAt!: string | null;
+    @ApiProperty({ description: 'Approved timestamp at snapshot time.', format: 'date-time', nullable: true })
+    approvedAt!: string | null;
+    @ApiProperty({ description: 'Implemented timestamp at snapshot time.', format: 'date-time', nullable: true })
+    implementedAt!: string | null;
+    @ApiProperty({ description: 'Obsolescence reason at snapshot time.', nullable: true })
+    obsolescenceReason!: string | null;
+    @ApiProperty({ description: 'Obsolete timestamp at snapshot time.', format: 'date-time', nullable: true })
+    obsoleteAt!: string | null;
     @ApiProperty({ description: 'Original requirement creation timestamp.', format: 'date-time' })
     requirementCreatedAt!: string;
     @ApiProperty({ description: 'Requirement updated timestamp captured by the snapshot.', format: 'date-time' })

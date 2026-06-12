@@ -40,6 +40,14 @@ export class RequirementResponseDto {
     rejectedAt!: string | null;
     @ApiProperty({ description: 'ISO timestamp when deleted.', format: 'date-time', nullable: true })
     deletedAt!: string | null;
+    @ApiProperty({ description: 'ISO timestamp when approved.', format: 'date-time', nullable: true })
+    approvedAt!: string | null;
+    @ApiProperty({ description: 'ISO timestamp when implemented.', format: 'date-time', nullable: true })
+    implementedAt!: string | null;
+    @ApiProperty({ description: 'Obsolescence reason when obsolete.', nullable: true })
+    obsolescenceReason!: string | null;
+    @ApiProperty({ description: 'ISO timestamp when obsolete.', format: 'date-time', nullable: true })
+    obsoleteAt!: string | null;
     @ApiProperty({ description: 'ISO timestamp when created.', format: 'date-time' })
     createdAt!: string;
     @ApiProperty({ description: 'ISO timestamp when last updated.', format: 'date-time' })

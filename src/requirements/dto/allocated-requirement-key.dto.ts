@@ -5,9 +5,9 @@ import { RequirementType } from '@/requirements/requirement-type-enum';
 /**
  * Internal DTO returned by visible-key allocation.
  *
- * The allocator persists a placeholder requirement row and returns the reserved
- * identity so the requirement service can fill editable draft fields without
- * recalculating key material.
+ * The allocator persists the requirement identity and returns the reserved key
+ * material so the requirement service can fill editable draft fields in the
+ * surrounding creation transaction without recalculating key material.
  */
 export class AllocatedRequirementKeyDto {
     @ApiProperty({ description: 'Persisted internal requirement UUID.', format: 'uuid' })

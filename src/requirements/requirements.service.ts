@@ -17,6 +17,15 @@ import { DataSource, EntityManager, FindOptionsWhere, Not, Repository } from 'ty
 const VISIBLE_KEY_PATTERN = /^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const IMMUTABLE_UPDATE_FIELDS = ['id', 'visibleKey', 'type', 'categoryId', 'sequenceNumber', 'status'] as const;
+const EDITABLE_UPDATE_FIELDS = ['description', 'priority', 'owner', 'rationale', 'source'] as const;
+const LIFECYCLE_TRANSITIONS: Readonly<Record<RequirementStatus, readonly RequirementStatus[]>> = {
+    [RequirementStatus.Draft]: [RequirementStatus.Approved, RequirementStatus.Rejected],
+    [RequirementStatus.Approved]: [RequirementStatus.Implemented, RequirementStatus.Obsolete],
+    [RequirementStatus.Rejected]: [RequirementStatus.Obsolete],
+    [RequirementStatus.Implemented]: [],
+    [RequirementStatus.Obsolete]: [],
+    [RequirementStatus.Deleted]: [],
+};
 
 /**
  * Coordinates requirement persistence, lifecycle transitions, filtering, and revision snapshots.
@@ -38,7 +47,7 @@ export class RequirementsService {
     /**
      * Creates a draft requirement after validating request content and allocating a visible key.
      *
-     * Validation runs before key allocation so malformed input cannot consume sequence numbers. The allocator persists the empty requirement identity in a transaction, after which this method stores editable draft fields.
+     * Validation runs before key allocation so malformed input cannot consume sequence numbers. Key reservation and draft-content persistence share one transaction so a created requirement is never partially initialized.
      *
      * @param createRequirementDto - Client-provided classification and draft content.
      * @returns The created requirement response with allocated internal ID and visible key.
@@ -49,37 +58,42 @@ export class RequirementsService {
     async create(createRequirementDto: CreateRequirementDto): Promise<RequirementResponseDto> {
         this.validateCreateRequirementDto(createRequirementDto);
 
-        const allocation = await this.requirementsKeyAllocatorService.allocate(
-            createRequirementDto.type,
-            createRequirementDto.categoryId,
+        return this.requirementsKeyAllocatorService.runWithAllocationConflictMapping(() =>
+            this.dataSource.transaction(async (manager) => {
+                const allocation = await this.requirementsKeyAllocatorService.allocateInTransaction(
+                    manager,
+                    createRequirementDto.type,
+                    createRequirementDto.categoryId,
+                );
+
+                const requirement = await manager.findOne(Requirement, { where: { id: allocation.id } });
+
+                if (requirement === null) {
+                    throw new NotFoundException(`Requirement "${allocation.id}" was not found after key allocation`);
+                }
+
+                requirement.status = RequirementStatus.Draft;
+                requirement.description = createRequirementDto.description.trim();
+                requirement.priority = createRequirementDto.priority.trim();
+                requirement.owner = this.toOptionalTrimmedString(createRequirementDto.owner);
+                requirement.rationale = this.toOptionalTrimmedString(createRequirementDto.rationale);
+                requirement.source = this.toOptionalTrimmedString(createRequirementDto.source);
+
+                return this.toResponseDto(await manager.save(Requirement, requirement));
+            }),
         );
-
-        const requirement = await this.requirementsRepository.findOne({ where: { id: allocation.id } });
-
-        if (requirement === null) {
-            throw new NotFoundException(`Requirement "${allocation.id}" was not found after key allocation`);
-        }
-
-        requirement.status = RequirementStatus.Draft;
-        requirement.description = createRequirementDto.description.trim();
-        requirement.priority = createRequirementDto.priority.trim();
-        requirement.owner = this.toOptionalTrimmedString(createRequirementDto.owner);
-        requirement.rationale = this.toOptionalTrimmedString(createRequirementDto.rationale);
-        requirement.source = this.toOptionalTrimmedString(createRequirementDto.source);
-
-        return this.toResponseDto(await this.requirementsRepository.save(requirement));
     }
 
     /**
      * Retrieves visible requirements ordered by visible key with validated list filters.
      *
-     * Deleted requirements remain hidden from list responses so soft deletion cannot expose resources that normal lookups treat as absent. Explicit status filters override includeRejected for draft and rejected states.
+     * Deleted requirements remain hidden from list responses so soft deletion cannot expose resources that normal lookups treat as absent. Explicit status filters may select any non-deleted lifecycle state.
      *
      * @param query - Raw HTTP query values received by the controller.
      * @returns Requirement response objects sorted by visible key.
      * @throws BadRequestException If a filter value is invalid or contradictory.
      */
-    async findAll(query: RequirementListQueryDto | boolean = {}): Promise<RequirementResponseDto[]> {
+    async findAll(query: RequirementListQueryDto = {}): Promise<RequirementResponseDto[]> {
         const filters = this.toListFilters(query);
         const where: FindOptionsWhere<Requirement> = { status: RequirementStatus.Draft };
 
@@ -116,7 +130,7 @@ export class RequirementsService {
      * Retrieves one non-deleted requirement by internal UUID.
      *
      * @param id - Internal requirement UUID supplied in the route path.
-     * @returns Requirement response for draft or rejected requirements.
+     * @returns Requirement response for non-deleted requirements.
      * @throws BadRequestException If the UUID is malformed.
      * @throws NotFoundException If no non-deleted requirement exists.
      */
@@ -130,7 +144,7 @@ export class RequirementsService {
      * Retrieves one non-deleted requirement by consumer-facing visible key.
      *
      * @param visibleKey - Visible key in FR-KEY-0001 or NFR-KEY-0001 format.
-     * @returns Requirement response for draft or rejected requirements.
+     * @returns Requirement response for non-deleted requirements.
      * @throws BadRequestException If the visible key format is invalid.
      * @throws NotFoundException If no non-deleted requirement exists for the key.
      */
@@ -236,7 +250,6 @@ export class RequirementsService {
     async approve(id: string): Promise<RequirementResponseDto> {
         return this.transitionRequirement(
             id,
-            RequirementStatus.Draft,
             RequirementStatus.Approved,
             'Only draft requirements can be approved',
             (requirement) => {
@@ -248,7 +261,6 @@ export class RequirementsService {
     async markImplemented(id: string): Promise<RequirementResponseDto> {
         return this.transitionRequirement(
             id,
-            RequirementStatus.Approved,
             RequirementStatus.Implemented,
             'Only approved requirements can be marked implemented',
             (requirement) => {
@@ -266,7 +278,7 @@ export class RequirementsService {
         return this.dataSource.transaction(async (manager) => {
             const requirement = await this.findRequirementForUpdate(manager, id);
 
-            if (![RequirementStatus.Approved, RequirementStatus.Rejected].includes(requirement.status)) {
+            if (!this.canTransition(requirement.status, RequirementStatus.Obsolete)) {
                 throw new ConflictException('Only approved or rejected requirements can be marked obsolete');
             }
 
@@ -311,7 +323,6 @@ export class RequirementsService {
 
     private async transitionRequirement(
         id: string,
-        requiredStatus: RequirementStatus,
         nextStatus: RequirementStatus,
         invalidTransitionMessage: string,
         applyTransition: (requirement: Requirement) => void,
@@ -321,7 +332,7 @@ export class RequirementsService {
         return this.dataSource.transaction(async (manager) => {
             const requirement = await this.findRequirementForUpdate(manager, id);
 
-            if (requirement.status !== requiredStatus) {
+            if (!this.canTransition(requirement.status, nextStatus)) {
                 throw new ConflictException(invalidTransitionMessage);
             }
 
@@ -332,6 +343,10 @@ export class RequirementsService {
 
             return this.toResponseDto(await manager.save(Requirement, requirement));
         });
+    }
+
+    private canTransition(currentStatus: RequirementStatus, nextStatus: RequirementStatus): boolean {
+        return LIFECYCLE_TRANSITIONS[currentStatus].includes(nextStatus);
     }
 
     private async findRequirementForUpdate(manager: EntityManager, id: string): Promise<Requirement> {
@@ -398,15 +413,11 @@ export class RequirementsService {
     /**
      * Normalizes and validates raw requirement listing query values.
      *
-     * @param query - Query object or legacy boolean includeRejected value used by existing unit tests.
+     * @param query - Query object received from the controller.
      * @returns Service-level filters with trimmed string values.
      * @throws BadRequestException If any filter is malformed.
      */
-    private toListFilters(query: RequirementListQueryDto | boolean): RequirementListFilters {
-        if (typeof query === 'boolean') {
-            return { includeRejected: query };
-        }
-
+    private toListFilters(query: RequirementListQueryDto): RequirementListFilters {
         const includeRejected = query.includeRejected === 'true';
         const { type } = query;
 
@@ -423,7 +434,9 @@ export class RequirementsService {
         }
 
         if (query.status !== undefined && !Object.values(RequirementStatus).includes(query.status)) {
-            throw new BadRequestException('Requirement status filter must be draft, rejected, or deleted');
+            throw new BadRequestException(
+                'Requirement status filter must be draft, approved, implemented, obsolete, rejected, or deleted',
+            );
         }
 
         if (query.owner !== undefined && query.owner.trim() === '') {
@@ -539,9 +552,7 @@ export class RequirementsService {
             }
         }
 
-        if (
-            !suppliedFields.some((field) => ['description', 'priority', 'owner', 'rationale', 'source'].includes(field))
-        ) {
+        if (!suppliedFields.some((field) => (EDITABLE_UPDATE_FIELDS as readonly string[]).includes(field))) {
             throw new BadRequestException('At least one editable requirement field is required');
         }
 

@@ -20,6 +20,9 @@ describe('OpenAPI document', () => {
                 '/requirements/{id}',
                 '/requirements/key/{visibleKey}',
                 '/requirements/{id}/reject',
+                '/requirements/{id}/approve',
+                '/requirements/{id}/implemented',
+                '/requirements/{id}/obsolete',
                 '/requirements/{id}/revisions',
                 '/requirements/{id}/revisions/{revisionNumber}',
             ]),
@@ -33,5 +36,31 @@ describe('OpenAPI document', () => {
             'status',
             'owner',
         ]);
+
+        expect(document.components?.schemas?.RequirementStatus).toEqual(
+            expect.objectContaining({ enum: ['draft', 'approved', 'implemented', 'obsolete', 'rejected', 'deleted'] }),
+        );
+
+        const requirementResponse = document.components?.schemas?.RequirementResponseDto as {
+            required: string[];
+            properties: Record<string, unknown>;
+        };
+        expect(requirementResponse.required).toEqual(
+            expect.arrayContaining(['approvedAt', 'implementedAt', 'obsolescenceReason', 'obsoleteAt']),
+        );
+        expect(requirementResponse.properties.approvedAt).toEqual(
+            expect.objectContaining({ format: 'date-time', nullable: true }),
+        );
+        expect(requirementResponse.properties.implementedAt).toEqual(
+            expect.objectContaining({ format: 'date-time', nullable: true }),
+        );
+        expect(requirementResponse.properties.obsolescenceReason).toEqual(expect.objectContaining({ nullable: true }));
+        expect(requirementResponse.properties.obsoleteAt).toEqual(
+            expect.objectContaining({ format: 'date-time', nullable: true }),
+        );
+
+        expect(document.components?.schemas?.MarkObsoleteRequirementDto).toEqual(
+            expect.objectContaining({ required: ['obsolescenceReason'] }),
+        );
     });
 });

@@ -41,38 +41,31 @@ export class RequirementsKeyAllocatorService {
      * @throws ConflictException If the sequence range is exhausted or a database uniqueness constraint is hit.
      */
     async allocate(type: RequirementType, categoryId: string): Promise<AllocatedRequirementKeyDto> {
-        this.validateType(type);
-        this.validateCategoryId(categoryId);
-
-        try {
-            return await this.dataSource.transaction(async (manager) =>
-                this.allocateInTransaction(manager, type, categoryId),
-            );
-        } catch (error) {
-            if (this.isUniqueViolation(error)) {
-                throw new ConflictException('Requirement visible key allocation collided with an existing key');
-            }
-
-            throw error;
-        }
+        return this.runWithAllocationConflictMapping(() =>
+            this.dataSource.transaction(async (manager) => this.allocateInTransaction(manager, type, categoryId)),
+        );
     }
 
     /**
      * Performs key reservation with the caller-provided transaction manager.
      *
-     * The saved requirement row is intentionally sparse; RequirementsService
-     * populates editable draft fields after allocation has succeeded.
+     * The saved requirement row contains only durable identity/classification fields;
+     * RequirementsService populates editable draft fields in the same creation
+     * transaction.
      *
      * @param manager - Transactional manager used for all allocation writes.
      * @param type - Requirement type being allocated.
      * @param categoryId - Category UUID being allocated within.
      * @returns The persisted identity and visible key reserved by this transaction.
      */
-    private async allocateInTransaction(
+    async allocateInTransaction(
         manager: EntityManager,
         type: RequirementType,
         categoryId: string,
     ): Promise<AllocatedRequirementKeyDto> {
+        this.validateType(type);
+        this.validateCategoryId(categoryId);
+
         const category = await manager.findOne(Category, { where: { id: categoryId } });
 
         if (category === null) {
@@ -153,6 +146,18 @@ export class RequirementsKeyAllocatorService {
 
         if (!UUID_PATTERN.test(categoryId)) {
             throw new BadRequestException('Category id must be a valid UUID');
+        }
+    }
+
+    async runWithAllocationConflictMapping<T>(operation: () => Promise<T>): Promise<T> {
+        try {
+            return await operation();
+        } catch (error) {
+            if (this.isUniqueViolation(error)) {
+                throw new ConflictException('Requirement visible key allocation collided with an existing key');
+            }
+
+            throw error;
         }
     }
 

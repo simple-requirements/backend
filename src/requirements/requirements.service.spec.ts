@@ -76,7 +76,10 @@ describe('RequirementsService', () => {
 
     const requirementsRepositoryMock = { find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
     const requirementRevisionsRepositoryMock = { find: vi.fn(), findOne: vi.fn() };
-    const requirementsKeyAllocatorServiceMock = { allocate: vi.fn() };
+    const requirementsKeyAllocatorServiceMock = {
+        allocateInTransaction: vi.fn(),
+        runWithAllocationConflictMapping: vi.fn(),
+    };
     const transactionManagerMock = { findOne: vi.fn(), create: vi.fn(), save: vi.fn() };
     const dataSourceMock = { transaction: vi.fn() };
 
@@ -86,6 +89,9 @@ describe('RequirementsService', () => {
             Promise.resolve(callback(transactionManagerMock)),
         );
         transactionManagerMock.create.mockImplementation((_entity: unknown, value: unknown) => value);
+        requirementsKeyAllocatorServiceMock.runWithAllocationConflictMapping.mockImplementation(
+            (operation: () => Promise<unknown>) => operation(),
+        );
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -111,15 +117,15 @@ describe('RequirementsService', () => {
             source: ' US-REQ-001 ',
         };
 
-        requirementsKeyAllocatorServiceMock.allocate.mockResolvedValue({
+        requirementsKeyAllocatorServiceMock.allocateInTransaction.mockResolvedValue({
             id: baseRequirement.id,
             type: baseRequirement.type,
             categoryId: baseRequirement.categoryId,
             sequenceNumber: baseRequirement.sequenceNumber,
             visibleKey: baseRequirement.visibleKey,
         });
-        requirementsRepositoryMock.findOne.mockResolvedValue({ ...baseRequirement, description: null, priority: null });
-        requirementsRepositoryMock.save.mockImplementation((requirement: Requirement) =>
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, description: null, priority: null });
+        transactionManagerMock.save.mockImplementation((_entity: unknown, requirement: Requirement) =>
             Promise.resolve({ ...requirement, updatedAt: new Date('2026-06-12T00:00:01.000Z') }),
         );
 
@@ -147,7 +153,11 @@ describe('RequirementsService', () => {
             updatedAt: '2026-06-12T00:00:01.000Z',
         });
 
-        expect(requirementsKeyAllocatorServiceMock.allocate).toHaveBeenCalledWith(RequirementType.NFR, dto.categoryId);
+        expect(requirementsKeyAllocatorServiceMock.allocateInTransaction).toHaveBeenCalledWith(
+            transactionManagerMock,
+            RequirementType.NFR,
+            dto.categoryId,
+        );
     });
 
     it('rejects requirement creation with missing required fields.', async () => {
@@ -156,7 +166,7 @@ describe('RequirementsService', () => {
             service.create({ categoryId: baseRequirement.categoryId, description: 'Description', priority: 'p1' }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
-        expect(requirementsKeyAllocatorServiceMock.allocate).not.toHaveBeenCalled();
+        expect(requirementsKeyAllocatorServiceMock.allocateInTransaction).not.toHaveBeenCalled();
     });
 
     it('rejects requirement priorities outside p1, p2, or p3.', async () => {
@@ -212,7 +222,7 @@ describe('RequirementsService', () => {
         const rejectedRequirement = { ...baseRequirement, status: RequirementStatus.Rejected };
         requirementsRepositoryMock.find.mockResolvedValue([rejectedRequirement]);
 
-        await expect(service.findAll(true)).resolves.toEqual([
+        await expect(service.findAll({ includeRejected: 'true' })).resolves.toEqual([
             expect.objectContaining({ id: baseRequirement.id, status: RequirementStatus.Rejected }),
         ]);
 
@@ -225,7 +235,7 @@ describe('RequirementsService', () => {
         const obsoleteRequirement = { ...baseRequirement, status: RequirementStatus.Obsolete };
         requirementsRepositoryMock.find.mockResolvedValue([obsoleteRequirement]);
 
-        await expect(service.findAll(false, true)).resolves.toEqual([
+        await expect(service.findAll({ status: RequirementStatus.Obsolete })).resolves.toEqual([
             expect.objectContaining({ id: baseRequirement.id, status: RequirementStatus.Obsolete }),
         ]);
 
@@ -493,6 +503,84 @@ describe('RequirementsService', () => {
             await expect(service.delete(baseRequirement.id)).rejects.toBeInstanceOf(ConflictException);
         },
     );
+
+    it.each([RequirementStatus.Approved, RequirementStatus.Rejected, RequirementStatus.Implemented])(
+        'prevents %s requirements from returning to draft through the generic update path.',
+        async () => {
+            await expect(
+                service.update(baseRequirement.id, {
+                    status: RequirementStatus.Draft,
+                    description: 'Back to draft.',
+                } as unknown as UpdateRequirementDto),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(dataSourceMock.transaction).not.toHaveBeenCalled();
+        },
+    );
+
+    it('rejects approved requirements being rejected or deleted.', async () => {
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status: RequirementStatus.Approved });
+
+        await expect(
+            service.reject(baseRequirement.id, { rejectionReason: 'No longer wanted.', reviewer: 'QA Lead' }),
+        ).rejects.toThrow('Only draft requirements can be rejected');
+        await expect(service.delete(baseRequirement.id)).rejects.toThrow('Only draft requirements can be deleted');
+    });
+
+    it('rejects rejected requirements being approved or deleted.', async () => {
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status: RequirementStatus.Rejected });
+
+        await expect(service.approve(baseRequirement.id)).rejects.toThrow('Only draft requirements can be approved');
+        await expect(service.delete(baseRequirement.id)).rejects.toThrow('Only draft requirements can be deleted');
+    });
+
+    it('treats implemented requirements as terminal for every lifecycle transition.', async () => {
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status: RequirementStatus.Implemented });
+
+        await expect(service.approve(baseRequirement.id)).rejects.toThrow('Only draft requirements can be approved');
+        await expect(
+            service.reject(baseRequirement.id, { rejectionReason: 'No longer wanted.', reviewer: 'QA Lead' }),
+        ).rejects.toThrow('Only draft requirements can be rejected');
+        await expect(service.markImplemented(baseRequirement.id)).rejects.toThrow(
+            'Only approved requirements can be marked implemented',
+        );
+        await expect(
+            service.markObsolete(baseRequirement.id, { obsolescenceReason: 'No longer needed.' }),
+        ).rejects.toThrow('Only approved or rejected requirements can be marked obsolete');
+        await expect(service.delete(baseRequirement.id)).rejects.toThrow('Only draft requirements can be deleted');
+    });
+
+    it('treats obsolete requirements as terminal for every lifecycle transition.', async () => {
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status: RequirementStatus.Obsolete });
+
+        await expect(service.approve(baseRequirement.id)).rejects.toThrow('Only draft requirements can be approved');
+        await expect(
+            service.reject(baseRequirement.id, { rejectionReason: 'No longer wanted.', reviewer: 'QA Lead' }),
+        ).rejects.toThrow('Only draft requirements can be rejected');
+        await expect(service.markImplemented(baseRequirement.id)).rejects.toThrow(
+            'Only approved requirements can be marked implemented',
+        );
+        await expect(
+            service.markObsolete(baseRequirement.id, { obsolescenceReason: 'No longer needed.' }),
+        ).rejects.toThrow('Only approved or rejected requirements can be marked obsolete');
+        await expect(service.delete(baseRequirement.id)).rejects.toThrow('Only draft requirements can be deleted');
+    });
+
+    it('treats deleted requirements as unavailable for normal lookup and lifecycle transitions.', async () => {
+        requirementsRepositoryMock.findOne.mockResolvedValue(null);
+        await expect(service.findOne(baseRequirement.id)).rejects.toBeInstanceOf(NotFoundException);
+        await expect(service.findByVisibleKey(baseRequirement.visibleKey)).rejects.toBeInstanceOf(NotFoundException);
+
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status: RequirementStatus.Deleted });
+        await expect(service.approve(baseRequirement.id)).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            service.reject(baseRequirement.id, { rejectionReason: 'No longer wanted.', reviewer: 'QA Lead' }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(service.markImplemented(baseRequirement.id)).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            service.markObsolete(baseRequirement.id, { obsolescenceReason: 'No longer needed.' }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
 
     it('returns requirement revision history.', async () => {
         requirementsRepositoryMock.findOne.mockResolvedValue(baseRequirement);

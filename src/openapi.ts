@@ -17,7 +17,7 @@ export const OPENAPI_JSON_PATH = 'api/docs-json';
 export function createOpenApiDocument(): OpenAPIObject {
     const config = new DocumentBuilder()
         .setTitle('Requirements Backend API')
-        .setDescription('HTTP API for category management and draft requirement lifecycle operations.')
+        .setDescription('HTTP API for category management and requirement lifecycle operations.')
         .setVersion('0.0.1')
         .build();
 
@@ -259,6 +259,72 @@ export function createOpenApiDocument(): OpenAPIObject {
                     },
                 },
             },
+            '/requirements/{id}/approve': {
+                patch: {
+                    tags: ['requirements'],
+                    summary: 'Approve a draft requirement.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Requirement approved.',
+                            content: {
+                                'application/json': { schema: { $ref: '#/components/schemas/RequirementResponseDto' } },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                        '409': { $ref: '#/components/responses/Conflict' },
+                    },
+                },
+            },
+            '/requirements/{id}/implemented': {
+                patch: {
+                    tags: ['requirements'],
+                    summary: 'Mark an approved requirement implemented.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Requirement implemented.',
+                            content: {
+                                'application/json': { schema: { $ref: '#/components/schemas/RequirementResponseDto' } },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                        '409': { $ref: '#/components/responses/Conflict' },
+                    },
+                },
+            },
+            '/requirements/{id}/obsolete': {
+                patch: {
+                    tags: ['requirements'],
+                    summary: 'Mark an approved or rejected requirement obsolete.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': { schema: { $ref: '#/components/schemas/MarkObsoleteRequirementDto' } },
+                        },
+                    },
+                    responses: {
+                        '200': {
+                            description: 'Requirement obsolete.',
+                            content: {
+                                'application/json': { schema: { $ref: '#/components/schemas/RequirementResponseDto' } },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                        '409': { $ref: '#/components/responses/Conflict' },
+                    },
+                },
+            },
             '/requirements/{id}/revisions': {
                 get: {
                     tags: ['requirements'],
@@ -315,7 +381,7 @@ export function createOpenApiDocument(): OpenAPIObject {
                 },
                 RequirementStatus: {
                     type: 'string',
-                    enum: ['draft', 'rejected', 'deleted'],
+                    enum: ['draft', 'approved', 'implemented', 'obsolete', 'rejected', 'deleted'],
                     description: 'Implemented requirement lifecycle state.',
                 },
                 CreateCategoryDto: {
@@ -368,6 +434,11 @@ export function createOpenApiDocument(): OpenAPIObject {
                         reviewer: { type: 'string', example: 'QA Lead' },
                     },
                 },
+                MarkObsoleteRequirementDto: {
+                    type: 'object',
+                    required: ['obsolescenceReason'],
+                    properties: { obsolescenceReason: { type: 'string', example: 'Superseded by NFR-PERF-0002.' } },
+                },
                 RequirementResponseDto: {
                     type: 'object',
                     required: [
@@ -386,6 +457,10 @@ export function createOpenApiDocument(): OpenAPIObject {
                         'reviewer',
                         'rejectedAt',
                         'deletedAt',
+                        'approvedAt',
+                        'implementedAt',
+                        'obsolescenceReason',
+                        'obsoleteAt',
                         'createdAt',
                         'updatedAt',
                     ],
@@ -405,6 +480,10 @@ export function createOpenApiDocument(): OpenAPIObject {
                         reviewer: { type: 'string', nullable: true },
                         rejectedAt: { type: 'string', format: 'date-time', nullable: true },
                         deletedAt: { type: 'string', format: 'date-time', nullable: true },
+                        approvedAt: { type: 'string', format: 'date-time', nullable: true },
+                        implementedAt: { type: 'string', format: 'date-time', nullable: true },
+                        obsolescenceReason: { type: 'string', nullable: true },
+                        obsoleteAt: { type: 'string', format: 'date-time', nullable: true },
                         createdAt: { type: 'string', format: 'date-time' },
                         updatedAt: { type: 'string', format: 'date-time' },
                     },

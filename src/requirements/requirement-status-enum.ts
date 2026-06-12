@@ -1,9 +1,9 @@
 /**
  * Implemented lifecycle states for requirements.
  *
- * Deleted requirements are soft-deleted and hidden from normal reads, while
- * rejected requirements remain explicitly retrievable and can be included in
- * list responses.
+ * Implemented, obsolete, and deleted are terminal states. Deleted requirements
+ * are soft-deleted and hidden from normal reads, while status filters can
+ * explicitly retrieve other non-deleted lifecycle states.
  */
 export enum RequirementStatus {
     Draft = 'draft',
