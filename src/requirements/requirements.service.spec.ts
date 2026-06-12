@@ -20,7 +20,7 @@ const baseRequirement: Requirement = {
     visibleKey: 'NFR-PERF-0001',
     status: RequirementStatus.Draft,
     description: 'The API responds quickly.',
-    priority: 'high',
+    priority: 'p1',
     owner: 'Team A',
     rationale: 'Latency impacts users.',
     source: 'US-REQ-001',
@@ -105,7 +105,7 @@ describe('RequirementsService', () => {
             type: RequirementType.NFR,
             categoryId: baseRequirement.categoryId,
             description: ' The API responds quickly. ',
-            priority: ' high ',
+            priority: ' p1 ',
             owner: ' ',
             rationale: ' Latency impacts users. ',
             source: ' US-REQ-001 ',
@@ -131,7 +131,7 @@ describe('RequirementsService', () => {
             sequenceNumber: 1,
             status: RequirementStatus.Draft,
             description: 'The API responds quickly.',
-            priority: 'high',
+            priority: 'p1',
             owner: null,
             rationale: 'Latency impacts users.',
             source: 'US-REQ-001',
@@ -153,10 +153,27 @@ describe('RequirementsService', () => {
     it('rejects requirement creation with missing required fields.', async () => {
         await expect(
             // @ts-expect-error -- The type field has to be left out to make this test meaningful
-            service.create({ categoryId: baseRequirement.categoryId, description: 'Description', priority: 'high' }),
+            service.create({ categoryId: baseRequirement.categoryId, description: 'Description', priority: 'p1' }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
         expect(requirementsKeyAllocatorServiceMock.allocate).not.toHaveBeenCalled();
+    });
+
+    it('rejects requirement priorities outside p1, p2, or p3.', async () => {
+        await expect(
+            service.create({
+                type: RequirementType.NFR,
+                categoryId: baseRequirement.categoryId,
+                description: 'Description',
+                priority: 'high',
+            }),
+        ).rejects.toThrow('Requirement priority must be p1, p2, or p3');
+
+        await expect(service.update(baseRequirement.id, { priority: 'p4' })).rejects.toThrow(
+            'Requirement priority must be p1, p2, or p3',
+        );
+
+        expect(dataSourceMock.transaction).not.toHaveBeenCalled();
     });
 
     it('retrieves a requirement by internal ID.', async () => {
@@ -408,33 +425,38 @@ describe('RequirementsService', () => {
         vi.useRealTimers();
     });
 
-    it('marks approved or implemented requirements obsolete with a mandatory reason and server date.', async () => {
-        const obsoleteAt = new Date('2026-06-12T00:00:12.000Z');
-        const currentRequirement = { ...baseRequirement, status: RequirementStatus.Implemented };
-        vi.useFakeTimers();
-        vi.setSystemTime(obsoleteAt);
-        transactionManagerMock.findOne.mockResolvedValueOnce(currentRequirement).mockResolvedValueOnce(null);
-        transactionManagerMock.save.mockImplementation((entity: unknown, value: Requirement | RequirementRevision) => {
-            if (entity === RequirementRevision) {
-                return Promise.resolve({ ...value, id: baseRevision.id, createdAt: baseRevision.createdAt });
-            }
+    it.each([RequirementStatus.Approved, RequirementStatus.Rejected])(
+        'marks %s requirements obsolete with a mandatory reason and server date.',
+        async (status) => {
+            const obsoleteAt = new Date('2026-06-12T00:00:12.000Z');
+            const currentRequirement = { ...baseRequirement, status };
+            vi.useFakeTimers();
+            vi.setSystemTime(obsoleteAt);
+            transactionManagerMock.findOne.mockResolvedValueOnce(currentRequirement).mockResolvedValueOnce(null);
+            transactionManagerMock.save.mockImplementation(
+                (entity: unknown, value: Requirement | RequirementRevision) => {
+                    if (entity === RequirementRevision) {
+                        return Promise.resolve({ ...value, id: baseRevision.id, createdAt: baseRevision.createdAt });
+                    }
 
-            return Promise.resolve({ ...value, updatedAt: new Date('2026-06-12T00:00:13.000Z') });
-        });
+                    return Promise.resolve({ ...value, updatedAt: new Date('2026-06-12T00:00:13.000Z') });
+                },
+            );
 
-        await expect(
-            service.markObsolete(baseRequirement.id, { obsolescenceReason: ' Superseded by NFR-PERF-0002. ' }),
-        ).resolves.toEqual(
-            expect.objectContaining({
-                id: baseRequirement.id,
-                status: RequirementStatus.Obsolete,
-                obsolescenceReason: 'Superseded by NFR-PERF-0002.',
-                obsoleteAt: obsoleteAt.toISOString(),
-            }),
-        );
+            await expect(
+                service.markObsolete(baseRequirement.id, { obsolescenceReason: ' Superseded by NFR-PERF-0002. ' }),
+            ).resolves.toEqual(
+                expect.objectContaining({
+                    id: baseRequirement.id,
+                    status: RequirementStatus.Obsolete,
+                    obsolescenceReason: 'Superseded by NFR-PERF-0002.',
+                    obsoleteAt: obsoleteAt.toISOString(),
+                }),
+            );
 
-        vi.useRealTimers();
-    });
+            vi.useRealTimers();
+        },
+    );
 
     it('rejects invalid lifecycle transitions with meaningful conflicts.', async () => {
         transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status: RequirementStatus.Draft });
@@ -444,7 +466,15 @@ describe('RequirementsService', () => {
         );
         await expect(
             service.markObsolete(baseRequirement.id, { obsolescenceReason: 'No longer needed.' }),
-        ).rejects.toThrow('Only approved or implemented requirements can be marked obsolete');
+        ).rejects.toThrow('Only approved or rejected requirements can be marked obsolete');
+    });
+
+    it('rejects obsolete transitions from implemented requirements.', async () => {
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status: RequirementStatus.Implemented });
+
+        await expect(
+            service.markObsolete(baseRequirement.id, { obsolescenceReason: 'No longer needed.' }),
+        ).rejects.toThrow('Only approved or rejected requirements can be marked obsolete');
     });
 
     it('requires an obsolescence reason before opening an obsolete transition transaction.', async () => {

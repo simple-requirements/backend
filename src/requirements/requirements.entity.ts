@@ -19,6 +19,7 @@ import {
 @Check('CHK_requirements_type', `"type" IN ('FR', 'NFR')`)
 @Check('CHK_requirements_status', `"status" IN ('draft', 'approved', 'implemented', 'obsolete', 'rejected', 'deleted')`)
 @Check('CHK_requirements_sequence_number_range', '"sequence_number" > 0 AND "sequence_number" <= 9999')
+@Check('CHK_requirements_priority', `"priority" IN ('p1', 'p2', 'p3')`)
 @Check('CHK_requirements_visible_key_format', `"visible_key" ~ '/^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$/gm'`)
 export class Requirement {
     @PrimaryGeneratedColumn('uuid')
@@ -36,7 +37,7 @@ export class Requirement {
     @Column({ type: 'varchar', length: 13, name: 'visible_key' })
     visibleKey!: string;
 
-    @Column({ type: 'varchar', length: 20, default: RequirementStatus.Draft })
+    @Column({ type: 'varchar', length: 10, default: RequirementStatus.Draft })
     status!: RequirementStatus;
 
     @Column({ type: 'text', nullable: true })

@@ -22,7 +22,7 @@ describe('RequirementsController', () => {
         sequenceNumber: 1,
         status: RequirementStatus.Draft,
         description: 'The API responds quickly.',
-        priority: 'high',
+        priority: 'p1',
         owner: null,
         rationale: 'Latency impacts users.',
         source: 'US-REQ-001',

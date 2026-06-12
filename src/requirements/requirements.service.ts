@@ -186,8 +186,8 @@ export class RequirementsService {
         return this.dataSource.transaction(async (manager) => {
             const requirement = await this.findRequirementForUpdate(manager, id);
 
-            if (![RequirementStatus.Approved, RequirementStatus.Implemented].includes(requirement.status)) {
-                throw new ConflictException('Only approved or implemented requirements can be marked obsolete');
+            if (![RequirementStatus.Approved, RequirementStatus.Rejected].includes(requirement.status)) {
+                throw new ConflictException('Only approved or rejected requirements can be marked obsolete');
             }
 
             await this.createRevisionSnapshot(manager, requirement);
@@ -354,7 +354,7 @@ export class RequirementsService {
             throw new BadRequestException('Requirement category id must be a valid UUID');
         }
         this.validateRequiredString(createRequirementDto.description, 'Requirement description is required');
-        this.validateRequiredString(createRequirementDto.priority, 'Requirement priority is required', 40);
+        this.validatePriority(createRequirementDto.priority);
         this.validateOptionalString(
             createRequirementDto.owner,
             'Requirement owner must be a string when provided',
@@ -391,7 +391,7 @@ export class RequirementsService {
         }
 
         if (updateRequirementDto.priority !== undefined) {
-            this.validateRequiredString(updateRequirementDto.priority, 'Requirement priority is required', 40);
+            this.validatePriority(updateRequirementDto.priority);
         }
 
         this.validateOptionalString(
@@ -404,6 +404,14 @@ export class RequirementsService {
             'Requirement rationale must be a string when provided',
         );
         this.validateOptionalString(updateRequirementDto.source, 'Requirement source must be a string when provided');
+    }
+
+    private validatePriority(value: unknown): void {
+        this.validateRequiredString(value, 'Requirement priority is required');
+
+        if (!['p1', 'p2', 'p3'].includes((value as string).trim())) {
+            throw new BadRequestException('Requirement priority must be p1, p2, or p3');
+        }
     }
 
     private validateMarkObsoleteRequirementDto(markObsoleteRequirementDto: MarkObsoleteRequirementDto): void {

@@ -35,7 +35,7 @@ export class RequirementRevision {
     @Column({ type: 'integer', name: 'sequence_number' })
     sequenceNumber!: number;
 
-    @Column({ type: 'varchar', length: 20 })
+    @Column({ type: 'varchar', length: 10 })
     status!: RequirementStatus;
 
     @Column({ type: 'text', nullable: true })
