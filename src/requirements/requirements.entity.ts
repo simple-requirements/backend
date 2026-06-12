@@ -33,7 +33,7 @@ export class Requirement {
     @Column({ type: 'integer', name: 'sequence_number' })
     sequenceNumber!: number;
 
-    @Column({ type: 'varchar', length: 10, name: 'visible_key' })
+    @Column({ type: 'varchar', length: 13, name: 'visible_key' })
     visibleKey!: string;
 
     @Column({ type: 'varchar', length: 10, default: RequirementStatus.Draft })
