@@ -29,6 +29,25 @@ interface RequirementApiResponse {
     updatedAt: string;
 }
 
+interface RequirementRevisionApiResponse {
+    id: string;
+    requirementId: string;
+    revisionNumber: number;
+    visibleKey: string;
+    type: RequirementType;
+    categoryId: string;
+    sequenceNumber: number;
+    status: RequirementStatus;
+    description: string;
+    priority: string;
+    owner: string | null;
+    rationale: string | null;
+    source: string | null;
+    requirementCreatedAt: string;
+    requirementUpdatedAt: string;
+    createdAt: string;
+}
+
 async function createCategory(request: APIRequestContext, name: string, key: string): Promise<CategoryApiResponse> {
     const response = await request.post('/categories', { data: { name, key } });
 
@@ -159,6 +178,107 @@ test.describe('requirements API', () => {
         const requirements = (await listResponse.json()) as RequirementApiResponse[];
         expect(requirements).toEqual(
             expect.arrayContaining([expect.objectContaining({ id: created.id, visibleKey: created.visibleKey })]),
+        );
+    });
+
+    test('Updates editable draft requirement fields while preserving identity and classification.', async ({
+        request,
+    }) => {
+        const created = await createRequirement(request, category.id, { owner: 'Team A' });
+
+        const response = await request.patch(`/requirements/${created.id}`, {
+            data: {
+                description: ' The API should respond within 250 ms. ',
+                priority: ' critical ',
+                owner: ' Team B ',
+                rationale: ' Faster responses improve conversion. ',
+                source: ' US-REQ-004 ',
+            },
+        });
+
+        expect(response.status()).toBe(200);
+
+        const updated = (await response.json()) as RequirementApiResponse;
+
+        expect(updated).toEqual(
+            expect.objectContaining({
+                id: created.id,
+                visibleKey: created.visibleKey,
+                type: created.type,
+                categoryId: created.categoryId,
+                sequenceNumber: created.sequenceNumber,
+                description: 'The API should respond within 250 ms.',
+                priority: 'critical',
+                owner: 'Team B',
+                rationale: 'Faster responses improve conversion.',
+                source: 'US-REQ-004',
+            }),
+        );
+    });
+
+    test('Creates immutable previous-version snapshots and retrieves revision history.', async ({ request }) => {
+        const created = await createRequirement(request, category.id, { owner: 'Team A' });
+
+        const response = await request.patch(`/requirements/${created.id}`, {
+            data: { description: 'The API should respond within 250 ms.', owner: 'Team B', source: 'US-REQ-005' },
+        });
+        expect(response.status()).toBe(200);
+
+        const historyResponse = await request.get(`/requirements/${created.id}/revisions`);
+        expect(historyResponse.status()).toBe(200);
+
+        const history = (await historyResponse.json()) as RequirementRevisionApiResponse[];
+        expect(history).toHaveLength(1);
+        expect(history[0]).toEqual(
+            expect.objectContaining({
+                requirementId: created.id,
+                revisionNumber: 1,
+                visibleKey: created.visibleKey,
+                type: created.type,
+                categoryId: created.categoryId,
+                sequenceNumber: created.sequenceNumber,
+                description: created.description,
+                priority: created.priority,
+                owner: 'Team A',
+                rationale: created.rationale,
+                source: created.source,
+                requirementCreatedAt: created.createdAt,
+                requirementUpdatedAt: created.updatedAt,
+            }),
+        );
+
+        const revisionResponse = await request.get(`/requirements/${created.id}/revisions/1`);
+        expect(revisionResponse.status()).toBe(200);
+        expect((await revisionResponse.json()) as RequirementRevisionApiResponse).toEqual(
+            expect.objectContaining({ requirementId: created.id, revisionNumber: 1, description: created.description }),
+        );
+    });
+
+    test('Rejects reclassification and identity changes during normal editing.', async ({ request }) => {
+        const created = await createRequirement(request, category.id);
+
+        const response = await request.patch(`/requirements/${created.id}`, {
+            data: {
+                type: RequirementType.FR,
+                categoryId: category.id,
+                visibleKey: 'FR-PERF-0001',
+                description: 'Changed',
+            },
+        });
+
+        expect(response.status()).toBe(400);
+
+        const retrievedResponse = await request.get(`/requirements/${created.id}`);
+        expect(retrievedResponse.status()).toBe(200);
+        const retrieved = (await retrievedResponse.json()) as RequirementApiResponse;
+        expect(retrieved).toEqual(
+            expect.objectContaining({
+                id: created.id,
+                visibleKey: created.visibleKey,
+                type: created.type,
+                categoryId: created.categoryId,
+                description: created.description,
+            }),
         );
     });
 

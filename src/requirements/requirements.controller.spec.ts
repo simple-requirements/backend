@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
 import type { RequirementResponseDto } from '@/requirements/dto/requirement-response.dto';
+import type { RequirementRevisionResponseDto } from '@/requirements/dto/requirement-revision-response.dto';
+import type { UpdateRequirementDto } from '@/requirements/dto/update-requirement.dto';
 import { RequirementStatus } from '@/requirements/requirement-status-enum';
 import { RequirementType } from '@/requirements/requirement-type-enum';
 import { RequirementsController } from '@/requirements/requirements.controller';
@@ -15,7 +17,7 @@ describe('RequirementsController', () => {
     const requirement: RequirementResponseDto = {
         id: 'adf3f623-ef79-49f9-8148-2b43efe903bb',
         visibleKey: 'NFR-PERF-0001',
-        kind: RequirementType.NFR,
+        type: RequirementType.NFR,
         categoryId: '57eb6e68-1b15-48ea-b976-8fbdb2bfc802',
         sequenceNumber: 1,
         status: RequirementStatus.Draft,
@@ -27,8 +29,34 @@ describe('RequirementsController', () => {
         createdAt: '2026-06-12T00:00:00.000Z',
         updatedAt: '2026-06-12T00:00:00.000Z',
     };
+    const revision: RequirementRevisionResponseDto = {
+        id: '31f99575-e1f5-4c1f-a7bb-490f7f1661e4',
+        requirementId: requirement.id,
+        revisionNumber: 1,
+        visibleKey: requirement.visibleKey,
+        type: requirement.type,
+        categoryId: requirement.categoryId,
+        sequenceNumber: requirement.sequenceNumber,
+        status: requirement.status,
+        description: requirement.description,
+        priority: requirement.priority,
+        owner: requirement.owner,
+        rationale: requirement.rationale,
+        source: requirement.source,
+        requirementCreatedAt: requirement.createdAt,
+        requirementUpdatedAt: requirement.updatedAt,
+        createdAt: '2026-06-12T00:00:01.000Z',
+    };
 
-    const requirementsServiceMock = { create: vi.fn(), findAll: vi.fn(), findOne: vi.fn(), findByVisibleKey: vi.fn() };
+    const requirementsServiceMock = {
+        create: vi.fn(),
+        findAll: vi.fn(),
+        findOne: vi.fn(),
+        findByVisibleKey: vi.fn(),
+        update: vi.fn(),
+        findRevisionHistory: vi.fn(),
+        findRevision: vi.fn(),
+    };
 
     beforeEach(async () => {
         vi.clearAllMocks();
@@ -43,7 +71,7 @@ describe('RequirementsController', () => {
 
     it('delegates draft requirement creation to the service.', async () => {
         const dto: CreateRequirementDto = {
-            kind: RequirementType.NFR,
+            type: RequirementType.NFR,
             categoryId: requirement.categoryId,
             description: requirement.description,
             priority: requirement.priority,
@@ -80,6 +108,32 @@ describe('RequirementsController', () => {
         await expect(controller.findByVisibleKey(requirement.visibleKey)).resolves.toEqual(requirement);
 
         expect(requirementsServiceMock.findByVisibleKey).toHaveBeenCalledWith(requirement.visibleKey);
+    });
+
+    it('delegates draft requirement updates to the service.', async () => {
+        const dto: UpdateRequirementDto = { owner: 'Team B', rationale: 'Updated rationale' };
+        const updated = { ...requirement, owner: 'Team B', rationale: 'Updated rationale' };
+        requirementsServiceMock.update.mockResolvedValue(updated);
+
+        await expect(controller.update(requirement.id, dto)).resolves.toEqual(updated);
+
+        expect(requirementsServiceMock.update).toHaveBeenCalledWith(requirement.id, dto);
+    });
+
+    it('retrieves requirement revision history.', async () => {
+        requirementsServiceMock.findRevisionHistory.mockResolvedValue([revision]);
+
+        await expect(controller.findRevisionHistory(requirement.id)).resolves.toEqual([revision]);
+
+        expect(requirementsServiceMock.findRevisionHistory).toHaveBeenCalledWith(requirement.id);
+    });
+
+    it('retrieves a previous requirement version.', async () => {
+        requirementsServiceMock.findRevision.mockResolvedValue(revision);
+
+        await expect(controller.findRevision(requirement.id, 1)).resolves.toEqual(revision);
+
+        expect(requirementsServiceMock.findRevision).toHaveBeenCalledWith(requirement.id, 1);
     });
 
     it('propagates errors from the service.', async () => {

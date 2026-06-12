@@ -1,9 +1,11 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
+import type { UpdateRequirementDto } from '@/requirements/dto/update-requirement.dto';
+import { RequirementRevision } from '@/requirements/requirement-revision.entity';
 import { RequirementStatus } from '@/requirements/requirement-status-enum';
 import { RequirementType } from '@/requirements/requirement-type-enum';
 import { RequirementsKeyAllocatorService } from '@/requirements/requirements-key-allocator.service';
@@ -17,11 +19,11 @@ const baseRequirement: Requirement = {
     sequenceNumber: 1,
     visibleKey: 'NFR-PERF-0001',
     status: RequirementStatus.Draft,
-    description: null,
-    priority: null,
-    owner: null,
-    rationale: null,
-    source: null,
+    description: 'The API responds quickly.',
+    priority: 'high',
+    owner: 'Team A',
+    rationale: 'Latency impacts users.',
+    source: 'US-REQ-001',
     createdAt: new Date('2026-06-12T00:00:00.000Z'),
     updatedAt: new Date('2026-06-12T00:00:00.000Z'),
     category: {
@@ -33,20 +35,48 @@ const baseRequirement: Requirement = {
     },
 };
 
+const baseRevision: RequirementRevision = {
+    id: '31f99575-e1f5-4c1f-a7bb-490f7f1661e4',
+    requirementId: baseRequirement.id,
+    revisionNumber: 1,
+    visibleKey: baseRequirement.visibleKey,
+    type: baseRequirement.type,
+    categoryId: baseRequirement.categoryId,
+    sequenceNumber: baseRequirement.sequenceNumber,
+    status: baseRequirement.status,
+    description: baseRequirement.description,
+    priority: baseRequirement.priority,
+    owner: baseRequirement.owner,
+    rationale: baseRequirement.rationale,
+    source: baseRequirement.source,
+    requirementCreatedAt: baseRequirement.createdAt,
+    requirementUpdatedAt: baseRequirement.updatedAt,
+    createdAt: new Date('2026-06-12T00:00:02.000Z'),
+    requirement: baseRequirement,
+};
+
 describe('RequirementsService', () => {
     let service: RequirementsService;
 
     const requirementsRepositoryMock = { find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
-
+    const requirementRevisionsRepositoryMock = { find: vi.fn(), findOne: vi.fn() };
     const requirementsKeyAllocatorServiceMock = { allocate: vi.fn() };
+    const transactionManagerMock = { findOne: vi.fn(), create: vi.fn(), save: vi.fn() };
+    const dataSourceMock = { transaction: vi.fn() };
 
     beforeEach(async () => {
         vi.clearAllMocks();
+        dataSourceMock.transaction.mockImplementation((callback: (manager: typeof transactionManagerMock) => unknown) =>
+            Promise.resolve(callback(transactionManagerMock)),
+        );
+        transactionManagerMock.create.mockImplementation((_entity: unknown, value: unknown) => value);
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 RequirementsService,
                 { provide: getRepositoryToken(Requirement), useValue: requirementsRepositoryMock },
+                { provide: getRepositoryToken(RequirementRevision), useValue: requirementRevisionsRepositoryMock },
+                { provide: getDataSourceToken(), useValue: dataSourceMock },
                 { provide: RequirementsKeyAllocatorService, useValue: requirementsKeyAllocatorServiceMock },
             ],
         }).compile();
@@ -72,7 +102,7 @@ describe('RequirementsService', () => {
             sequenceNumber: baseRequirement.sequenceNumber,
             visibleKey: baseRequirement.visibleKey,
         });
-        requirementsRepositoryMock.findOne.mockResolvedValue({ ...baseRequirement });
+        requirementsRepositoryMock.findOne.mockResolvedValue({ ...baseRequirement, description: null, priority: null });
         requirementsRepositoryMock.save.mockImplementation((requirement: Requirement) =>
             Promise.resolve({ ...requirement, updatedAt: new Date('2026-06-12T00:00:01.000Z') }),
         );
@@ -106,11 +136,7 @@ describe('RequirementsService', () => {
     });
 
     it('retrieves a requirement by internal ID.', async () => {
-        requirementsRepositoryMock.findOne.mockResolvedValue({
-            ...baseRequirement,
-            description: 'The API responds quickly.',
-            priority: 'high',
-        });
+        requirementsRepositoryMock.findOne.mockResolvedValue(baseRequirement);
 
         await expect(service.findOne(baseRequirement.id)).resolves.toEqual(
             expect.objectContaining({ id: baseRequirement.id, visibleKey: baseRequirement.visibleKey }),
@@ -118,11 +144,7 @@ describe('RequirementsService', () => {
     });
 
     it('retrieves a requirement by visible key.', async () => {
-        requirementsRepositoryMock.findOne.mockResolvedValue({
-            ...baseRequirement,
-            description: 'The API responds quickly.',
-            priority: 'high',
-        });
+        requirementsRepositoryMock.findOne.mockResolvedValue(baseRequirement);
 
         await expect(service.findByVisibleKey(baseRequirement.visibleKey)).resolves.toEqual(
             expect.objectContaining({ id: baseRequirement.id, visibleKey: baseRequirement.visibleKey }),
@@ -134,9 +156,7 @@ describe('RequirementsService', () => {
     });
 
     it('lists requirements ordered by visible key.', async () => {
-        requirementsRepositoryMock.find.mockResolvedValue([
-            { ...baseRequirement, description: 'The API responds quickly.', priority: 'high' },
-        ]);
+        requirementsRepositoryMock.find.mockResolvedValue([baseRequirement]);
 
         await expect(service.findAll()).resolves.toEqual([
             expect.objectContaining({ id: baseRequirement.id, visibleKey: baseRequirement.visibleKey }),
@@ -149,5 +169,85 @@ describe('RequirementsService', () => {
         requirementsRepositoryMock.findOne.mockResolvedValue(null);
 
         await expect(service.findOne(baseRequirement.id)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('updates editable requirement fields and stores an immutable previous-version snapshot.', async () => {
+        const updateDto: UpdateRequirementDto = {
+            description: ' Updated description. ',
+            owner: ' Team B ',
+            rationale: ' Updated rationale. ',
+            source: ' US-REQ-005 ',
+        };
+        const currentRequirement = { ...baseRequirement };
+
+        transactionManagerMock.findOne.mockResolvedValueOnce(currentRequirement).mockResolvedValueOnce(null);
+        transactionManagerMock.save.mockImplementation((entity: unknown, value: Requirement | RequirementRevision) => {
+            if (entity === RequirementRevision) {
+                return Promise.resolve({ ...value, id: baseRevision.id, createdAt: baseRevision.createdAt });
+            }
+
+            return Promise.resolve({ ...value, updatedAt: new Date('2026-06-12T00:00:03.000Z') });
+        });
+
+        await expect(service.update(baseRequirement.id, updateDto)).resolves.toEqual(
+            expect.objectContaining({
+                id: baseRequirement.id,
+                visibleKey: baseRequirement.visibleKey,
+                type: baseRequirement.type,
+                categoryId: baseRequirement.categoryId,
+                sequenceNumber: baseRequirement.sequenceNumber,
+                description: 'Updated description.',
+                owner: 'Team B',
+                rationale: 'Updated rationale.',
+                source: 'US-REQ-005',
+            }),
+        );
+
+        expect(transactionManagerMock.save).toHaveBeenCalledWith(
+            RequirementRevision,
+            expect.objectContaining({
+                requirementId: baseRequirement.id,
+                revisionNumber: 1,
+                visibleKey: baseRequirement.visibleKey,
+                type: baseRequirement.type,
+                categoryId: baseRequirement.categoryId,
+                description: baseRequirement.description,
+                owner: baseRequirement.owner,
+            }),
+        );
+    });
+
+    it('rejects updates that try to change immutable requirement identity or classification fields.', async () => {
+        await expect(
+            service.update(baseRequirement.id, {
+                type: RequirementType.FR,
+                description: 'Updated',
+            } as unknown as UpdateRequirementDto),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(dataSourceMock.transaction).not.toHaveBeenCalled();
+    });
+
+    it('returns requirement revision history.', async () => {
+        requirementsRepositoryMock.findOne.mockResolvedValue(baseRequirement);
+        requirementRevisionsRepositoryMock.find.mockResolvedValue([baseRevision]);
+
+        await expect(service.findRevisionHistory(baseRequirement.id)).resolves.toEqual([
+            expect.objectContaining({
+                requirementId: baseRequirement.id,
+                revisionNumber: 1,
+                visibleKey: baseRequirement.visibleKey,
+                description: baseRequirement.description,
+            }),
+        ]);
+    });
+
+    it('retrieves a previous requirement version by revision number.', async () => {
+        requirementsRepositoryMock.findOne.mockResolvedValue(baseRequirement);
+        requirementRevisionsRepositoryMock.findOne.mockResolvedValue(baseRevision);
+
+        await expect(service.findRevision(baseRequirement.id, 1)).resolves.toEqual(
+            expect.objectContaining({ requirementId: baseRequirement.id, revisionNumber: 1 }),
+        );
     });
 });
