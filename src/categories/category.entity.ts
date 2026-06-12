@@ -1,5 +1,10 @@
 import { Check, Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
+/**
+ * TypeORM entity for requirement categories.
+ *
+ * Category keys are unique, uppercase database-backed segments used when allocating visible requirement keys.
+ */
 @Entity({ name: 'categories' })
 @Index('UQ_categories_key', ['key'], { unique: true })
 @Check('CHK_categories_key_format', `"key" ~ '^[A-Z][A-Z0-9_]*$'`)

@@ -3,6 +3,11 @@ import { Check, Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedCo
 import { Category } from '@/categories/category.entity';
 import { RequirementType } from '@/requirements/requirement-type-enum';
 
+/**
+ * TypeORM entity containing durable visible-key counters per requirement type and category.
+ *
+ * Rows are pessimistically locked during allocation so concurrent requests cannot receive duplicate sequence numbers.
+ */
 @Entity({ name: 'requirements_key_counters' })
 @Index('UQ_requirements_key_counters_type_category', ['type', 'categoryId'], { unique: true })
 @Check('CHK_requirements_key_counters_type', `"type" IN ('FR', 'NFR')`)

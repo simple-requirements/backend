@@ -3,6 +3,11 @@ import { RequirementType } from '@/requirements/requirement-type-enum';
 import { Requirement } from '@/requirements/requirements.entity';
 import { Check, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
+/**
+ * TypeORM entity storing immutable snapshots of requirement state before mutations.
+ *
+ * Revision numbers are unique per requirement and are created inside the same transaction as lifecycle or edit changes.
+ */
 @Entity({ name: 'requirements_revision' })
 @Index('UQ_requirements_revisions_requirement_revision', ['requirementId', 'revisionNumber'], { unique: true })
 @Check('CHK_requirements_revisions_type', `"type" IN ('FR', 'NFR')`)

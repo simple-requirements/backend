@@ -13,10 +13,33 @@ const POSTGRES_UNIQUE_VIOLATION_CODE = '23505';
 const REQUIREMENT_CATEGORY_KEY_PATTERN = /^[A-Z]{3,4}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/**
+ * Allocates durable visible keys for requirements.
+ *
+ * A requirement key is reserved by inserting the requirement row in the same
+ * transaction that advances the per-type/per-category counter. Once consumed,
+ * a sequence number is not reused by later lifecycle transitions because the
+ * counter is only incremented and never derived from existing requirements.
+ */
 @Injectable()
 export class RequirementsKeyAllocatorService {
     constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
+    /**
+     * Reserves the next visible key for a requirement type and category.
+     *
+     * The underlying counter row is created on first use and locked with a
+     * pessimistic write lock before its value is consumed. This makes concurrent
+     * PostgreSQL transactions serialize allocation for the same type/category
+     * pair while allowing independent counters to progress separately.
+     *
+     * @param type - Visible-key prefix to allocate within.
+     * @param categoryId - Category UUID whose key forms the middle segment.
+     * @returns The persisted requirement identity and reserved visible key.
+     * @throws BadRequestException If the type, category ID, or category key is invalid.
+     * @throws NotFoundException If the category does not exist.
+     * @throws ConflictException If the sequence range is exhausted or a database uniqueness constraint is hit.
+     */
     async allocate(type: RequirementType, categoryId: string): Promise<AllocatedRequirementKeyDto> {
         this.validateType(type);
         this.validateCategoryId(categoryId);
@@ -34,6 +57,17 @@ export class RequirementsKeyAllocatorService {
         }
     }
 
+    /**
+     * Performs key reservation with the caller-provided transaction manager.
+     *
+     * The saved requirement row is intentionally sparse; RequirementsService
+     * populates editable draft fields after allocation has succeeded.
+     *
+     * @param manager - Transactional manager used for all allocation writes.
+     * @param type - Requirement type being allocated.
+     * @param categoryId - Category UUID being allocated within.
+     * @returns The persisted identity and visible key reserved by this transaction.
+     */
     private async allocateInTransaction(
         manager: EntityManager,
         type: RequirementType,
@@ -94,6 +128,14 @@ export class RequirementsKeyAllocatorService {
             visibleKey: savedRequirement.visibleKey,
         };
     }
+    /**
+     * Formats the externally visible requirement identifier.
+     *
+     * @param type - Requirement type prefix.
+     * @param categoryKey - Validated uppercase category key.
+     * @param sequenceNumber - Durable sequence number already reserved by the counter.
+     * @returns Visible key in TYPE-CAT-0001 form.
+     */
     private formatVisibleKey(type: RequirementType, categoryKey: string, sequenceNumber: number): string {
         return `${type}-${categoryKey}-${sequenceNumber.toString().padStart(4, '0')}`;
     }
