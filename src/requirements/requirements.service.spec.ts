@@ -193,6 +193,20 @@ describe('RequirementsService', () => {
         );
     });
 
+    it('applies requirement type filters to list queries.', async () => {
+        const functionalRequirement = { ...baseRequirement, type: RequirementType.FR, visibleKey: 'FR-PERF-0001' };
+        requirementsRepositoryMock.find.mockResolvedValue([functionalRequirement]);
+
+        await expect(service.findAll({ type: RequirementType.FR })).resolves.toEqual([
+            expect.objectContaining({ id: baseRequirement.id, type: RequirementType.FR }),
+        ]);
+
+        expect(requirementsRepositoryMock.find).toHaveBeenCalledWith({
+            where: { status: RequirementStatus.Draft, type: RequirementType.FR },
+            order: { visibleKey: 'ASC' },
+        });
+    });
+
     it('throws not found when a requirement cannot be retrieved.', async () => {
         requirementsRepositoryMock.findOne.mockResolvedValue(null);
 
