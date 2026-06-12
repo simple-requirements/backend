@@ -1,4 +1,5 @@
 import { Category } from '@/categories/category.entity';
+import { RequirementStatus } from '@/requirements/requirement-status-enum';
 import { RequirementType } from '@/requirements/requirement-type-enum';
 import {
     Check,
@@ -7,7 +8,7 @@ import {
     Entity,
     Index,
     JoinColumn,
-    ManyToMany,
+    ManyToOne,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
@@ -16,6 +17,7 @@ import {
 @Index('UQ_requirements_visible_key', ['visibleKey'], { unique: true })
 @Index('UQ_requirements_type_category_sequence', ['type', 'categoryId', 'sequenceNumber'], { unique: true })
 @Check('CHK_requirements_type', `"type" IN ('FR', 'NFR')`)
+@Check('CHK_requirements_status', `"status" IN ('draft')`)
 @Check('CHK_requirements_sequence_number_range', '"sequence_number" > 0 AND "sequence_number" <= 9999')
 @Check('CHK_requirements_visible_key_format', `"visible_key" ~ '/^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$/gm'`)
 export class Requirement {
@@ -34,13 +36,31 @@ export class Requirement {
     @Column({ type: 'varchar', length: 10, name: 'visible_key' })
     visibleKey!: string;
 
+    @Column({ type: 'varchar', length: 10, default: RequirementStatus.Draft })
+    status!: RequirementStatus;
+
+    @Column({ type: 'text', nullable: true })
+    description!: string | null;
+
+    @Column({ type: 'varchar', length: 5, nullable: true })
+    priority!: string | null;
+
+    @Column({ type: 'varchar', length: 120, nullable: true })
+    owner!: string | null;
+
+    @Column({ type: 'text', nullable: true })
+    rationale!: string | null;
+
+    @Column({ type: 'text', nullable: true })
+    source!: string | null;
+
     @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
     createdAt!: Date;
 
     @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
     updatedAt!: Date;
 
-    @ManyToMany(() => Category, { nullable: false, onDelete: 'RESTRICT' })
+    @ManyToOne(() => Category, { nullable: false, onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'category_id' })
     category!: Category;
 }
