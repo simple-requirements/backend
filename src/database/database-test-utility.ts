@@ -27,6 +27,8 @@ export async function cleanDatabase(): Promise<void> {
 
     await db.query(`
         TRUNCATE TABLE
+            requirements,
+            requirement_key_counters,
             categories
         RESTART IDENTITY CASCADE;
     `);
