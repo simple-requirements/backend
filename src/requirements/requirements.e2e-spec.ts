@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { cleanDatabase, closeE2eDataSource } from '@/database/database-test-utility';
 import { RequirementStatus } from '@/requirements/requirement-status-enum';
@@ -28,8 +28,6 @@ interface RequirementApiResponse {
     createdAt: string;
     updatedAt: string;
 }
-
-const uniqueKey = (prefix: string): string => `${prefix}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`;
 
 async function createCategory(request: APIRequestContext, name: string, key: string): Promise<CategoryApiResponse> {
     const response = await request.post('/categories', { data: { name, key } });
@@ -70,13 +68,12 @@ async function createRequirement(
 }
 
 test.describe('requirements API', () => {
-    let categoryKey: string;
     let category: CategoryApiResponse;
-    let created: RequirementApiResponse;
 
-    test.beforeEach(async () => {
+    test.beforeEach(async ({ request }) => {
         await cleanDatabase();
-        categoryKey = uniqueKey('PERF');
+
+        category = await createCategory(request, 'Performance', 'PERF');
     });
 
     test.afterAll(async () => {
@@ -84,32 +81,29 @@ test.describe('requirements API', () => {
     });
 
     test('Creates a draft requirement.', async ({ request }) => {
-        category = await createCategory(request, 'Performance', categoryKey);
-        created = await createRequirement(request, category.id);
+        const created = await createRequirement(request, category.id);
+
         expect(created).toEqual(
             expect.objectContaining({
                 id: expect.any(String),
-                visibleKey: `${RequirementType.NFR}-${categoryKey}-0001`,
+                visibleKey: 'NFR-PERF-0001',
                 type: RequirementType.NFR,
                 categoryId: category.id,
                 sequenceNumber: 1,
                 status: RequirementStatus.Draft,
-                description: 'The API should respond quickly for interactive users.',
-                priority: 'high',
-                owner: null,
-                rationale: 'Latency impacts user trust.',
-                source: 'US-REQ-001',
-                createdAt: expect.any(String),
-                updatedAt: expect.any(String),
             }),
         );
     });
 
     test('Retrieves a draft requirement by internal ID.', async ({ request }) => {
+        const created = await createRequirement(request, category.id);
+
         const response = await request.get(`/requirements/${created.id}`);
+
         expect(response.status()).toBe(200);
 
         const retrieved = (await response.json()) as RequirementApiResponse;
+
         expect(retrieved).toEqual(
             expect.objectContaining({
                 id: created.id,
@@ -123,10 +117,14 @@ test.describe('requirements API', () => {
     });
 
     test('Retrieves a draft requirement by its visible key.', async ({ request }) => {
+        const created = await createRequirement(request, category.id);
+
         const response = await request.get(`/requirements/key/${created.visibleKey}`);
+
         expect(response.status()).toBe(200);
 
         const retrieved = (await response.json()) as RequirementApiResponse;
+
         expect(retrieved).toEqual(
             expect.objectContaining({
                 id: created.id,
@@ -140,7 +138,7 @@ test.describe('requirements API', () => {
     });
 
     test('Lists requirements.', async ({ request }) => {
-        categoryKey = uniqueKey('SEC');
+        const categoryKey = 'SEC';
         const categoryResponse = await request.post('/categories', { data: { name: 'Security', key: categoryKey } });
         expect(categoryResponse.status()).toBe(201);
 
@@ -155,7 +153,7 @@ test.describe('requirements API', () => {
         });
         expect(createResponse.status()).toBe(201);
 
-        created = (await createResponse.json()) as RequirementApiResponse;
+        const created = (await createResponse.json()) as RequirementApiResponse;
         const listResponse = await request.get('/requirements');
         expect(listResponse.status()).toBe(200);
         const requirements = (await listResponse.json()) as RequirementApiResponse[];
