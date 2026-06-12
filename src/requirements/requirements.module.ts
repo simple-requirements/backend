@@ -8,11 +8,6 @@ import { RequirementRevision } from '@/requirements/requirements-revision.entity
 import { Requirement } from '@/requirements/requirements.entity';
 import { RequirementsService } from '@/requirements/requirements.service';
 
-/**
- * NestJS feature module for requirement allocation, lifecycle, and revision components.
- *
- * The module registers all requirement-related repositories so services can run transactional allocation and mutation logic against PostgreSQL.
- */
 @Module({
     imports: [TypeOrmModule.forFeature([Category, Requirement, RequirementRevision, RequirementsKeyCounter])],
     controllers: [RequirementsController],
