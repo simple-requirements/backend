@@ -1,0 +1,5 @@
+export interface OpenAPIObject { openapi: string; info: { title: string; description: string; version: string }; paths: Record<string, unknown>; components?: Record<string, unknown>; }
+export class DocumentBuilder { setTitle(title: string): this; setDescription(description: string): this; setVersion(version: string): this; build(): OpenAPIObject; }
+export const SwaggerModule: { createDocument(app: unknown, config: OpenAPIObject): OpenAPIObject; setup(path: string, app: unknown, document: OpenAPIObject): void; };
+type Decorator = (...args: unknown[]) => ClassDecorator & MethodDecorator & PropertyDecorator & ParameterDecorator;
+export const ApiTags: Decorator; export const ApiOperation: Decorator; export const ApiResponse: Decorator; export const ApiCreatedResponse: Decorator; export const ApiOkResponse: Decorator; export const ApiBadRequestResponse: Decorator; export const ApiNotFoundResponse: Decorator; export const ApiConflictResponse: Decorator; export const ApiParam: Decorator; export const ApiQuery: Decorator; export const ApiBody: Decorator; export const ApiProperty: Decorator; export const ApiPropertyOptional: Decorator;

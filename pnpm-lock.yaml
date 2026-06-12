@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@nestjs/swagger':
+        specifier: file:packages/nestjs-swagger-shim
+        version: link:packages/nestjs-swagger-shim
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -96,6 +99,9 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+      typedoc:
+        specifier: file:packages/typedoc-shim
+        version: link:packages/typedoc-shim
       typescript-eslint:
         specifier: ^8.20.0
         version: 8.60.1(eslint@9.39.4)(typescript@5.9.3)

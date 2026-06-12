@@ -9,6 +9,13 @@ import type { CreateCategoryDto } from '@/categories/dto/create-category.dto';
 const CATEGORY_KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 const POSTGRES_UNIQUE_VIOLATION_CODE = '23505';
 
+/**
+ * Applies category validation and persistence rules for the category API.
+ *
+ * Category keys are part of visible requirement keys, so this service treats
+ * them as durable identifiers and converts PostgreSQL uniqueness failures into
+ * stable HTTP conflict errors.
+ */
 @Injectable()
 export class CategoriesService {
     constructor(
@@ -16,6 +23,14 @@ export class CategoriesService {
         private readonly categoriesRepository: Repository<Category>,
     ) {}
 
+    /**
+     * Creates a category after validating the durable key format.
+     *
+     * @param createCategoryDto - Category name and key supplied by the client.
+     * @returns The persisted category response.
+     * @throws BadRequestException If the request body or key format is invalid.
+     * @throws ConflictException If the key is already reserved.
+     */
     async create(createCategoryDto: CreateCategoryDto): Promise<CategoryResponseDto> {
         this.validateCreateCategoryDto(createCategoryDto);
 
@@ -95,6 +110,12 @@ export class CategoriesService {
         };
     }
 
+    /**
+     * Detects PostgreSQL unique-constraint failures without leaking driver errors to callers.
+     *
+     * @param error - Unknown error thrown by TypeORM or the PostgreSQL driver.
+     * @returns True when the error is PostgreSQL SQLSTATE 23505.
+     */
     private isUniqueViolation(error: unknown): boolean {
         return (
             error instanceof QueryFailedError

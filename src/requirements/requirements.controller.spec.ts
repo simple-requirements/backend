@@ -98,17 +98,17 @@ describe('RequirementsController', () => {
 
         await expect(controller.findAll()).resolves.toEqual([requirement]);
 
-        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(false);
+        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(undefined);
     });
 
     it('includes rejected requirements when requested.', async () => {
         requirementsServiceMock.findAll.mockResolvedValue([{ ...requirement, status: RequirementStatus.Rejected }]);
 
-        await expect(controller.findAll('true')).resolves.toEqual([
+        await expect(controller.findAll({ includeRejected: 'true' })).resolves.toEqual([
             { ...requirement, status: RequirementStatus.Rejected },
         ]);
 
-        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(true);
+        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith({ includeRejected: 'true' });
     });
 
     it('retrieves a requirement by internal ID.', async () => {

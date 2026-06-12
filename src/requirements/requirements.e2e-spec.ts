@@ -361,6 +361,148 @@ test.describe('requirements API', () => {
         );
     });
 
+    test('Creates requirements concurrently with unique sequential visible keys.', async ({ request }) => {
+        const responses = await Promise.all(
+            Array.from({ length: 5 }, (_, index) =>
+                request.post('/requirements', {
+                    data: {
+                        type: RequirementType.NFR,
+                        categoryId: category.id,
+                        description: `Concurrent requirement ${index + 1}`,
+                        priority: 'p3',
+                        owner: 'Concurrent Team',
+                    },
+                }),
+            ),
+        );
+
+        expect(responses.every((response) => response.status() === 201)).toBe(true);
+        const created = (await Promise.all(responses.map((response) => response.json()))) as RequirementApiResponse[];
+        const visibleKeys = created.map((requirement) => requirement.visibleKey).sort();
+        const sequenceNumbers = created.map((requirement) => requirement.sequenceNumber).sort((a, b) => a - b);
+
+        expect(new Set(visibleKeys).size).toBe(5);
+        expect(new Set(sequenceNumbers).size).toBe(5);
+        expect(visibleKeys).toEqual([
+            'NFR-PERF-0001',
+            'NFR-PERF-0002',
+            'NFR-PERF-0003',
+            'NFR-PERF-0004',
+            'NFR-PERF-0005',
+        ]);
+        expect(sequenceNumbers).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    test('Does not reuse visible keys after deletion, rejection, and a new database connection.', async ({
+        request,
+    }) => {
+        const deleted = await createRequirement(request, category.id, { description: 'Delete me.' });
+        const deleteResponse = await request.delete(`/requirements/${deleted.id}`);
+        expect(deleteResponse.status()).toBe(204);
+
+        await closeE2eDataSource();
+        const afterDelete = await createRequirement(request, category.id, { description: 'After delete.' });
+        expect(afterDelete.id).not.toBe(deleted.id);
+        expect(afterDelete.visibleKey).toBe('NFR-PERF-0002');
+
+        const rejected = await createRequirement(request, category.id, { description: 'Reject me.' });
+        const rejectResponse = await request.patch(`/requirements/${rejected.id}/reject`, {
+            data: { rejectionReason: 'Superseded before review.', reviewer: 'QA Lead' },
+        });
+        expect(rejectResponse.status()).toBe(200);
+
+        await closeE2eDataSource();
+        const afterReject = await createRequirement(request, category.id, { description: 'After reject.' });
+        expect(afterReject.id).not.toBe(rejected.id);
+        expect(afterReject.visibleKey).toBe('NFR-PERF-0004');
+    });
+
+    test('Filters requirements by type, category, status, and owner.', async ({ request }) => {
+        const security = await createCategory(request, 'Security', 'SEC');
+        const perfNfr = await createRequirement(request, category.id, {
+            type: RequirementType.NFR,
+            owner: 'Team A',
+            description: 'Perf NFR.',
+        });
+        const perfFr = await createRequirement(request, category.id, {
+            type: RequirementType.FR,
+            owner: 'Team B',
+            description: 'Perf FR.',
+        });
+        const secNfr = await createRequirement(request, security.id, {
+            type: RequirementType.NFR,
+            owner: 'Team A',
+            description: 'Sec NFR.',
+        });
+        const rejected = await createRequirement(request, security.id, {
+            type: RequirementType.FR,
+            owner: 'Team C',
+            description: 'Rejected FR.',
+        });
+        const rejectResponse = await request.patch(`/requirements/${rejected.id}/reject`, {
+            data: { rejectionReason: 'Not needed.', reviewer: 'QA Lead' },
+        });
+        expect(rejectResponse.status()).toBe(200);
+
+        const byType = await request.get('/requirements?type=NFR');
+        expect(byType.status()).toBe(200);
+        expect(((await byType.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([
+            perfNfr.id,
+            secNfr.id,
+        ]);
+
+        const byKind = await request.get('/requirements?kind=FR&includeRejected=true');
+        expect(byKind.status()).toBe(200);
+        expect(((await byKind.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([
+            perfFr.id,
+            rejected.id,
+        ]);
+
+        const byCategory = await request.get(`/requirements?categoryId=${security.id}`);
+        expect(byCategory.status()).toBe(200);
+        expect(((await byCategory.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([secNfr.id]);
+
+        const byStatus = await request.get('/requirements?status=rejected');
+        expect(byStatus.status()).toBe(200);
+        expect(((await byStatus.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([rejected.id]);
+
+        const combined = await request.get(`/requirements?type=NFR&categoryId=${security.id}&owner=Team%20A`);
+        expect(combined.status()).toBe(200);
+        expect(((await combined.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([secNfr.id]);
+
+        const empty = await request.get('/requirements?owner=Nobody');
+        expect(empty.status()).toBe(200);
+        expect((await empty.json()) as RequirementApiResponse[]).toEqual([]);
+
+        const invalid = await request.get('/requirements?status=obsolete');
+        expect(invalid.status()).toBe(400);
+    });
+
+    test('Returns consistent error response structures.', async ({ request }) => {
+        const malformed = await request.post('/requirements', { data: { type: 'BUG' } });
+        expect(malformed.status()).toBe(400);
+        await expect(malformed.json()).resolves.toEqual(
+            expect.objectContaining({ statusCode: 400, message: expect.any(String) }),
+        );
+
+        const unknown = await request.get('/requirements/key/NFR-PERF-9999');
+        expect(unknown.status()).toBe(404);
+        await expect(unknown.json()).resolves.toEqual(
+            expect.objectContaining({ statusCode: 404, message: expect.any(String) }),
+        );
+
+        const created = await createRequirement(request, category.id);
+        const rejectResponse = await request.patch(`/requirements/${created.id}/reject`, {
+            data: { rejectionReason: 'Duplicate.', reviewer: 'QA Lead' },
+        });
+        expect(rejectResponse.status()).toBe(200);
+        const conflict = await request.patch(`/requirements/${created.id}`, { data: { description: 'Cannot edit.' } });
+        expect(conflict.status()).toBe(409);
+        await expect(conflict.json()).resolves.toEqual(
+            expect.objectContaining({ statusCode: 409, message: expect.any(String) }),
+        );
+    });
+
     test('Rejects invalid requirement creation requests.', async ({ request }) => {
         const response = await request.post('/requirements', {
             data: { type: 'BUG', categoryId: 'missing', description: 'Description', priority: 'p3' },
