@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 
 import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
+import type { MarkObsoleteRequirementDto } from '@/requirements/dto/mark-obsolete-requirement.dto';
 import type { RejectRequirementDto } from '@/requirements/dto/reject-requirement.dto';
 import type { RequirementResponseDto } from '@/requirements/dto/requirement-response.dto';
 import type { RequirementRevisionResponseDto } from '@/requirements/dto/requirement-revision-response.dto';
@@ -17,8 +18,11 @@ export class RequirementsController {
     }
 
     @Get()
-    async findAll(@Query('includeRejected') includeRejected?: string): Promise<RequirementResponseDto[]> {
-        return this.requirementsService.findAll(includeRejected === 'true');
+    async findAll(
+        @Query('includeRejected') includeRejected?: string,
+        @Query('includeObsolete') includeObsolete?: string,
+    ): Promise<RequirementResponseDto[]> {
+        return this.requirementsService.findAll(includeRejected === 'true', includeObsolete === 'true');
     }
 
     @Get('key/:visibleKey')
@@ -58,6 +62,24 @@ export class RequirementsController {
         @Body() rejectRequirementDto: RejectRequirementDto,
     ): Promise<RequirementResponseDto> {
         return this.requirementsService.reject(id, rejectRequirementDto);
+    }
+
+    @Patch(':id/approve')
+    async approve(@Param('id') id: string): Promise<RequirementResponseDto> {
+        return this.requirementsService.approve(id);
+    }
+
+    @Patch(':id/implemented')
+    async markImplemented(@Param('id') id: string): Promise<RequirementResponseDto> {
+        return this.requirementsService.markImplemented(id);
+    }
+
+    @Patch(':id/obsolete')
+    async markObsolete(
+        @Param('id') id: string,
+        @Body() markObsoleteRequirementDto: MarkObsoleteRequirementDto,
+    ): Promise<RequirementResponseDto> {
+        return this.requirementsService.markObsolete(id, markObsoleteRequirementDto);
     }
 
     @Delete(':id')

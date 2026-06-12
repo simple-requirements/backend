@@ -1,4 +1,5 @@
 import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
+import type { MarkObsoleteRequirementDto } from '@/requirements/dto/mark-obsolete-requirement.dto';
 import type { RejectRequirementDto } from '@/requirements/dto/reject-requirement.dto';
 import type { RequirementResponseDto } from '@/requirements/dto/requirement-response.dto';
 import type { RequirementRevisionResponseDto } from '@/requirements/dto/requirement-revision-response.dto';
@@ -10,7 +11,7 @@ import { RequirementRevision } from '@/requirements/requirements-revision.entity
 import { Requirement } from '@/requirements/requirements.entity';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Not, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 
 const VISIBLE_KEY_PATTERN = /^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -52,9 +53,19 @@ export class RequirementsService {
         return this.toResponseDto(await this.requirementsRepository.save(requirement));
     }
 
-    async findAll(includeRejected = false): Promise<RequirementResponseDto[]> {
+    async findAll(includeRejected = false, includeObsolete = false): Promise<RequirementResponseDto[]> {
+        const statuses = [RequirementStatus.Draft, RequirementStatus.Approved, RequirementStatus.Implemented];
+
+        if (includeRejected) {
+            statuses.push(RequirementStatus.Rejected);
+        }
+
+        if (includeObsolete) {
+            statuses.push(RequirementStatus.Obsolete);
+        }
+
         const requirements = await this.requirementsRepository.find({
-            where: includeRejected ? { status: Not(RequirementStatus.Deleted) } : { status: RequirementStatus.Draft },
+            where: { status: In(statuses) },
             order: { visibleKey: 'ASC' },
         });
 
@@ -88,14 +99,7 @@ export class RequirementsService {
         this.validateUpdateRequirementDto(updateRequirementDto);
 
         return this.dataSource.transaction(async (manager) => {
-            const requirement = await manager.findOne(Requirement, {
-                where: { id },
-                lock: { mode: 'pessimistic_write' },
-            });
-
-            if (requirement === null || requirement.status === RequirementStatus.Deleted) {
-                throw new NotFoundException(`Requirement "${id}" was not found`);
-            }
+            const requirement = await this.findRequirementForUpdate(manager, id);
 
             if (requirement.status !== RequirementStatus.Draft) {
                 throw new ConflictException('Only draft requirements can be updated');
@@ -132,14 +136,7 @@ export class RequirementsService {
         this.validateRejectRequirementDto(rejectRequirementDto);
 
         return this.dataSource.transaction(async (manager) => {
-            const requirement = await manager.findOne(Requirement, {
-                where: { id },
-                lock: { mode: 'pessimistic_write' },
-            });
-
-            if (requirement === null || requirement.status === RequirementStatus.Deleted) {
-                throw new NotFoundException(`Requirement "${id}" was not found`);
-            }
+            const requirement = await this.findRequirementForUpdate(manager, id);
 
             if (requirement.status !== RequirementStatus.Draft) {
                 throw new ConflictException('Only draft requirements can be rejected');
@@ -156,18 +153,58 @@ export class RequirementsService {
         });
     }
 
+    async approve(id: string): Promise<RequirementResponseDto> {
+        return this.transitionRequirement(
+            id,
+            RequirementStatus.Draft,
+            RequirementStatus.Approved,
+            'Only draft requirements can be approved',
+            (requirement) => {
+                requirement.approvedAt = new Date();
+            },
+        );
+    }
+
+    async markImplemented(id: string): Promise<RequirementResponseDto> {
+        return this.transitionRequirement(
+            id,
+            RequirementStatus.Approved,
+            RequirementStatus.Implemented,
+            'Only approved requirements can be marked implemented',
+            (requirement) => {
+                requirement.implementedAt = new Date();
+            },
+        );
+    }
+
+    async markObsolete(
+        id: string,
+        markObsoleteRequirementDto: MarkObsoleteRequirementDto,
+    ): Promise<RequirementResponseDto> {
+        this.validateMarkObsoleteRequirementDto(markObsoleteRequirementDto);
+
+        return this.dataSource.transaction(async (manager) => {
+            const requirement = await this.findRequirementForUpdate(manager, id);
+
+            if (![RequirementStatus.Approved, RequirementStatus.Implemented].includes(requirement.status)) {
+                throw new ConflictException('Only approved or implemented requirements can be marked obsolete');
+            }
+
+            await this.createRevisionSnapshot(manager, requirement);
+
+            requirement.status = RequirementStatus.Obsolete;
+            requirement.obsolescenceReason = markObsoleteRequirementDto.obsolescenceReason.trim();
+            requirement.obsoleteAt = new Date();
+
+            return this.toResponseDto(await manager.save(Requirement, requirement));
+        });
+    }
+
     async delete(id: string): Promise<void> {
         this.validateRequirementId(id);
 
         await this.dataSource.transaction(async (manager) => {
-            const requirement = await manager.findOne(Requirement, {
-                where: { id },
-                lock: { mode: 'pessimistic_write' },
-            });
-
-            if (requirement === null || requirement.status === RequirementStatus.Deleted) {
-                throw new NotFoundException(`Requirement "${id}" was not found`);
-            }
+            const requirement = await this.findRequirementForUpdate(manager, id);
 
             if (requirement.status !== RequirementStatus.Draft) {
                 throw new ConflictException('Only draft requirements can be deleted');
@@ -180,6 +217,43 @@ export class RequirementsService {
 
             await manager.save(Requirement, requirement);
         });
+    }
+
+    private async transitionRequirement(
+        id: string,
+        requiredStatus: RequirementStatus,
+        nextStatus: RequirementStatus,
+        invalidTransitionMessage: string,
+        applyTransition: (requirement: Requirement) => void,
+    ): Promise<RequirementResponseDto> {
+        this.validateRequirementId(id);
+
+        return this.dataSource.transaction(async (manager) => {
+            const requirement = await this.findRequirementForUpdate(manager, id);
+
+            if (requirement.status !== requiredStatus) {
+                throw new ConflictException(invalidTransitionMessage);
+            }
+
+            await this.createRevisionSnapshot(manager, requirement);
+
+            requirement.status = nextStatus;
+            applyTransition(requirement);
+
+            return this.toResponseDto(await manager.save(Requirement, requirement));
+        });
+    }
+
+    private async findRequirementForUpdate(manager: EntityManager, id: string): Promise<Requirement> {
+        this.validateRequirementId(id);
+
+        const requirement = await manager.findOne(Requirement, { where: { id }, lock: { mode: 'pessimistic_write' } });
+
+        if (requirement === null || requirement.status === RequirementStatus.Deleted) {
+            throw new NotFoundException(`Requirement "${id}" was not found`);
+        }
+
+        return requirement;
     }
 
     async findRevisionHistory(id: string): Promise<RequirementRevisionResponseDto[]> {
@@ -238,6 +312,10 @@ export class RequirementsService {
             reviewer: requirement.reviewer,
             rejectedAt: requirement.rejectedAt,
             deletedAt: requirement.deletedAt,
+            approvedAt: requirement.approvedAt,
+            implementedAt: requirement.implementedAt,
+            obsolescenceReason: requirement.obsolescenceReason,
+            obsoleteAt: requirement.obsoleteAt,
             requirementCreatedAt: requirement.createdAt,
             requirementUpdatedAt: requirement.updatedAt,
         });
@@ -328,6 +406,17 @@ export class RequirementsService {
         this.validateOptionalString(updateRequirementDto.source, 'Requirement source must be a string when provided');
     }
 
+    private validateMarkObsoleteRequirementDto(markObsoleteRequirementDto: MarkObsoleteRequirementDto): void {
+        if (typeof markObsoleteRequirementDto !== 'object' || markObsoleteRequirementDto === null) {
+            throw new BadRequestException('Requirement obsolete request body is required');
+        }
+
+        this.validateRequiredString(
+            markObsoleteRequirementDto.obsolescenceReason,
+            'Requirement obsolescence reason is required',
+        );
+    }
+
     private validateRejectRequirementDto(rejectRequirementDto: RejectRequirementDto): void {
         if (typeof rejectRequirementDto !== 'object' || rejectRequirementDto === null) {
             throw new BadRequestException('Requirement rejection request body is required');
@@ -400,6 +489,10 @@ export class RequirementsService {
             reviewer: requirement.reviewer,
             rejectedAt: requirement.rejectedAt?.toISOString() ?? null,
             deletedAt: requirement.deletedAt?.toISOString() ?? null,
+            approvedAt: requirement.approvedAt?.toISOString() ?? null,
+            implementedAt: requirement.implementedAt?.toISOString() ?? null,
+            obsolescenceReason: requirement.obsolescenceReason,
+            obsoleteAt: requirement.obsoleteAt?.toISOString() ?? null,
             createdAt: requirement.createdAt.toISOString(),
             updatedAt: requirement.updatedAt.toISOString(),
         };
@@ -424,6 +517,10 @@ export class RequirementsService {
             reviewer: revision.reviewer,
             rejectedAt: revision.rejectedAt?.toISOString() ?? null,
             deletedAt: revision.deletedAt?.toISOString() ?? null,
+            approvedAt: revision.approvedAt?.toISOString() ?? null,
+            implementedAt: revision.implementedAt?.toISOString() ?? null,
+            obsolescenceReason: revision.obsolescenceReason,
+            obsoleteAt: revision.obsoleteAt?.toISOString() ?? null,
             requirementCreatedAt: revision.requirementCreatedAt.toISOString(),
             requirementUpdatedAt: revision.requirementUpdatedAt.toISOString(),
             createdAt: revision.createdAt.toISOString(),

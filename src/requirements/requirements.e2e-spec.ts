@@ -29,6 +29,10 @@ interface RequirementApiResponse {
     reviewer: string | null;
     rejectedAt: string | null;
     deletedAt: string | null;
+    approvedAt: string | null;
+    implementedAt: string | null;
+    obsolescenceReason: string | null;
+    obsoleteAt: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -51,6 +55,10 @@ interface RequirementRevisionApiResponse {
     reviewer: string | null;
     rejectedAt: string | null;
     deletedAt: string | null;
+    approvedAt: string | null;
+    implementedAt: string | null;
+    obsolescenceReason: string | null;
+    obsoleteAt: string | null;
     requirementCreatedAt: string;
     requirementUpdatedAt: string;
     createdAt: string;
@@ -258,6 +266,122 @@ test.describe('requirements API', () => {
 
         const deleteResponse = await request.delete(`/requirements/${created.id}`);
         expect(deleteResponse.status()).toBe(409);
+    });
+
+    test('Approves, implements, and obsoletes controlled requirements while protecting them from deletion.', async ({
+        request,
+    }) => {
+        const approvedFromDraft = await createRequirement(request, category.id);
+        const approveResponse = await request.patch(`/requirements/${approvedFromDraft.id}/approve`);
+        expect(approveResponse.status()).toBe(200);
+        const approved = (await approveResponse.json()) as RequirementApiResponse;
+        expect(approved).toEqual(
+            expect.objectContaining({
+                id: approvedFromDraft.id,
+                status: RequirementStatus.Approved,
+                approvedAt: expect.any(String),
+            }),
+        );
+
+        const approvedDeleteResponse = await request.delete(`/requirements/${approved.id}`);
+        expect(approvedDeleteResponse.status()).toBe(409);
+
+        const implementedResponse = await request.patch(`/requirements/${approved.id}/implemented`);
+        expect(implementedResponse.status()).toBe(200);
+        const implemented = (await implementedResponse.json()) as RequirementApiResponse;
+        expect(implemented).toEqual(
+            expect.objectContaining({
+                id: approved.id,
+                status: RequirementStatus.Implemented,
+                approvedAt: approved.approvedAt,
+                implementedAt: expect.any(String),
+            }),
+        );
+
+        const implementedDeleteResponse = await request.delete(`/requirements/${implemented.id}`);
+        expect(implementedDeleteResponse.status()).toBe(409);
+
+        const obsoleteResponse = await request.patch(`/requirements/${implemented.id}/obsolete`, {
+            data: { obsolescenceReason: ' Superseded by NFR-PERF-0002. ' },
+        });
+        expect(obsoleteResponse.status()).toBe(200);
+        const obsolete = (await obsoleteResponse.json()) as RequirementApiResponse;
+        expect(obsolete).toEqual(
+            expect.objectContaining({
+                id: implemented.id,
+                status: RequirementStatus.Obsolete,
+                obsolescenceReason: 'Superseded by NFR-PERF-0002.',
+                obsoleteAt: expect.any(String),
+            }),
+        );
+
+        const obsoleteDeleteResponse = await request.delete(`/requirements/${obsolete.id}`);
+        expect(obsoleteDeleteResponse.status()).toBe(409);
+
+        const directObsoleteCandidate = await createRequirement(request, category.id, {
+            description: 'The API should include cache hit metrics.',
+        });
+        const directlyApprovedResponse = await request.patch(`/requirements/${directObsoleteCandidate.id}/approve`);
+        expect(directlyApprovedResponse.status()).toBe(200);
+        const directlyObsoleteResponse = await request.patch(`/requirements/${directObsoleteCandidate.id}/obsolete`, {
+            data: { obsolescenceReason: 'Metric replaced by trace coverage.' },
+        });
+        expect(directlyObsoleteResponse.status()).toBe(200);
+        expect((await directlyObsoleteResponse.json()) as RequirementApiResponse).toEqual(
+            expect.objectContaining({
+                id: directObsoleteCandidate.id,
+                status: RequirementStatus.Obsolete,
+                obsolescenceReason: 'Metric replaced by trace coverage.',
+                obsoleteAt: expect.any(String),
+            }),
+        );
+
+        const defaultListResponse = await request.get('/requirements');
+        expect(defaultListResponse.status()).toBe(200);
+        const defaultList = (await defaultListResponse.json()) as RequirementApiResponse[];
+        expect(defaultList).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: obsolete.id })]));
+
+        const includeObsoleteResponse = await request.get('/requirements?includeObsolete=true');
+        expect(includeObsoleteResponse.status()).toBe(200);
+        const includeObsoleteList = (await includeObsoleteResponse.json()) as RequirementApiResponse[];
+        expect(includeObsoleteList).toEqual(
+            expect.arrayContaining([expect.objectContaining({ id: obsolete.id, status: RequirementStatus.Obsolete })]),
+        );
+    });
+
+    test('Rejects invalid remaining lifecycle transitions with meaningful errors.', async ({ request }) => {
+        const draft = await createRequirement(request, category.id);
+
+        const invalidImplementedResponse = await request.patch(`/requirements/${draft.id}/implemented`);
+        expect(invalidImplementedResponse.status()).toBe(409);
+        expect(await invalidImplementedResponse.json()).toEqual(
+            expect.objectContaining({ message: 'Only approved requirements can be marked implemented' }),
+        );
+
+        const invalidObsoleteResponse = await request.patch(`/requirements/${draft.id}/obsolete`, {
+            data: { obsolescenceReason: 'No longer needed.' },
+        });
+        expect(invalidObsoleteResponse.status()).toBe(409);
+        expect(await invalidObsoleteResponse.json()).toEqual(
+            expect.objectContaining({ message: 'Only approved or implemented requirements can be marked obsolete' }),
+        );
+
+        const approvedResponse = await request.patch(`/requirements/${draft.id}/approve`);
+        expect(approvedResponse.status()).toBe(200);
+
+        const invalidApproveResponse = await request.patch(`/requirements/${draft.id}/approve`);
+        expect(invalidApproveResponse.status()).toBe(409);
+        expect(await invalidApproveResponse.json()).toEqual(
+            expect.objectContaining({ message: 'Only draft requirements can be approved' }),
+        );
+
+        const missingReasonResponse = await request.patch(`/requirements/${draft.id}/obsolete`, {
+            data: { obsolescenceReason: ' ' },
+        });
+        expect(missingReasonResponse.status()).toBe(400);
+        expect(await missingReasonResponse.json()).toEqual(
+            expect.objectContaining({ message: 'Requirement obsolescence reason is required' }),
+        );
     });
 
     test('Updates editable draft requirement fields while preserving identity and classification.', async ({

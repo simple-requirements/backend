@@ -17,6 +17,10 @@ export interface RequirementResponseDto {
     reviewer: string | null;
     rejectedAt: string | null;
     deletedAt: string | null;
+    approvedAt: string | null;
+    implementedAt: string | null;
+    obsolescenceReason: string | null;
+    obsoleteAt: string | null;
     createdAt: string;
     updatedAt: string;
 }

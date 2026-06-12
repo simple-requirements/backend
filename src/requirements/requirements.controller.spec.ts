@@ -26,6 +26,14 @@ describe('RequirementsController', () => {
         owner: null,
         rationale: 'Latency impacts users.',
         source: 'US-REQ-001',
+        rejectionReason: null,
+        reviewer: null,
+        rejectedAt: null,
+        deletedAt: null,
+        approvedAt: null,
+        implementedAt: null,
+        obsolescenceReason: null,
+        obsoleteAt: null,
         createdAt: '2026-06-12T00:00:00.000Z',
         updatedAt: '2026-06-12T00:00:00.000Z',
     };
@@ -48,6 +56,10 @@ describe('RequirementsController', () => {
         reviewer: requirement.reviewer,
         rejectedAt: requirement.rejectedAt,
         deletedAt: requirement.deletedAt,
+        approvedAt: requirement.approvedAt,
+        implementedAt: requirement.implementedAt,
+        obsolescenceReason: requirement.obsolescenceReason,
+        obsoleteAt: requirement.obsoleteAt,
         requirementCreatedAt: requirement.createdAt,
         requirementUpdatedAt: requirement.updatedAt,
         createdAt: '2026-06-12T00:00:01.000Z',
@@ -62,6 +74,9 @@ describe('RequirementsController', () => {
         findRevisionHistory: vi.fn(),
         findRevision: vi.fn(),
         reject: vi.fn(),
+        approve: vi.fn(),
+        markImplemented: vi.fn(),
+        markObsolete: vi.fn(),
         delete: vi.fn(),
     };
 
@@ -98,7 +113,7 @@ describe('RequirementsController', () => {
 
         await expect(controller.findAll()).resolves.toEqual([requirement]);
 
-        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(false);
+        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(false, false);
     });
 
     it('includes rejected requirements when requested.', async () => {
@@ -108,7 +123,7 @@ describe('RequirementsController', () => {
             { ...requirement, status: RequirementStatus.Rejected },
         ]);
 
-        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(true);
+        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(true, false);
     });
 
     it('retrieves a requirement by internal ID.', async () => {
@@ -151,6 +166,39 @@ describe('RequirementsController', () => {
         await expect(controller.reject(requirement.id, dto)).resolves.toEqual(rejected);
 
         expect(requirementsServiceMock.reject).toHaveBeenCalledWith(requirement.id, dto);
+    });
+
+    it('delegates approval to the service.', async () => {
+        const approved = { ...requirement, status: RequirementStatus.Approved, approvedAt: '2026-06-12T00:00:02.000Z' };
+        requirementsServiceMock.approve.mockResolvedValue(approved);
+
+        await expect(controller.approve(requirement.id)).resolves.toEqual(approved);
+
+        expect(requirementsServiceMock.approve).toHaveBeenCalledWith(requirement.id);
+    });
+
+    it('delegates implemented and obsolete lifecycle actions to the service.', async () => {
+        const implemented = {
+            ...requirement,
+            status: RequirementStatus.Implemented,
+            approvedAt: '2026-06-12T00:00:02.000Z',
+            implementedAt: '2026-06-12T00:00:03.000Z',
+        };
+        const obsoleteDto = { obsolescenceReason: 'Superseded by NFR-PERF-0002.' };
+        const obsolete = {
+            ...implemented,
+            status: RequirementStatus.Obsolete,
+            obsolescenceReason: obsoleteDto.obsolescenceReason,
+            obsoleteAt: '2026-06-12T00:00:04.000Z',
+        };
+        requirementsServiceMock.markImplemented.mockResolvedValue(implemented);
+        requirementsServiceMock.markObsolete.mockResolvedValue(obsolete);
+
+        await expect(controller.markImplemented(requirement.id)).resolves.toEqual(implemented);
+        await expect(controller.markObsolete(requirement.id, obsoleteDto)).resolves.toEqual(obsolete);
+
+        expect(requirementsServiceMock.markImplemented).toHaveBeenCalledWith(requirement.id);
+        expect(requirementsServiceMock.markObsolete).toHaveBeenCalledWith(requirement.id, obsoleteDto);
     });
 
     it('delegates draft requirement deletion to the service.', async () => {

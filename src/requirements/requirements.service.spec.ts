@@ -28,6 +28,10 @@ const baseRequirement: Requirement = {
     reviewer: null,
     rejectedAt: null,
     deletedAt: null,
+    approvedAt: null,
+    implementedAt: null,
+    obsolescenceReason: null,
+    obsoleteAt: null,
     createdAt: new Date('2026-06-12T00:00:00.000Z'),
     updatedAt: new Date('2026-06-12T00:00:00.000Z'),
     category: {
@@ -57,6 +61,10 @@ const baseRevision: RequirementRevision = {
     reviewer: baseRequirement.reviewer,
     rejectedAt: baseRequirement.rejectedAt,
     deletedAt: baseRequirement.deletedAt,
+    approvedAt: baseRequirement.approvedAt,
+    implementedAt: baseRequirement.implementedAt,
+    obsolescenceReason: baseRequirement.obsolescenceReason,
+    obsoleteAt: baseRequirement.obsoleteAt,
     requirementCreatedAt: baseRequirement.createdAt,
     requirementUpdatedAt: baseRequirement.updatedAt,
     createdAt: new Date('2026-06-12T00:00:02.000Z'),
@@ -131,6 +139,10 @@ describe('RequirementsService', () => {
             reviewer: null,
             rejectedAt: null,
             deletedAt: null,
+            approvedAt: null,
+            implementedAt: null,
+            obsolescenceReason: null,
+            obsoleteAt: null,
             createdAt: '2026-06-12T00:00:00.000Z',
             updatedAt: '2026-06-12T00:00:01.000Z',
         });
@@ -174,10 +186,9 @@ describe('RequirementsService', () => {
             expect.objectContaining({ id: baseRequirement.id, visibleKey: baseRequirement.visibleKey }),
         ]);
 
-        expect(requirementsRepositoryMock.find).toHaveBeenCalledWith({
-            where: { status: RequirementStatus.Draft },
-            order: { visibleKey: 'ASC' },
-        });
+        expect(requirementsRepositoryMock.find).toHaveBeenCalledWith(
+            expect.objectContaining({ order: { visibleKey: 'ASC' } }),
+        );
     });
 
     it('lists rejected requirements only when explicitly requested.', async () => {
@@ -186,6 +197,19 @@ describe('RequirementsService', () => {
 
         await expect(service.findAll(true)).resolves.toEqual([
             expect.objectContaining({ id: baseRequirement.id, status: RequirementStatus.Rejected }),
+        ]);
+
+        expect(requirementsRepositoryMock.find).toHaveBeenCalledWith(
+            expect.objectContaining({ order: { visibleKey: 'ASC' } }),
+        );
+    });
+
+    it('lists obsolete requirements only when explicitly requested.', async () => {
+        const obsoleteRequirement = { ...baseRequirement, status: RequirementStatus.Obsolete };
+        requirementsRepositoryMock.find.mockResolvedValue([obsoleteRequirement]);
+
+        await expect(service.findAll(false, true)).resolves.toEqual([
+            expect.objectContaining({ id: baseRequirement.id, status: RequirementStatus.Obsolete }),
         ]);
 
         expect(requirementsRepositoryMock.find).toHaveBeenCalledWith(
@@ -331,6 +355,114 @@ describe('RequirementsService', () => {
 
         await expect(service.delete(baseRequirement.id)).rejects.toBeInstanceOf(ConflictException);
     });
+
+    it('transitions draft requirements to approved with a server approval date.', async () => {
+        const currentRequirement = { ...baseRequirement };
+        const approvedAt = new Date('2026-06-12T00:00:08.000Z');
+        vi.useFakeTimers();
+        vi.setSystemTime(approvedAt);
+        transactionManagerMock.findOne.mockResolvedValueOnce(currentRequirement).mockResolvedValueOnce(null);
+        transactionManagerMock.save.mockImplementation((entity: unknown, value: Requirement | RequirementRevision) => {
+            if (entity === RequirementRevision) {
+                return Promise.resolve({ ...value, id: baseRevision.id, createdAt: baseRevision.createdAt });
+            }
+
+            return Promise.resolve({ ...value, updatedAt: new Date('2026-06-12T00:00:09.000Z') });
+        });
+
+        await expect(service.approve(baseRequirement.id)).resolves.toEqual(
+            expect.objectContaining({
+                id: baseRequirement.id,
+                status: RequirementStatus.Approved,
+                approvedAt: approvedAt.toISOString(),
+            }),
+        );
+
+        vi.useRealTimers();
+    });
+
+    it('transitions approved requirements to implemented with a server implementation date.', async () => {
+        const approvedAt = new Date('2026-06-12T00:00:08.000Z');
+        const implementedAt = new Date('2026-06-12T00:00:10.000Z');
+        const currentRequirement = { ...baseRequirement, status: RequirementStatus.Approved, approvedAt };
+        vi.useFakeTimers();
+        vi.setSystemTime(implementedAt);
+        transactionManagerMock.findOne.mockResolvedValueOnce(currentRequirement).mockResolvedValueOnce(null);
+        transactionManagerMock.save.mockImplementation((entity: unknown, value: Requirement | RequirementRevision) => {
+            if (entity === RequirementRevision) {
+                return Promise.resolve({ ...value, id: baseRevision.id, createdAt: baseRevision.createdAt });
+            }
+
+            return Promise.resolve({ ...value, updatedAt: new Date('2026-06-12T00:00:11.000Z') });
+        });
+
+        await expect(service.markImplemented(baseRequirement.id)).resolves.toEqual(
+            expect.objectContaining({
+                id: baseRequirement.id,
+                status: RequirementStatus.Implemented,
+                approvedAt: approvedAt.toISOString(),
+                implementedAt: implementedAt.toISOString(),
+            }),
+        );
+
+        vi.useRealTimers();
+    });
+
+    it('marks approved or implemented requirements obsolete with a mandatory reason and server date.', async () => {
+        const obsoleteAt = new Date('2026-06-12T00:00:12.000Z');
+        const currentRequirement = { ...baseRequirement, status: RequirementStatus.Implemented };
+        vi.useFakeTimers();
+        vi.setSystemTime(obsoleteAt);
+        transactionManagerMock.findOne.mockResolvedValueOnce(currentRequirement).mockResolvedValueOnce(null);
+        transactionManagerMock.save.mockImplementation((entity: unknown, value: Requirement | RequirementRevision) => {
+            if (entity === RequirementRevision) {
+                return Promise.resolve({ ...value, id: baseRevision.id, createdAt: baseRevision.createdAt });
+            }
+
+            return Promise.resolve({ ...value, updatedAt: new Date('2026-06-12T00:00:13.000Z') });
+        });
+
+        await expect(
+            service.markObsolete(baseRequirement.id, { obsolescenceReason: ' Superseded by NFR-PERF-0002. ' }),
+        ).resolves.toEqual(
+            expect.objectContaining({
+                id: baseRequirement.id,
+                status: RequirementStatus.Obsolete,
+                obsolescenceReason: 'Superseded by NFR-PERF-0002.',
+                obsoleteAt: obsoleteAt.toISOString(),
+            }),
+        );
+
+        vi.useRealTimers();
+    });
+
+    it('rejects invalid lifecycle transitions with meaningful conflicts.', async () => {
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status: RequirementStatus.Draft });
+
+        await expect(service.markImplemented(baseRequirement.id)).rejects.toThrow(
+            'Only approved requirements can be marked implemented',
+        );
+        await expect(
+            service.markObsolete(baseRequirement.id, { obsolescenceReason: 'No longer needed.' }),
+        ).rejects.toThrow('Only approved or implemented requirements can be marked obsolete');
+    });
+
+    it('requires an obsolescence reason before opening an obsolete transition transaction.', async () => {
+        await expect(service.markObsolete(baseRequirement.id, { obsolescenceReason: ' ' })).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+
+        expect(dataSourceMock.transaction).not.toHaveBeenCalled();
+    });
+
+    it.each([RequirementStatus.Approved, RequirementStatus.Implemented, RequirementStatus.Obsolete])(
+        'rejects deletion of %s requirements.',
+        async (status) => {
+            transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status });
+
+            await expect(service.delete(baseRequirement.id)).rejects.toBeInstanceOf(ConflictException);
+        },
+    );
 
     it('returns requirement revision history.', async () => {
         requirementsRepositoryMock.findOne.mockResolvedValue(baseRequirement);
