@@ -26,6 +26,10 @@ describe('RequirementsController', () => {
         owner: null,
         rationale: 'Latency impacts users.',
         source: 'US-REQ-001',
+        rejectionReason: null,
+        reviewer: null,
+        rejectedAt: null,
+        deletedAt: null,
         createdAt: '2026-06-12T00:00:00.000Z',
         updatedAt: '2026-06-12T00:00:00.000Z',
     };
@@ -96,9 +100,9 @@ describe('RequirementsController', () => {
     it('returns all requirements from the service.', async () => {
         requirementsServiceMock.findAll.mockResolvedValue([requirement]);
 
-        await expect(controller.findAll()).resolves.toEqual([requirement]);
+        await expect(controller.findAll({})).resolves.toEqual([requirement]);
 
-        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(undefined);
+        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith({});
     });
 
     it('includes rejected requirements when requested.', async () => {
