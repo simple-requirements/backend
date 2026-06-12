@@ -10,6 +10,8 @@ import { RequirementType } from '@/requirements/requirement-type-enum';
 
 const MAX_REQUIREMENT_SEQUENCE_NUMBER = 9_999;
 const POSTGRES_UNIQUE_VIOLATION_CODE = '23505';
+const REQUIREMENT_CATEGORY_KEY_PATTERN = /^[A-Z]{3,4}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class RequirementsKeyAllocatorService {
@@ -41,6 +43,10 @@ export class RequirementsKeyAllocatorService {
 
         if (category === null) {
             throw new NotFoundException(`Category "${categoryId}" was not found`);
+        }
+
+        if (!REQUIREMENT_CATEGORY_KEY_PATTERN.test(category.key)) {
+            throw new BadRequestException('Requirement category key must contain 3 or 4 uppercase letters');
         }
 
         await manager
@@ -101,6 +107,10 @@ export class RequirementsKeyAllocatorService {
     private validateCategoryId(categoryId: string): void {
         if (typeof categoryId !== 'string' || categoryId.trim() === '') {
             throw new BadRequestException('Category id is required');
+        }
+
+        if (!UUID_PATTERN.test(categoryId)) {
+            throw new BadRequestException('Category id must be a valid UUID');
         }
     }
 

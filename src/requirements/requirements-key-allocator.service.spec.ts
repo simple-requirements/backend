@@ -206,6 +206,18 @@ describe('RequirementsKeyAllocatorService', () => {
         );
     });
 
+    it('rejects categories whose keys cannot be used in requirement visible keys.', async () => {
+        const { service } = createService({ findCategory: { ...category, key: 'LONG_KEY' } });
+
+        await expect(service.allocate(RequirementType.FR, category.id)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects malformed category ids.', async () => {
+        const { service } = createService();
+
+        await expect(service.allocate(RequirementType.FR, 'not-a-uuid')).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('rejects unknown categories.', async () => {
         const { service } = createService({ findCategory: null });
 

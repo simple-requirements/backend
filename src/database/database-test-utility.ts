@@ -29,7 +29,7 @@ export async function cleanDatabase(): Promise<void> {
         TRUNCATE TABLE
             categories,
             requirements,
-            requirement_key_counters
+            requirements_key_counters
         RESTART IDENTITY CASCADE;
     `);
 }
