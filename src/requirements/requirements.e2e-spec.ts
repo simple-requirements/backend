@@ -25,6 +25,10 @@ interface RequirementApiResponse {
     owner: string | null;
     rationale: string | null;
     source: string | null;
+    rejectionReason: string | null;
+    reviewer: string | null;
+    rejectedAt: string | null;
+    deletedAt: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -43,6 +47,10 @@ interface RequirementRevisionApiResponse {
     owner: string | null;
     rationale: string | null;
     source: string | null;
+    rejectionReason: string | null;
+    reviewer: string | null;
+    rejectedAt: string | null;
+    deletedAt: string | null;
     requirementCreatedAt: string;
     requirementUpdatedAt: string;
     createdAt: string;
@@ -179,6 +187,77 @@ test.describe('requirements API', () => {
         expect(requirements).toEqual(
             expect.arrayContaining([expect.objectContaining({ id: created.id, visibleKey: created.visibleKey })]),
         );
+    });
+
+    test('Deletes a draft requirement while preserving its visible key reservation.', async ({ request }) => {
+        const created = await createRequirement(request, category.id);
+
+        const deleteResponse = await request.delete(`/requirements/${created.id}`);
+        expect(deleteResponse.status()).toBe(204);
+
+        const retrievedResponse = await request.get(`/requirements/${created.id}`);
+        expect(retrievedResponse.status()).toBe(404);
+
+        const second = await createRequirement(request, category.id);
+        expect(second.visibleKey).toBe('NFR-PERF-0002');
+        expect(second.sequenceNumber).toBe(2);
+    });
+
+    test('Rejects a draft requirement and excludes it from active lists unless explicitly requested.', async ({
+        request,
+    }) => {
+        const created = await createRequirement(request, category.id);
+
+        const rejectResponse = await request.patch(`/requirements/${created.id}/reject`, {
+            data: { rejectionReason: 'Does not describe observable behavior.', reviewer: 'QA Lead' },
+        });
+        expect(rejectResponse.status()).toBe(200);
+
+        const rejected = (await rejectResponse.json()) as RequirementApiResponse;
+        expect(rejected).toEqual(
+            expect.objectContaining({
+                id: created.id,
+                status: RequirementStatus.Rejected,
+                rejectionReason: 'Does not describe observable behavior.',
+                reviewer: 'QA Lead',
+                rejectedAt: expect.any(String),
+            }),
+        );
+
+        const defaultListResponse = await request.get('/requirements');
+        expect(defaultListResponse.status()).toBe(200);
+        const defaultList = (await defaultListResponse.json()) as RequirementApiResponse[];
+        expect(defaultList).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id })]));
+
+        const includeRejectedResponse = await request.get('/requirements?includeRejected=true');
+        expect(includeRejectedResponse.status()).toBe(200);
+        const includeRejectedList = (await includeRejectedResponse.json()) as RequirementApiResponse[];
+        expect(includeRejectedList).toEqual(
+            expect.arrayContaining([expect.objectContaining({ id: created.id, status: RequirementStatus.Rejected })]),
+        );
+
+        const explicitResponse = await request.get(`/requirements/${created.id}`);
+        expect(explicitResponse.status()).toBe(200);
+        expect((await explicitResponse.json()) as RequirementApiResponse).toEqual(
+            expect.objectContaining({ id: created.id, status: RequirementStatus.Rejected }),
+        );
+    });
+
+    test('Requires a rejection reason and prevents deleting rejected requirements.', async ({ request }) => {
+        const created = await createRequirement(request, category.id);
+
+        const invalidRejectResponse = await request.patch(`/requirements/${created.id}/reject`, {
+            data: { rejectionReason: ' ', reviewer: 'QA Lead' },
+        });
+        expect(invalidRejectResponse.status()).toBe(400);
+
+        const rejectResponse = await request.patch(`/requirements/${created.id}/reject`, {
+            data: { rejectionReason: 'Duplicate requirement.', reviewer: 'QA Lead' },
+        });
+        expect(rejectResponse.status()).toBe(200);
+
+        const deleteResponse = await request.delete(`/requirements/${created.id}`);
+        expect(deleteResponse.status()).toBe(409);
     });
 
     test('Updates editable draft requirement fields while preserving identity and classification.', async ({

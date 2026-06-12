@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,6 +24,10 @@ const baseRequirement: Requirement = {
     owner: 'Team A',
     rationale: 'Latency impacts users.',
     source: 'US-REQ-001',
+    rejectionReason: null,
+    reviewer: null,
+    rejectedAt: null,
+    deletedAt: null,
     createdAt: new Date('2026-06-12T00:00:00.000Z'),
     updatedAt: new Date('2026-06-12T00:00:00.000Z'),
     category: {
@@ -49,6 +53,10 @@ const baseRevision: RequirementRevision = {
     owner: baseRequirement.owner,
     rationale: baseRequirement.rationale,
     source: baseRequirement.source,
+    rejectionReason: baseRequirement.rejectionReason,
+    reviewer: baseRequirement.reviewer,
+    rejectedAt: baseRequirement.rejectedAt,
+    deletedAt: baseRequirement.deletedAt,
     requirementCreatedAt: baseRequirement.createdAt,
     requirementUpdatedAt: baseRequirement.updatedAt,
     createdAt: new Date('2026-06-12T00:00:02.000Z'),
@@ -119,6 +127,10 @@ describe('RequirementsService', () => {
             owner: null,
             rationale: 'Latency impacts users.',
             source: 'US-REQ-001',
+            rejectionReason: null,
+            reviewer: null,
+            rejectedAt: null,
+            deletedAt: null,
             createdAt: '2026-06-12T00:00:00.000Z',
             updatedAt: '2026-06-12T00:00:01.000Z',
         });
@@ -162,7 +174,23 @@ describe('RequirementsService', () => {
             expect.objectContaining({ id: baseRequirement.id, visibleKey: baseRequirement.visibleKey }),
         ]);
 
-        expect(requirementsRepositoryMock.find).toHaveBeenCalledWith({ order: { visibleKey: 'ASC' } });
+        expect(requirementsRepositoryMock.find).toHaveBeenCalledWith({
+            where: { status: RequirementStatus.Draft },
+            order: { visibleKey: 'ASC' },
+        });
+    });
+
+    it('lists rejected requirements only when explicitly requested.', async () => {
+        const rejectedRequirement = { ...baseRequirement, status: RequirementStatus.Rejected };
+        requirementsRepositoryMock.find.mockResolvedValue([rejectedRequirement]);
+
+        await expect(service.findAll(true)).resolves.toEqual([
+            expect.objectContaining({ id: baseRequirement.id, status: RequirementStatus.Rejected }),
+        ]);
+
+        expect(requirementsRepositoryMock.find).toHaveBeenCalledWith(
+            expect.objectContaining({ order: { visibleKey: 'ASC' } }),
+        );
     });
 
     it('throws not found when a requirement cannot be retrieved.', async () => {
@@ -226,6 +254,82 @@ describe('RequirementsService', () => {
         ).rejects.toBeInstanceOf(BadRequestException);
 
         expect(dataSourceMock.transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects a draft requirement with mandatory reason, reviewer, and server rejection date.', async () => {
+        const currentRequirement = { ...baseRequirement };
+        const rejectedAt = new Date('2026-06-12T00:00:05.000Z');
+        vi.useFakeTimers();
+        vi.setSystemTime(rejectedAt);
+        transactionManagerMock.findOne.mockResolvedValueOnce(currentRequirement).mockResolvedValueOnce(null);
+        transactionManagerMock.save.mockImplementation((entity: unknown, value: Requirement | RequirementRevision) => {
+            if (entity === RequirementRevision) {
+                return Promise.resolve({ ...value, id: baseRevision.id, createdAt: baseRevision.createdAt });
+            }
+
+            return Promise.resolve({ ...value, updatedAt: new Date('2026-06-12T00:00:06.000Z') });
+        });
+
+        await expect(
+            service.reject(baseRequirement.id, {
+                rejectionReason: ' Not testable as written. ',
+                reviewer: ' QA Lead ',
+            }),
+        ).resolves.toEqual(
+            expect.objectContaining({
+                id: baseRequirement.id,
+                status: RequirementStatus.Rejected,
+                rejectionReason: 'Not testable as written.',
+                reviewer: 'QA Lead',
+                rejectedAt: rejectedAt.toISOString(),
+            }),
+        );
+
+        vi.useRealTimers();
+    });
+
+    it('requires a rejection reason and reviewer when rejecting a draft requirement.', async () => {
+        await expect(
+            service.reject(baseRequirement.id, { rejectionReason: ' ', reviewer: 'QA Lead' }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            service.reject(baseRequirement.id, { rejectionReason: 'Not needed', reviewer: ' ' }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(dataSourceMock.transaction).not.toHaveBeenCalled();
+    });
+
+    it('soft deletes draft requirements so their visible key stays reserved.', async () => {
+        const currentRequirement = { ...baseRequirement };
+        const deletedAt = new Date('2026-06-12T00:00:07.000Z');
+        vi.useFakeTimers();
+        vi.setSystemTime(deletedAt);
+        transactionManagerMock.findOne.mockResolvedValueOnce(currentRequirement).mockResolvedValueOnce(null);
+        transactionManagerMock.save.mockResolvedValue({
+            ...currentRequirement,
+            status: RequirementStatus.Deleted,
+            deletedAt,
+        });
+
+        await expect(service.delete(baseRequirement.id)).resolves.toBeUndefined();
+
+        expect(transactionManagerMock.save).toHaveBeenCalledWith(
+            Requirement,
+            expect.objectContaining({
+                id: baseRequirement.id,
+                visibleKey: baseRequirement.visibleKey,
+                status: RequirementStatus.Deleted,
+                deletedAt,
+            }),
+        );
+
+        vi.useRealTimers();
+    });
+
+    it('rejects deletion of rejected requirements.', async () => {
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, status: RequirementStatus.Rejected });
+
+        await expect(service.delete(baseRequirement.id)).rejects.toBeInstanceOf(ConflictException);
     });
 
     it('returns requirement revision history.', async () => {

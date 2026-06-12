@@ -44,6 +44,10 @@ describe('RequirementsController', () => {
         owner: requirement.owner,
         rationale: requirement.rationale,
         source: requirement.source,
+        rejectionReason: requirement.rejectionReason,
+        reviewer: requirement.reviewer,
+        rejectedAt: requirement.rejectedAt,
+        deletedAt: requirement.deletedAt,
         requirementCreatedAt: requirement.createdAt,
         requirementUpdatedAt: requirement.updatedAt,
         createdAt: '2026-06-12T00:00:01.000Z',
@@ -57,6 +61,8 @@ describe('RequirementsController', () => {
         update: vi.fn(),
         findRevisionHistory: vi.fn(),
         findRevision: vi.fn(),
+        reject: vi.fn(),
+        delete: vi.fn(),
     };
 
     beforeEach(async () => {
@@ -92,7 +98,17 @@ describe('RequirementsController', () => {
 
         await expect(controller.findAll()).resolves.toEqual([requirement]);
 
-        expect(requirementsServiceMock.findAll).toHaveBeenCalledOnce();
+        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(false);
+    });
+
+    it('includes rejected requirements when requested.', async () => {
+        requirementsServiceMock.findAll.mockResolvedValue([{ ...requirement, status: RequirementStatus.Rejected }]);
+
+        await expect(controller.findAll('true')).resolves.toEqual([
+            { ...requirement, status: RequirementStatus.Rejected },
+        ]);
+
+        expect(requirementsServiceMock.findAll).toHaveBeenCalledWith(true);
     });
 
     it('retrieves a requirement by internal ID.', async () => {
@@ -119,6 +135,30 @@ describe('RequirementsController', () => {
         await expect(controller.update(requirement.id, dto)).resolves.toEqual(updated);
 
         expect(requirementsServiceMock.update).toHaveBeenCalledWith(requirement.id, dto);
+    });
+
+    it('delegates draft requirement rejection to the service.', async () => {
+        const dto = { rejectionReason: 'Not aligned', reviewer: 'Reviewer A' };
+        const rejected = {
+            ...requirement,
+            status: RequirementStatus.Rejected,
+            rejectionReason: 'Not aligned',
+            reviewer: 'Reviewer A',
+            rejectedAt: '2026-06-12T00:00:02.000Z',
+        };
+        requirementsServiceMock.reject.mockResolvedValue(rejected);
+
+        await expect(controller.reject(requirement.id, dto)).resolves.toEqual(rejected);
+
+        expect(requirementsServiceMock.reject).toHaveBeenCalledWith(requirement.id, dto);
+    });
+
+    it('delegates draft requirement deletion to the service.', async () => {
+        requirementsServiceMock.delete.mockResolvedValue(undefined);
+
+        await expect(controller.delete(requirement.id)).resolves.toBeUndefined();
+
+        expect(requirementsServiceMock.delete).toHaveBeenCalledWith(requirement.id);
     });
 
     it('retrieves requirement revision history.', async () => {

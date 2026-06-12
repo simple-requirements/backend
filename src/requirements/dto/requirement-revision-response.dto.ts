@@ -15,6 +15,10 @@ export interface RequirementRevisionResponseDto {
     owner: string | null;
     rationale: string | null;
     source: string | null;
+    rejectionReason: string | null;
+    reviewer: string | null;
+    rejectedAt: string | null;
+    deletedAt: string | null;
     requirementCreatedAt: string;
     requirementUpdatedAt: string;
     createdAt: string;

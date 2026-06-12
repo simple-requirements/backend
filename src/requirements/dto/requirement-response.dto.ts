@@ -13,6 +13,10 @@ export interface RequirementResponseDto {
     owner: string | null;
     rationale: string | null;
     source: string | null;
+    rejectionReason: string | null;
+    reviewer: string | null;
+    rejectedAt: string | null;
+    deletedAt: string | null;
     createdAt: string;
     updatedAt: string;
 }

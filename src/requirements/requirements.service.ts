@@ -1,4 +1,5 @@
 import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
+import type { RejectRequirementDto } from '@/requirements/dto/reject-requirement.dto';
 import type { RequirementResponseDto } from '@/requirements/dto/requirement-response.dto';
 import type { RequirementRevisionResponseDto } from '@/requirements/dto/requirement-revision-response.dto';
 import type { UpdateRequirementDto } from '@/requirements/dto/update-requirement.dto';
@@ -7,9 +8,9 @@ import { RequirementType } from '@/requirements/requirement-type-enum';
 import { RequirementsKeyAllocatorService } from '@/requirements/requirements-key-allocator.service';
 import { RequirementRevision } from '@/requirements/requirements-revision.entity';
 import { Requirement } from '@/requirements/requirements.entity';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Not, Repository } from 'typeorm';
 
 const VISIBLE_KEY_PATTERN = /^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -51,18 +52,17 @@ export class RequirementsService {
         return this.toResponseDto(await this.requirementsRepository.save(requirement));
     }
 
-    async findAll(): Promise<RequirementResponseDto[]> {
-        const requirements = await this.requirementsRepository.find({ order: { visibleKey: 'ASC' } });
+    async findAll(includeRejected = false): Promise<RequirementResponseDto[]> {
+        const requirements = await this.requirementsRepository.find({
+            where: includeRejected ? { status: Not(RequirementStatus.Deleted) } : { status: RequirementStatus.Draft },
+            order: { visibleKey: 'ASC' },
+        });
 
         return requirements.map((requirement) => this.toResponseDto(requirement));
     }
 
     async findOne(id: string): Promise<RequirementResponseDto> {
-        const requirement = await this.requirementsRepository.findOne({ where: { id } });
-
-        if (requirement === null) {
-            throw new NotFoundException(`Requirement "${id}" was not found`);
-        }
+        const requirement = await this.findActiveOrRejectedRequirementById(id);
 
         return this.toResponseDto(requirement);
     }
@@ -72,7 +72,9 @@ export class RequirementsService {
             throw new BadRequestException('Requirement visible key must match FR-KEY-0001 or NFR-KEY-0001');
         }
 
-        const requirement = await this.requirementsRepository.findOne({ where: { visibleKey } });
+        const requirement = await this.requirementsRepository.findOne({
+            where: { visibleKey, status: Not(RequirementStatus.Deleted) },
+        });
 
         if (requirement === null) {
             throw new NotFoundException(`Requirement "${visibleKey}" was not found`);
@@ -80,6 +82,7 @@ export class RequirementsService {
 
         return this.toResponseDto(requirement);
     }
+
     async update(id: string, updateRequirementDto: UpdateRequirementDto): Promise<RequirementResponseDto> {
         this.validateRequirementId(id);
         this.validateUpdateRequirementDto(updateRequirementDto);
@@ -90,34 +93,15 @@ export class RequirementsService {
                 lock: { mode: 'pessimistic_write' },
             });
 
-            if (requirement === null) {
+            if (requirement === null || requirement.status === RequirementStatus.Deleted) {
                 throw new NotFoundException(`Requirement "${id}" was not found`);
             }
 
-            const latestRevision = await manager.findOne(RequirementRevision, {
-                where: { requirementId: requirement.id },
-                order: { revisionNumber: 'DESC' },
-                lock: { mode: 'pessimistic_write' },
-            });
-            
-            const revision = manager.create(RequirementRevision, {
-                requirementId: requirement.id,
-                revisionNumber: (latestRevision?.revisionNumber ?? 0) + 1,
-                visibleKey: requirement.visibleKey,
-                type: requirement.type,
-                categoryId: requirement.categoryId,
-                sequenceNumber: requirement.sequenceNumber,
-                status: requirement.status,
-                description: requirement.description,
-                priority: requirement.priority,
-                owner: requirement.owner,
-                rationale: requirement.rationale,
-                source: requirement.source,
-                requirementCreatedAt: requirement.createdAt,
-                requirementUpdatedAt: requirement.updatedAt,
-            });
+            if (requirement.status !== RequirementStatus.Draft) {
+                throw new ConflictException('Only draft requirements can be updated');
+            }
 
-            await manager.save(RequirementRevision, revision);
+            await this.createRevisionSnapshot(manager, requirement);
 
             if (updateRequirementDto.description !== undefined) {
                 requirement.description = updateRequirementDto.description.trim();
@@ -140,6 +124,61 @@ export class RequirementsService {
             }
 
             return this.toResponseDto(await manager.save(Requirement, requirement));
+        });
+    }
+
+    async reject(id: string, rejectRequirementDto: RejectRequirementDto): Promise<RequirementResponseDto> {
+        this.validateRequirementId(id);
+        this.validateRejectRequirementDto(rejectRequirementDto);
+
+        return this.dataSource.transaction(async (manager) => {
+            const requirement = await manager.findOne(Requirement, {
+                where: { id },
+                lock: { mode: 'pessimistic_write' },
+            });
+
+            if (requirement === null || requirement.status === RequirementStatus.Deleted) {
+                throw new NotFoundException(`Requirement "${id}" was not found`);
+            }
+
+            if (requirement.status !== RequirementStatus.Draft) {
+                throw new ConflictException('Only draft requirements can be rejected');
+            }
+
+            await this.createRevisionSnapshot(manager, requirement);
+
+            requirement.status = RequirementStatus.Rejected;
+            requirement.rejectionReason = rejectRequirementDto.rejectionReason.trim();
+            requirement.reviewer = rejectRequirementDto.reviewer.trim();
+            requirement.rejectedAt = new Date();
+
+            return this.toResponseDto(await manager.save(Requirement, requirement));
+        });
+    }
+
+    async delete(id: string): Promise<void> {
+        this.validateRequirementId(id);
+
+        await this.dataSource.transaction(async (manager) => {
+            const requirement = await manager.findOne(Requirement, {
+                where: { id },
+                lock: { mode: 'pessimistic_write' },
+            });
+
+            if (requirement === null || requirement.status === RequirementStatus.Deleted) {
+                throw new NotFoundException(`Requirement "${id}" was not found`);
+            }
+
+            if (requirement.status !== RequirementStatus.Draft) {
+                throw new ConflictException('Only draft requirements can be deleted');
+            }
+
+            await this.createRevisionSnapshot(manager, requirement);
+
+            requirement.status = RequirementStatus.Deleted;
+            requirement.deletedAt = new Date();
+
+            await manager.save(Requirement, requirement);
         });
     }
 
@@ -175,12 +214,51 @@ export class RequirementsService {
         return this.toRevisionResponseDto(revision);
     }
 
+    private async createRevisionSnapshot(manager: EntityManager, requirement: Requirement): Promise<void> {
+        const latestRevision = await manager.findOne(RequirementRevision, {
+            where: { requirementId: requirement.id },
+            order: { revisionNumber: 'DESC' },
+            lock: { mode: 'pessimistic_write' },
+        });
+
+        const revision = manager.create(RequirementRevision, {
+            requirementId: requirement.id,
+            revisionNumber: (latestRevision?.revisionNumber ?? 0) + 1,
+            visibleKey: requirement.visibleKey,
+            type: requirement.type,
+            categoryId: requirement.categoryId,
+            sequenceNumber: requirement.sequenceNumber,
+            status: requirement.status,
+            description: requirement.description,
+            priority: requirement.priority,
+            owner: requirement.owner,
+            rationale: requirement.rationale,
+            source: requirement.source,
+            rejectionReason: requirement.rejectionReason,
+            reviewer: requirement.reviewer,
+            rejectedAt: requirement.rejectedAt,
+            deletedAt: requirement.deletedAt,
+            requirementCreatedAt: requirement.createdAt,
+            requirementUpdatedAt: requirement.updatedAt,
+        });
+
+        await manager.save(RequirementRevision, revision);
+    }
+
     private async ensureRequirementExists(id: string): Promise<void> {
-        const requirement = await this.requirementsRepository.findOne({ where: { id } });
+        await this.findActiveOrRejectedRequirementById(id);
+    }
+
+    private async findActiveOrRejectedRequirementById(id: string): Promise<Requirement> {
+        const requirement = await this.requirementsRepository.findOne({
+            where: { id, status: Not(RequirementStatus.Deleted) },
+        });
 
         if (requirement === null) {
             throw new NotFoundException(`Requirement "${id}" was not found`);
         }
+
+        return requirement;
     }
 
     private validateCreateRequirementDto(createRequirementDto: CreateRequirementDto): void {
@@ -250,6 +328,15 @@ export class RequirementsService {
         this.validateOptionalString(updateRequirementDto.source, 'Requirement source must be a string when provided');
     }
 
+    private validateRejectRequirementDto(rejectRequirementDto: RejectRequirementDto): void {
+        if (typeof rejectRequirementDto !== 'object' || rejectRequirementDto === null) {
+            throw new BadRequestException('Requirement rejection request body is required');
+        }
+
+        this.validateRequiredString(rejectRequirementDto.rejectionReason, 'Requirement rejection reason is required');
+        this.validateRequiredString(rejectRequirementDto.reviewer, 'Requirement reviewer is required', 120);
+    }
+
     private validateRequiredString(value: unknown, requiredMessage: string, maxLength?: number): void {
         if (typeof value !== 'string' || value.trim() === '') {
             throw new BadRequestException(requiredMessage);
@@ -309,6 +396,10 @@ export class RequirementsService {
             owner: requirement.owner,
             rationale: requirement.rationale,
             source: requirement.source,
+            rejectionReason: requirement.rejectionReason,
+            reviewer: requirement.reviewer,
+            rejectedAt: requirement.rejectedAt?.toISOString() ?? null,
+            deletedAt: requirement.deletedAt?.toISOString() ?? null,
             createdAt: requirement.createdAt.toISOString(),
             updatedAt: requirement.updatedAt.toISOString(),
         };
@@ -329,6 +420,10 @@ export class RequirementsService {
             owner: revision.owner,
             rationale: revision.rationale,
             source: revision.source,
+            rejectionReason: revision.rejectionReason,
+            reviewer: revision.reviewer,
+            rejectedAt: revision.rejectedAt?.toISOString() ?? null,
+            deletedAt: revision.deletedAt?.toISOString() ?? null,
             requirementCreatedAt: revision.requirementCreatedAt.toISOString(),
             requirementUpdatedAt: revision.requirementUpdatedAt.toISOString(),
             createdAt: revision.createdAt.toISOString(),
