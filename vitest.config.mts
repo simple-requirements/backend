@@ -6,7 +6,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
     plugins: [swc.vite({ module: { type: 'es6' } })],
 
-    resolve: { alias: { src: fileURLToPath(new URL('./src', import.meta.url)) } },
+    oxc: false,
+
+    resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
 
     test: {
         environment: 'node',

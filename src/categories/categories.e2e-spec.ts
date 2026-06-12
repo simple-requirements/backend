@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { cleanDatabase, closeE2eDataSource } from '../database/database-test-utility';
+import { cleanDatabase, closeE2eDataSource } from '@/database/database-test-utility';
 
 interface CategoryApiResponse {
     id: string;

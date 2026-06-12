@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, type ConfigType } from '@nestjs/config';
 import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { CategoriesModule } from './categories/categories.module';
-import databaseConfig from './database/database.config';
+import { AppController } from '@/app.controller';
+import { AppService } from '@/app.service';
+import { CategoriesModule } from '@/categories/categories.module';
+import databaseConfig from '@/database/database.config';
 
 @Module({
     imports: [

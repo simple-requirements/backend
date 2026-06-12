@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { CategoriesController } from './categories.controller';
+import { CategoriesController } from '@/categories/categories.controller';
 
 describe('CategoriesController', () => {
     let controller: CategoriesController;

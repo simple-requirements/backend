@@ -2,9 +2,9 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 
-import { Category } from './category.entity';
-import type { CategoryResponseDto } from './dto/category-response.dto';
-import type { CreateCategoryDto } from './dto/create-category.dto';
+import { Category } from '@/categories/category.entity';
+import type { CategoryResponseDto } from '@/categories/dto/category-response.dto';
+import type { CreateCategoryDto } from '@/categories/dto/create-category.dto';
 
 const CATEGORY_KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 const POSTGRES_UNIQUE_VIOLATION_CODE = '23505';
