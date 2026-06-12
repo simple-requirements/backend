@@ -1,0 +1,7 @@
+{
+    "entryPoints": ["src/main.ts", "src/app.module.ts", "src/categories/categories.module.ts", "src/requirements/requirements.module.ts", "src/database/data-source.ts"],
+    "tsconfig": "tsconfig.json",
+    "out": "docs/typedoc",
+    "exclude": ["src/**/*.spec.ts", "src/**/*.e2e-spec.ts", "dist/**", "coverage/**"],
+    "excludePrivate": false
+}

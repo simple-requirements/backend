@@ -8,6 +8,11 @@ import { CategoriesModule } from '@/categories/categories.module';
 import { RequirementsModule } from '@/requirements/requirements.module';
 import databaseConfig from '@/database/database.config';
 
+/**
+ * Root NestJS module that composes configuration, database access, and domain modules.
+ *
+ * The module configures TypeORM with migrations-managed PostgreSQL schema and never enables synchronize, preserving migration ownership of production structure.
+ */
 @Module({
     imports: [
         ConfigModule.forRoot({ isGlobal: true, load: [databaseConfig] }),
@@ -26,7 +31,6 @@ import databaseConfig from '@/database/database.config';
 
                 autoLoadEntities: true,
 
-                // Schema changes are managed through migrations.
                 synchronize: false,
                 migrationsRun: false,
 

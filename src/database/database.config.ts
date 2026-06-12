@@ -29,6 +29,14 @@ function getDatabasePort(): number {
     return port;
 }
 
+/**
+ * Loads database settings shared by Nest startup and TypeORM CLI commands.
+ *
+ * Failing fast on missing values prevents the application from silently using a
+ * different database for migrations, tests, or production startup.
+ *
+ * @returns Validated PostgreSQL connection settings.
+ */
 export function loadDatabaseConfiguration(): DatabaseConfiguration {
     return {
         host: getRequiredEnvironmentVariable('DATABASE_HOST'),

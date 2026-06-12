@@ -13,6 +13,11 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 
+/**
+ * TypeORM entity representing the current state of a requirement.
+ *
+ * Visible keys and type/category sequence numbers are unique and remain reserved even after soft deletion or rejection.
+ */
 @Entity({ name: 'requirements' })
 @Index('UQ_requirements_visible_key', ['visibleKey'], { unique: true })
 @Index('UQ_requirements_type_category_sequence', ['type', 'categoryId', 'sequenceNumber'], { unique: true })
