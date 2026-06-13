@@ -1,3 +1,4 @@
+import { RequirementType } from '@/requirements/requirement-type-enum';
 import { Check, Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
 /**
@@ -7,7 +8,9 @@ import { Check, Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn,
  */
 @Entity({ name: 'categories' })
 @Index('UQ_categories_key', ['key'], { unique: true })
+@Index('UQ_categories_id_type', ['id', 'type'], { unique: true })
 @Check('CHK_categories_key_format', `"key" ~ '^[A-Z][A-Z0-9_]*$'`)
+@Check('CHK_categories_type', `"type" IN ('FR', 'NFR')`)
 export class Category {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
@@ -17,6 +20,9 @@ export class Category {
 
     @Column({ type: 'varchar', length: 40 })
     key!: string;
+
+    @Column({ type: 'varchar', length: 3 })
+    type!: RequirementType;
     @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
     createdAt!: Date;
 

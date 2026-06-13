@@ -1,3 +1,4 @@
+import { RequirementType } from '@/requirements/requirement-type-enum';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -15,6 +16,9 @@ export class CategoryResponseDto {
 
     @ApiProperty({ description: 'Uppercase category key.', example: 'PERF' })
     key!: string;
+
+    @ApiProperty({ description: 'Requirement type derived from this category.', enum: RequirementType })
+    type!: RequirementType;
 
     @ApiProperty({ description: 'ISO timestamp when the category was created.', format: 'date-time' })
     createdAt!: string;

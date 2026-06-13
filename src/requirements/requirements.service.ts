@@ -62,11 +62,13 @@ export class RequirementsService {
             this.dataSource.transaction(async (manager) => {
                 const allocation = await this.requirementsKeyAllocatorService.allocateInTransaction(
                     manager,
-                    createRequirementDto.type,
                     createRequirementDto.categoryId,
                 );
 
-                const requirement = await manager.findOne(Requirement, { where: { id: allocation.id } });
+                const requirement = await manager.findOne(Requirement, {
+                    where: { id: allocation.id },
+                    relations: { category: true },
+                });
 
                 if (requirement === null) {
                     throw new NotFoundException(`Requirement "${allocation.id}" was not found after key allocation`);
@@ -110,7 +112,7 @@ export class RequirementsService {
         }
 
         if (filters.type !== undefined) {
-            where.type = filters.type;
+            where.category = { type: filters.type };
         }
 
         if (filters.categoryId !== undefined) {
@@ -121,7 +123,11 @@ export class RequirementsService {
             where.owner = filters.owner;
         }
 
-        const requirements = await this.requirementsRepository.find({ where, order: { visibleKey: 'ASC' } });
+        const requirements = await this.requirementsRepository.find({
+            where,
+            relations: { category: true },
+            order: { visibleKey: 'ASC' },
+        });
 
         return requirements.map((requirement) => this.toResponseDto(requirement));
     }
@@ -155,6 +161,7 @@ export class RequirementsService {
 
         const requirement = await this.requirementsRepository.findOne({
             where: { visibleKey, status: Not(RequirementStatus.Deleted) },
+            relations: { category: true },
         });
 
         if (requirement === null) {
@@ -352,7 +359,11 @@ export class RequirementsService {
     private async findRequirementForUpdate(manager: EntityManager, id: string): Promise<Requirement> {
         this.validateRequirementId(id);
 
-        const requirement = await manager.findOne(Requirement, { where: { id }, lock: { mode: 'pessimistic_write' } });
+        const requirement = await manager.findOne(Requirement, {
+            where: { id },
+            relations: { category: true },
+            lock: { mode: 'pessimistic_write' },
+        });
 
         if (requirement === null || requirement.status === RequirementStatus.Deleted) {
             throw new NotFoundException(`Requirement "${id}" was not found`);
@@ -471,7 +482,7 @@ export class RequirementsService {
             requirementId: requirement.id,
             revisionNumber: (latestRevision?.revisionNumber ?? 0) + 1,
             visibleKey: requirement.visibleKey,
-            type: requirement.type,
+            type: requirement.category?.type ?? requirement.type,
             categoryId: requirement.categoryId,
             sequenceNumber: requirement.sequenceNumber,
             status: requirement.status,
@@ -502,6 +513,7 @@ export class RequirementsService {
     private async findActiveOrRejectedRequirementById(id: string): Promise<Requirement> {
         const requirement = await this.requirementsRepository.findOne({
             where: { id, status: Not(RequirementStatus.Deleted) },
+            relations: { category: true },
         });
 
         if (requirement === null) {
@@ -516,8 +528,8 @@ export class RequirementsService {
             throw new BadRequestException('Requirement request body is required');
         }
 
-        if (!Object.values(RequirementType).includes(createRequirementDto.type)) {
-            throw new BadRequestException('Requirement type must be FR or NFR');
+        if ('type' in (createRequirementDto as unknown as Record<string, unknown>)) {
+            throw new BadRequestException('Requirement type is derived from category and cannot be submitted');
         }
 
         this.validateRequiredString(createRequirementDto.categoryId, 'Requirement category id is required');
@@ -654,7 +666,7 @@ export class RequirementsService {
         return {
             id: requirement.id,
             visibleKey: requirement.visibleKey,
-            type: requirement.type,
+            type: requirement.category?.type ?? requirement.type,
             categoryId: requirement.categoryId,
             sequenceNumber: requirement.sequenceNumber,
             status: requirement.status,

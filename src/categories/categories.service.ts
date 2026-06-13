@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
+import { RequirementType } from '@/requirements/requirement-type-enum';
 
 import { Category } from '@/categories/category.entity';
 import type { CategoryResponseDto } from '@/categories/dto/category-response.dto';
@@ -43,6 +44,7 @@ export class CategoriesService {
         const category = this.categoriesRepository.create({
             name: createCategoryDto.name.trim(),
             key: createCategoryDto.key,
+            type: createCategoryDto.type,
         });
 
         try {
@@ -85,6 +87,14 @@ export class CategoriesService {
             throw new BadRequestException('Category name must be no longer than 120 characters');
         }
 
+        if (!Object.values(RequirementType).includes(createCategoryDto.type)) {
+            throw new BadRequestException('Category type must be FR or NFR');
+        }
+
+        if (Array.isArray((createCategoryDto as unknown as Record<string, unknown>).type)) {
+            throw new BadRequestException('Category type must be a single FR or NFR value');
+        }
+
         if (typeof createCategoryDto.key !== 'string') {
             throw new BadRequestException('Category key is required');
         }
@@ -105,6 +115,7 @@ export class CategoriesService {
             id: category.id,
             name: category.name,
             key: category.key,
+            type: category.type,
             createdAt: category.createdAt.toISOString(),
             updatedAt: category.updatedAt.toISOString(),
         };

@@ -12,13 +12,19 @@ import { RequirementType } from '@/requirements/requirement-type-enum';
 export class RequirementResponseDto {
     @ApiProperty({ description: 'Internal requirement UUID.', format: 'uuid' })
     id!: string;
-    @ApiProperty({ description: 'Visible requirement key.', example: 'NFR-PERF-0001' })
+    @ApiProperty({
+        description: 'Visible requirement key whose prefix is derived from the assigned category type.',
+        example: 'NFR-PERF-0001',
+    })
     visibleKey!: string;
-    @ApiProperty({ description: 'Requirement type.', enum: RequirementType })
+    @ApiProperty({
+        description: 'Read-only requirement type derived from the assigned category.',
+        enum: RequirementType,
+    })
     type!: RequirementType;
     @ApiProperty({ description: 'Category UUID.', format: 'uuid' })
     categoryId!: string;
-    @ApiProperty({ description: 'Per-type/category sequence number.', minimum: 1, maximum: 9999 })
+    @ApiProperty({ description: 'Category-scoped sequence number.', minimum: 1, maximum: 9999 })
     sequenceNumber!: number;
     @ApiProperty({ description: 'Requirement lifecycle status.', enum: RequirementStatus })
     status!: RequirementStatus;

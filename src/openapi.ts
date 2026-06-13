@@ -377,7 +377,7 @@ export function createOpenApiDocument(): OpenAPIObject {
                 RequirementType: {
                     type: 'string',
                     enum: ['FR', 'NFR'],
-                    description: 'Requirement type used as the visible-key prefix.',
+                    description: 'Requirement type. For requirements, this is derived from the assigned category.',
                 },
                 RequirementStatus: {
                     type: 'string',
@@ -386,28 +386,29 @@ export function createOpenApiDocument(): OpenAPIObject {
                 },
                 CreateCategoryDto: {
                     type: 'object',
-                    required: ['name', 'key'],
+                    required: ['name', 'key', 'type'],
                     properties: {
                         name: { type: 'string', example: 'Performance' },
                         key: { type: 'string', pattern: '^[A-Z][A-Z0-9_]*$', example: 'PERF' },
+                        type: { $ref: '#/components/schemas/RequirementType' },
                     },
                 },
                 CategoryResponseDto: {
                     type: 'object',
-                    required: ['id', 'name', 'key', 'createdAt', 'updatedAt'],
+                    required: ['id', 'name', 'key', 'type', 'createdAt', 'updatedAt'],
                     properties: {
                         id: { type: 'string', format: 'uuid' },
                         name: { type: 'string' },
                         key: { type: 'string', example: 'PERF' },
+                        type: { $ref: '#/components/schemas/RequirementType' },
                         createdAt: { type: 'string', format: 'date-time' },
                         updatedAt: { type: 'string', format: 'date-time' },
                     },
                 },
                 CreateRequirementDto: {
                     type: 'object',
-                    required: ['type', 'categoryId', 'description', 'priority'],
+                    required: ['categoryId', 'description', 'priority'],
                     properties: {
-                        type: { $ref: '#/components/schemas/RequirementType' },
                         categoryId: { type: 'string', format: 'uuid' },
                         description: { type: 'string' },
                         priority: { type: 'string', example: 'p3' },
@@ -466,8 +467,16 @@ export function createOpenApiDocument(): OpenAPIObject {
                     ],
                     properties: {
                         id: { type: 'string', format: 'uuid' },
-                        visibleKey: { type: 'string', example: 'NFR-PERF-0001' },
-                        type: { $ref: '#/components/schemas/RequirementType' },
+                        visibleKey: {
+                            type: 'string',
+                            example: 'NFR-PERF-0001',
+                            description: 'Prefix is derived from the assigned category type.',
+                        },
+                        type: {
+                            allOf: [{ $ref: '#/components/schemas/RequirementType' }],
+                            readOnly: true,
+                            description: 'Derived from the assigned category.',
+                        },
                         categoryId: { type: 'string', format: 'uuid' },
                         sequenceNumber: { type: 'integer', minimum: 1, maximum: 9999 },
                         status: { $ref: '#/components/schemas/RequirementStatus' },

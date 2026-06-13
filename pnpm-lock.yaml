@@ -98,7 +98,7 @@ importers:
         version: 4.2.0
       typedoc:
         specifier: file:packages/typedoc-shim
-        version: link:packages/typedoc-shim
+        version: file:packages/typedoc-shim
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -2531,6 +2531,10 @@ packages:
 
   typedarray@0.0.6:
     resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
+
+  typedoc@file:packages/typedoc-shim:
+    resolution: {directory: packages/typedoc-shim, type: directory}
+    hasBin: true
 
   typeorm@1.0.0:
     resolution: {integrity: sha512-2mSKNqucP8vo+xQLP59xlHUcqLvG6qajxA7q7tnhJgeZjTrA6lK/Ar7LRyiAxdXhyXmGbIPsArPmcUB9Xg+M7w==}
@@ -5181,6 +5185,8 @@ snapshots:
       mime-types: 3.0.2
 
   typedarray@0.0.6: {}
+
+  typedoc@file:packages/typedoc-shim: {}
 
   typeorm@1.0.0(pg@8.21.0)(ts-node@10.9.2(@swc/core@1.15.40)(@types/node@24.13.1)(typescript@5.9.3)):
     dependencies:

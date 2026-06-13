@@ -47,15 +47,25 @@ test.describe('PostgreSQL migrations', () => {
         ]);
 
         const constraintRows = (await db.query(
-            `SELECT conname FROM pg_constraint WHERE conname IN ('UQ_categories_key', 'UQ_requirements_visible_key', 'UQ_requirements_type_category_sequence', 'UQ_requirements_key_counters_type_category', 'CHK_requirements_status') ORDER BY conname`,
+            `SELECT conname FROM pg_constraint WHERE conname IN ('CHK_categories_type', 'CHK_requirements_status', 'FK_requirements_type_matches_category') ORDER BY conname`,
         )) as unknown;
         expect(stringColumn(constraintRows, 'conname')).toEqual(
             expect.arrayContaining([
+                'CHK_categories_type',
+                'CHK_requirements_status',
+                'FK_requirements_type_matches_category',
+            ]),
+        );
+
+        const indexRows = (await db.query(
+            `SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND indexname IN ('UQ_categories_key', 'UQ_requirements_visible_key', 'UQ_requirements_category_sequence', 'UQ_requirements_key_counters_category') ORDER BY indexname`,
+        )) as unknown;
+        expect(stringColumn(indexRows, 'indexname')).toEqual(
+            expect.arrayContaining([
                 'UQ_categories_key',
                 'UQ_requirements_visible_key',
-                'UQ_requirements_type_category_sequence',
-                'UQ_requirements_key_counters_type_category',
-                'CHK_requirements_status',
+                'UQ_requirements_category_sequence',
+                'UQ_requirements_key_counters_category',
             ]),
         );
 
