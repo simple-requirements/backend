@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@nestjs/swagger':
-        specifier: file:packages/nestjs-swagger-shim
-        version: link:packages/nestjs-swagger-shim
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -23,6 +20,9 @@ importers:
       '@nestjs/platform-express':
         specifier: ^11.0.1
         version: 11.1.24(@nestjs/common@11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.24)
+      '@nestjs/swagger':
+        specifier: file:packages/nestjs-swagger-shim
+        version: link:packages/nestjs-swagger-shim
       '@nestjs/typeorm':
         specifier: ^11.0.1
         version: 11.0.1(@nestjs/common@11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.24)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.0.0(pg@8.21.0)(ts-node@10.9.2(@swc/core@1.15.40)(@types/node@24.13.1)(typescript@5.9.3)))
@@ -96,12 +96,12 @@ importers:
       tsconfig-paths:
         specifier: ^4.2.0
         version: 4.2.0
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
       typedoc:
         specifier: file:packages/typedoc-shim
         version: link:packages/typedoc-shim
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
       typescript-eslint:
         specifier: ^8.20.0
         version: 8.60.1(eslint@9.39.4)(typescript@5.9.3)
