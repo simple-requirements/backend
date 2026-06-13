@@ -1,21 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-import { RequirementType } from '@/requirements/requirement-type-enum';
-
 /**
  * Request body used to create a draft requirement.
  *
- * The type and category are immutable classification inputs used for durable
+ * The selected category is the immutable classification input used for durable
  * visible-key allocation before the editable requirement text is persisted.
  */
 export class CreateRequirementDto {
-    @ApiProperty({
-        description: 'Requirement type used as the visible-key prefix.',
-        enum: RequirementType,
-        example: RequirementType.NFR,
-    })
-    type!: RequirementType;
-
     @ApiProperty({ description: 'Internal category UUID.', format: 'uuid' })
     categoryId!: string;
 

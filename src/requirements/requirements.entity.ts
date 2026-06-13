@@ -16,11 +16,11 @@ import {
 /**
  * TypeORM entity representing the current state of a requirement.
  *
- * Visible keys and type/category sequence numbers are unique and remain reserved even after soft deletion or rejection.
+ * Visible keys and category-scoped sequence numbers are unique and remain reserved even after soft deletion or rejection.
  */
 @Entity({ name: 'requirements' })
 @Index('UQ_requirements_visible_key', ['visibleKey'], { unique: true })
-@Index('UQ_requirements_type_category_sequence', ['type', 'categoryId', 'sequenceNumber'], { unique: true })
+@Index('UQ_requirements_category_sequence', ['categoryId', 'sequenceNumber'], { unique: true })
 @Check('CHK_requirements_type', `"type" IN ('FR', 'NFR')`)
 @Check('CHK_requirements_status', `"status" IN ('draft', 'approved', 'implemented', 'obsolete', 'rejected', 'deleted')`)
 @Check('CHK_requirements_sequence_number_range', '"sequence_number" > 0 AND "sequence_number" <= 9999')

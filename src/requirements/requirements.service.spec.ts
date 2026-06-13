@@ -40,6 +40,7 @@ const baseRequirement: Requirement = {
         key: 'PERF',
         createdAt: new Date('2026-06-12T00:00:00.000Z'),
         updatedAt: new Date('2026-06-12T00:00:00.000Z'),
+        type: RequirementType.NFR,
     },
 };
 
@@ -108,7 +109,6 @@ describe('RequirementsService', () => {
 
     it('creates a draft requirement with an allocated visible key.', async () => {
         const dto: CreateRequirementDto = {
-            type: RequirementType.NFR,
             categoryId: baseRequirement.categoryId,
             description: ' The API responds quickly. ',
             priority: ' p1 ',
@@ -155,15 +155,13 @@ describe('RequirementsService', () => {
 
         expect(requirementsKeyAllocatorServiceMock.allocateInTransaction).toHaveBeenCalledWith(
             transactionManagerMock,
-            RequirementType.NFR,
             dto.categoryId,
         );
     });
 
     it('rejects requirement creation with missing required fields.', async () => {
         await expect(
-            // @ts-expect-error -- The type field has to be left out to make this test meaningful
-            service.create({ categoryId: baseRequirement.categoryId, description: 'Description', priority: 'p1' }),
+            service.create({ description: 'Description', priority: 'p1' } as CreateRequirementDto),
         ).rejects.toBeInstanceOf(BadRequestException);
 
         expect(requirementsKeyAllocatorServiceMock.allocateInTransaction).not.toHaveBeenCalled();
@@ -171,12 +169,7 @@ describe('RequirementsService', () => {
 
     it('rejects requirement priorities outside p1, p2, or p3.', async () => {
         await expect(
-            service.create({
-                type: RequirementType.NFR,
-                categoryId: baseRequirement.categoryId,
-                description: 'Description',
-                priority: 'high',
-            }),
+            service.create({ categoryId: baseRequirement.categoryId, description: 'Description', priority: 'high' }),
         ).rejects.toThrow('Requirement priority must be p1, p2, or p3');
 
         await expect(service.update(baseRequirement.id, { priority: 'p4' })).rejects.toThrow(

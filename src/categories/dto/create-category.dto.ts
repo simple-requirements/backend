@@ -1,3 +1,4 @@
+import { RequirementType } from '@/requirements/requirement-type-enum';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -12,4 +13,11 @@ export class CreateCategoryDto {
 
     @ApiProperty({ description: 'Uppercase category key used in visible requirement keys.', example: 'PERF' })
     key!: string;
+
+    @ApiProperty({
+        description: 'Category-derived requirement type.',
+        enum: RequirementType,
+        example: RequirementType.NFR,
+    })
+    type!: RequirementType;
 }

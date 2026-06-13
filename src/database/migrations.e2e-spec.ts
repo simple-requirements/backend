@@ -47,14 +47,15 @@ test.describe('PostgreSQL migrations', () => {
         ]);
 
         const constraintRows = (await db.query(
-            `SELECT conname FROM pg_constraint WHERE conname IN ('UQ_categories_key', 'UQ_requirements_visible_key', 'UQ_requirements_type_category_sequence', 'UQ_requirements_key_counters_type_category', 'CHK_requirements_status') ORDER BY conname`,
+            `SELECT conname FROM pg_constraint WHERE conname IN ('UQ_categories_key', 'UQ_requirements_visible_key', 'UQ_requirements_category_sequence', 'UQ_requirements_key_counters_category', 'CHK_categories_type', 'CHK_requirements_status') ORDER BY conname`,
         )) as unknown;
         expect(stringColumn(constraintRows, 'conname')).toEqual(
             expect.arrayContaining([
                 'UQ_categories_key',
                 'UQ_requirements_visible_key',
-                'UQ_requirements_type_category_sequence',
-                'UQ_requirements_key_counters_type_category',
+                'UQ_requirements_category_sequence',
+                'UQ_requirements_key_counters_category',
+                'CHK_categories_type',
                 'CHK_requirements_status',
             ]),
         );

@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { RequirementType } from '@/requirements/requirement-type-enum';
 import { cleanDatabase, closeE2eDataSource } from '@/database/database-test-utility';
 
 interface CategoryApiResponse {
     id: string;
     name: string;
     key: string;
+    type: RequirementType;
     createdAt: string;
     updatedAt: string;
 }
@@ -26,15 +28,21 @@ test.describe('categories API', () => {
     });
 
     test('Creates categories with valid uppercase keys.', async ({ request }) => {
-        const createResponse = await request.post('/categories', { data: { name: categoryName, key } });
+        const createResponse = await request.post('/categories', {
+            data: { name: categoryName, key, type: RequirementType.NFR },
+        });
         expect(createResponse.status()).toBe(201);
         const created = (await createResponse.json()) as CategoryApiResponse;
 
-        expect(created).toEqual(expect.objectContaining({ id: expect.any(String), name: categoryName, key }));
+        expect(created).toEqual(
+            expect.objectContaining({ id: expect.any(String), name: categoryName, key, type: RequirementType.NFR }),
+        );
     });
 
     test('Lists categories with valid uppercase keys.', async ({ request }) => {
-        const createResponse = await request.post('/categories', { data: { name: categoryName, key } });
+        const createResponse = await request.post('/categories', {
+            data: { name: categoryName, key, type: RequirementType.NFR },
+        });
         expect(createResponse.status()).toBe(201);
         const created = (await createResponse.json()) as CategoryApiResponse;
 
@@ -44,12 +52,16 @@ test.describe('categories API', () => {
         const categories = (await listResponse.json()) as CategoryApiResponse;
 
         expect(categories).toEqual(
-            expect.arrayContaining([expect.objectContaining({ id: created.id, name: 'Performance', key })]),
+            expect.arrayContaining([
+                expect.objectContaining({ id: created.id, name: 'Performance', key, type: RequirementType.NFR }),
+            ]),
         );
     });
 
     test('Retrieves categories with valid uppercase keys.', async ({ request }) => {
-        const createResponse = await request.post('/categories', { data: { name: categoryName, key } });
+        const createResponse = await request.post('/categories', {
+            data: { name: categoryName, key, type: RequirementType.NFR },
+        });
         expect(createResponse.status()).toBe(201);
         const created = (await createResponse.json()) as CategoryApiResponse;
 
@@ -60,13 +72,17 @@ test.describe('categories API', () => {
 
     test.describe('Category keys', () => {
         test('Rejects lowercase category keys.', async ({ request }) => {
-            const response = await request.post('/categories', { data: { name: categoryName, key: 'lower-case-key' } });
+            const response = await request.post('/categories', {
+                data: { name: categoryName, key: 'lower-case-key', type: RequirementType.NFR },
+            });
 
             expect(response.status()).toBe(400);
         });
 
         test('Rejects invalid category key characters.', async ({ request }) => {
-            const response = await request.post('/categories', { data: { name: categoryName, key: '/nval/d-ke&' } });
+            const response = await request.post('/categories', {
+                data: { name: categoryName, key: '/nval/d-ke&', type: RequirementType.NFR },
+            });
 
             expect(response.status()).toBe(400);
         });
@@ -74,10 +90,14 @@ test.describe('categories API', () => {
         test('rejects duplicate category keys.', async ({ request }) => {
             const key = 'DUPKEY';
 
-            const firstResponse = await request.post('/categories', { data: { name: categoryName, key } });
+            const firstResponse = await request.post('/categories', {
+                data: { name: categoryName, key, type: RequirementType.NFR },
+            });
             expect(firstResponse.status()).toBe(201);
 
-            const duplicateResponse = await request.post('/categories', { data: { name: 'Compatibility', key } });
+            const duplicateResponse = await request.post('/categories', {
+                data: { name: 'Compatibility', key, type: RequirementType.NFR },
+            });
             expect(duplicateResponse.status()).toBe(409);
         });
     });

@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 
+import { RequirementType } from '@/requirements/requirement-type-enum';
 import { CategoriesService } from '@/categories/categories.service';
 import { Category } from '@/categories/category.entity';
 import { DeepPartial, FindManyOptions, FindOneOptions } from 'typeorm';
@@ -24,6 +25,7 @@ function createCategory(overrides: Partial<Category> = {}): Category {
         id: '0f25fbce-9c58-4e33-8e49-0b217f85a652',
         name: 'Performance',
         key: 'PERF',
+        type: RequirementType.NFR,
         createdAt: now,
         updatedAt: now,
         ...overrides,
@@ -33,12 +35,16 @@ function createCategory(overrides: Partial<Category> = {}): Category {
 describe('CategoriesService', () => {
     let service: CategoriesService;
     let categoriesRepository: CategoryRepositoryMock;
-    let expectedCategory: Pick<Category, 'name' | 'key'>;
+    let expectedCategory: Pick<Category, 'name' | 'key' | 'type'>;
 
     beforeEach(async () => {
         categoriesRepository = {
             create: vi.fn((category: DeepPartial<Category>) =>
-                createCategory({ name: category.name ?? '', key: category.key ?? '' }),
+                createCategory({
+                    name: category.name ?? '',
+                    key: category.key ?? '',
+                    type: category.type ?? RequirementType.NFR,
+                }),
             ),
 
             find: vi.fn().mockResolvedValue([]),
@@ -53,7 +59,7 @@ describe('CategoriesService', () => {
         }).compile();
 
         service = moduleRef.get(CategoriesService);
-        expectedCategory = { name: 'Performance', key: 'PERF' };
+        expectedCategory = { name: 'Performance', key: 'PERF', type: RequirementType.NFR };
     });
 
     it('creates a category with a valid uppercase key.', async () => {
@@ -65,6 +71,7 @@ describe('CategoriesService', () => {
             id: '0f25fbce-9c58-4e33-8e49-0b217f85a652',
             name: expectedCategory.name,
             key: expectedCategory.key,
+            type: RequirementType.NFR,
             createdAt: '2026-06-07T00:00:00.000Z',
             updatedAt: '2026-06-07T00:00:00.000Z',
         });
@@ -73,7 +80,11 @@ describe('CategoriesService', () => {
 
     it('rejects lowercase category keys', async () => {
         await expect(
-            service.create({ name: expectedCategory.name, key: expectedCategory.key.toLowerCase() }),
+            service.create({
+                name: expectedCategory.name,
+                key: expectedCategory.key.toLowerCase(),
+                type: RequirementType.NFR,
+            }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
         expect(categoriesRepository.findOne).not.toHaveBeenCalled();
@@ -81,9 +92,9 @@ describe('CategoriesService', () => {
     });
 
     it('rejects category keys with unsupported characters', async () => {
-        await expect(service.create({ name: 'Functional Requirements', key: '/nval/d-ke&' })).rejects.toBeInstanceOf(
-            BadRequestException,
-        );
+        await expect(
+            service.create({ name: 'Functional Requirements', key: '/nval/d-ke&', type: RequirementType.FR }),
+        ).rejects.toBeInstanceOf(BadRequestException);
 
         expect(categoriesRepository.findOne).not.toHaveBeenCalled();
         expect(categoriesRepository.save).not.toHaveBeenCalled();
@@ -93,7 +104,9 @@ describe('CategoriesService', () => {
         const key = 'DUPKEY';
         vi.mocked(categoriesRepository.findOne).mockResolvedValue(createCategory({ key }));
 
-        await expect(service.create({ name: expectedCategory.name, key })).rejects.toBeInstanceOf(ConflictException);
+        await expect(
+            service.create({ name: expectedCategory.name, key, type: RequirementType.NFR }),
+        ).rejects.toBeInstanceOf(ConflictException);
 
         expect(categoriesRepository.save).not.toHaveBeenCalled();
     });
@@ -106,6 +119,7 @@ describe('CategoriesService', () => {
                 id: '0f25fbce-9c58-4e33-8e49-0b217f85a652',
                 name: 'Performance',
                 key: 'PERF',
+                type: RequirementType.NFR,
                 createdAt: '2026-06-07T00:00:00.000Z',
                 updatedAt: '2026-06-07T00:00:00.000Z',
             },

@@ -64,8 +64,13 @@ interface RequirementRevisionApiResponse {
     createdAt: string;
 }
 
-async function createCategory(request: APIRequestContext, name: string, key: string): Promise<CategoryApiResponse> {
-    const response = await request.post('/categories', { data: { name, key } });
+async function createCategory(
+    request: APIRequestContext,
+    name: string,
+    key: string,
+    type = RequirementType.NFR,
+): Promise<CategoryApiResponse> {
+    const response = await request.post('/categories', { data: { name, key, type } });
 
     expect(response.status()).toBe(201);
 
@@ -76,7 +81,6 @@ async function createRequirement(
     request: APIRequestContext,
     categoryId: string,
     overrides: Partial<{
-        type: RequirementType;
         description: string;
         priority: string;
         owner: string | null;
@@ -86,7 +90,6 @@ async function createRequirement(
 ): Promise<RequirementApiResponse> {
     const response = await request.post('/requirements', {
         data: {
-            type: RequirementType.NFR,
             categoryId,
             description: 'The API should respond quickly for interactive users.',
             priority: 'p3',
@@ -173,18 +176,9 @@ test.describe('requirements API', () => {
     });
 
     test('Lists requirements.', async ({ request }) => {
-        const categoryKey = 'SEC';
-        const categoryResponse = await request.post('/categories', { data: { name: 'Security', key: categoryKey } });
-        expect(categoryResponse.status()).toBe(201);
-
-        const category = (await categoryResponse.json()) as CategoryApiResponse;
+        const category = await createCategory(request, 'Security', 'SEC', RequirementType.NFR);
         const createResponse = await request.post('/requirements', {
-            data: {
-                type: RequirementType.NFR,
-                categoryId: category.id,
-                description: 'The system records login events.',
-                priority: 'p2',
-            },
+            data: { categoryId: category.id, description: 'The system records login events.', priority: 'p2' },
         });
         expect(createResponse.status()).toBe(201);
 
@@ -499,12 +493,7 @@ test.describe('requirements API', () => {
         const created = await createRequirement(request, category.id);
 
         const response = await request.patch(`/requirements/${created.id}`, {
-            data: {
-                type: RequirementType.NFR,
-                categoryId: category.id,
-                visibleKey: 'NFR-PERF-0001',
-                description: 'Changed',
-            },
+            data: { categoryId: category.id, visibleKey: 'NFR-PERF-0001', description: 'Changed' },
         });
 
         expect(response.status()).toBe(400);
@@ -528,7 +517,6 @@ test.describe('requirements API', () => {
             Array.from({ length: 5 }, (_, index) =>
                 request.post('/requirements', {
                     data: {
-                        type: RequirementType.NFR,
                         categoryId: category.id,
                         description: `Concurrent requirement ${index + 1}`,
                         priority: 'p3',
@@ -594,7 +582,7 @@ test.describe('requirements API', () => {
     });
 
     test('Filters requirements by type, category, status, and owner.', async ({ request }) => {
-        const security = await createCategory(request, 'Security', 'SEC');
+        const security = await createCategory(request, 'Security', 'SEC', RequirementType.NFR);
         const perfNfr = await createRequirement(request, category.id, {
             type: RequirementType.NFR,
             owner: 'Team A',
@@ -690,9 +678,7 @@ test.describe('requirements API', () => {
 
         expect(invalidTypeResponse.status()).toBe(400);
 
-        const invalidPriorityResponse = await request.post('/requirements', {
-            data: { type: RequirementType.NFR, categoryId: category.id, description: 'Description', priority: 'high' },
-        });
+        const invalidPriorityResponse = await request.post('/requirements', {});
 
         expect(invalidPriorityResponse.status()).toBe(400);
         expect(await invalidPriorityResponse.json()).toEqual(
