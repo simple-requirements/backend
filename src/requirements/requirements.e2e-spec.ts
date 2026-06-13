@@ -583,23 +583,14 @@ test.describe('requirements API', () => {
 
     test('Filters requirements by type, category, status, and owner.', async ({ request }) => {
         const security = await createCategory(request, 'Security', 'SEC', RequirementType.NFR);
-        const perfNfr = await createRequirement(request, category.id, {
-            type: RequirementType.NFR,
-            owner: 'Team A',
-            description: 'Perf NFR.',
-        });
-        const perfFr = await createRequirement(request, category.id, {
-            type: RequirementType.FR,
+        const functional = await createCategory(request, 'Functional', 'FUNC', RequirementType.FR);
+        const perfNfr = await createRequirement(request, category.id, { owner: 'Team A', description: 'Perf NFR.' });
+        const perfFr = await createRequirement(request, functional.id, {
             owner: 'Team B',
-            description: 'Perf FR.',
+            description: 'Functional FR.',
         });
-        const secNfr = await createRequirement(request, security.id, {
-            type: RequirementType.NFR,
-            owner: 'Team A',
-            description: 'Sec NFR.',
-        });
-        const rejected = await createRequirement(request, security.id, {
-            type: RequirementType.FR,
+        const secNfr = await createRequirement(request, security.id, { owner: 'Team A', description: 'Sec NFR.' });
+        const rejected = await createRequirement(request, functional.id, {
             owner: 'Team C',
             description: 'Rejected FR.',
         });
@@ -678,7 +669,9 @@ test.describe('requirements API', () => {
 
         expect(invalidTypeResponse.status()).toBe(400);
 
-        const invalidPriorityResponse = await request.post('/requirements', {});
+        const invalidPriorityResponse = await request.post('/requirements', {
+            data: { categoryId: category.id, description: 'Description', priority: 'high' },
+        });
 
         expect(invalidPriorityResponse.status()).toBe(400);
         expect(await invalidPriorityResponse.json()).toEqual(
