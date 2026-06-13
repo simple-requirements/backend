@@ -17,7 +17,7 @@ export const OPENAPI_JSON_PATH = 'api/docs-json';
 export function createOpenApiDocument(): OpenAPIObject {
     const config = new DocumentBuilder()
         .setTitle('Requirements Backend API')
-        .setDescription('HTTP API for category management and requirement lifecycle operations.')
+        .setDescription('HTTP API for the Requirements Management app.')
         .setVersion('0.0.1')
         .build();
 
