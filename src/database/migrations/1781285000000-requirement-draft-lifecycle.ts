@@ -4,7 +4,10 @@ export class RequirementDraftLifecycle1781285000000 implements MigrationInterfac
     name = 'RequirementDraftLifecycle1781285000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "requirements" DROP CONSTRAINT "CHK_requirements_status"`);
+        await queryRunner.query(
+            `ALTER TABLE "requirements" ADD COLUMN IF NOT EXISTS "status" character varying(10) NOT NULL DEFAULT 'draft'`,
+        );
+        await queryRunner.query(`ALTER TABLE "requirements" DROP CONSTRAINT IF EXISTS "CHK_requirements_status"`);
         await queryRunner.query(
             `ALTER TABLE "requirements" ADD CONSTRAINT "CHK_requirements_status" CHECK ("status" IN ('draft', 'rejected', 'deleted'))`,
         );
