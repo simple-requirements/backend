@@ -28,12 +28,12 @@
         "@nestjs/config": "^4.0.4",
         "@nestjs/core": "^11.0.1",
         "@nestjs/platform-express": "^11.0.1",
+        "@nestjs/swagger": "^11.4.4",
         "@nestjs/typeorm": "^11.0.1",
         "pg": "^8.21.0",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.1",
-        "typeorm": "^1.0.0",
-        "@nestjs/swagger": "file:packages/nestjs-swagger-shim"
+        "typeorm": "^1.0.0"
     },
     "devDependencies": {
         "@eslint/eslintrc": "^3.2.0",
@@ -55,10 +55,10 @@
         "ts-loader": "^9.5.2",
         "ts-node": "^10.9.2",
         "tsconfig-paths": "^4.2.0",
+        "typedoc": "file:packages/typedoc-shim",
         "typescript": "^5.7.3",
         "typescript-eslint": "^8.20.0",
         "unplugin-swc": "^1.5.9",
-        "vitest": "^4.1.8",
-        "typedoc": "file:packages/typedoc-shim"
+        "vitest": "^4.1.8"
     }
 }
