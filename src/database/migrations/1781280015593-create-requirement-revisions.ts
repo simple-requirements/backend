@@ -11,6 +11,7 @@ export class CreateRequirementRevisions1781280015593 implements MigrationInterfa
                 "revision_number" integer NOT NULL,
                 "visible_key" character varying(13) NOT NULL,
                 "type" character varying(3) NOT NULL,
+                "project_id" uuid NOT NULL,
                 "category_id" uuid NOT NULL,
                 "sequence_number" integer NOT NULL,
                 "status" character varying(10) NOT NULL,
@@ -78,6 +79,20 @@ export class CreateRequirementRevisions1781280015593 implements MigrationInterfa
         );
 
         await queryRunner.query(
+            `CREATE INDEX "IDX_requirements_revision_project_id"
+             ON "requirements_revision" ("project_id")`,
+        );
+
+        await queryRunner.query(
+            `ALTER TABLE "requirements_revision"
+             ADD CONSTRAINT "FK_requirements_revision_project"
+             FOREIGN KEY ("project_id")
+             REFERENCES "projects"("id")
+             ON DELETE RESTRICT
+             ON UPDATE NO ACTION`,
+        );
+
+        await queryRunner.query(
             `ALTER TABLE "requirements_revision"
              ADD CONSTRAINT "FK_ca126efeced381fb48bdf5a0009"
              FOREIGN KEY ("requirement_id")
@@ -92,6 +107,13 @@ export class CreateRequirementRevisions1781280015593 implements MigrationInterfa
             `ALTER TABLE "requirements_revision"
              DROP CONSTRAINT "FK_ca126efeced381fb48bdf5a0009"`,
         );
+
+        await queryRunner.query(
+            `ALTER TABLE "requirements_revision"
+             DROP CONSTRAINT "FK_requirements_revision_project"`,
+        );
+
+        await queryRunner.query(`DROP INDEX "public"."IDX_requirements_revision_project_id"`);
 
         await queryRunner.query(`DROP INDEX "public"."UQ_requirements_revisions_requirement_revision"`);
 

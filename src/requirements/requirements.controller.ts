@@ -48,14 +48,16 @@ export class RequirementsController {
     }
 
     @Get()
-    @ApiOperation({ summary: 'List requirements with optional filters.' })
+    @ApiOperation({ summary: 'List requirements within a required project scope with optional filters.' })
+    @ApiQuery({ name: 'projectId', required: true })
     @ApiQuery({ name: 'includeRejected', required: false })
     @ApiQuery({ name: 'type', required: false })
     @ApiQuery({ name: 'categoryId', required: false })
     @ApiQuery({ name: 'status', required: false })
     @ApiQuery({ name: 'owner', required: false })
     @ApiOkResponse({ description: 'Requirements ordered by visible key.' })
-    @ApiBadRequestResponse({ description: 'Invalid filter value.' })
+    @ApiBadRequestResponse({ description: 'Missing project scope or invalid filter value.' })
+    @ApiNotFoundResponse({ description: 'Project was not found.' })
     async findAll(@Query() query: RequirementListQueryDto): Promise<RequirementResponseDto[]> {
         return this.requirementsService.findAll(query);
     }

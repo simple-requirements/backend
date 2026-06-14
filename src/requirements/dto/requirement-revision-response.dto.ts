@@ -20,6 +20,8 @@ export class RequirementRevisionResponseDto {
     visibleKey!: string;
     @ApiProperty({ description: 'Requirement type at snapshot time.', enum: RequirementType })
     type!: RequirementType;
+    @ApiProperty({ description: 'Project UUID at snapshot time.', format: 'uuid' })
+    projectId!: string;
     @ApiProperty({ description: 'Category UUID at snapshot time.', format: 'uuid' })
     categoryId!: string;
     @ApiProperty({ description: 'Sequence number at snapshot time.', minimum: 1, maximum: 9999 })

@@ -5,6 +5,7 @@ import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AppController } from '@/app.controller';
 import { AppService } from '@/app.service';
 import { CategoriesModule } from '@/categories/categories.module';
+import { ProjectsModule } from '@/projects/projects.module';
 import { RequirementsModule } from '@/requirements/requirements.module';
 import databaseConfig from '@/database/database.config';
 
@@ -42,6 +43,7 @@ import databaseConfig from '@/database/database.config';
         }),
 
         CategoriesModule,
+        ProjectsModule,
         RequirementsModule,
     ],
     controllers: [AppController],

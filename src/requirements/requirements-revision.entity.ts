@@ -34,6 +34,9 @@ export class RequirementRevision {
     @Column({ type: 'varchar', length: 3 })
     type!: RequirementType;
 
+    @Column({ type: 'uuid', name: 'project_id' })
+    projectId!: string;
+
     @Column({ type: 'uuid', name: 'category_id' })
     categoryId!: string;
 

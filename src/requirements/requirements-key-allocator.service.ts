@@ -38,9 +38,9 @@ export class RequirementsKeyAllocatorService {
      * @throws NotFoundException If the category does not exist.
      * @throws ConflictException If the sequence range is exhausted or a database uniqueness constraint is hit.
      */
-    async allocate(categoryId: string): Promise<AllocatedRequirementKeyDto> {
+    async allocate(categoryId: string, projectId: string): Promise<AllocatedRequirementKeyDto> {
         return this.runWithAllocationConflictMapping(() =>
-            this.dataSource.transaction(async (manager) => this.allocateInTransaction(manager, categoryId)),
+            this.dataSource.transaction(async (manager) => this.allocateInTransaction(manager, categoryId, projectId)),
         );
     }
 
@@ -55,7 +55,11 @@ export class RequirementsKeyAllocatorService {
      * @param categoryId - Category UUID being allocated within.
      * @returns The persisted identity and visible key reserved by this transaction.
      */
-    async allocateInTransaction(manager: EntityManager, categoryId: string): Promise<AllocatedRequirementKeyDto> {
+    async allocateInTransaction(
+        manager: EntityManager,
+        categoryId: string,
+        projectId: string,
+    ): Promise<AllocatedRequirementKeyDto> {
         this.validateCategoryId(categoryId);
 
         const category = await manager.findOne(Category, { where: { id: categoryId } });
@@ -97,6 +101,7 @@ export class RequirementsKeyAllocatorService {
 
         const requirement = manager.create(Requirement, {
             type: category.type,
+            projectId,
             categoryId,
             category,
             sequenceNumber,

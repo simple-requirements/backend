@@ -22,6 +22,8 @@ export class RequirementResponseDto {
         enum: RequirementType,
     })
     type!: RequirementType;
+    @ApiProperty({ description: 'Project UUID.', format: 'uuid' })
+    projectId!: string;
     @ApiProperty({ description: 'Category UUID.', format: 'uuid' })
     categoryId!: string;
     @ApiProperty({ description: 'Category-scoped sequence number.', minimum: 1, maximum: 9999 })

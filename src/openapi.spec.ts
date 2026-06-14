@@ -14,6 +14,8 @@ describe('OpenAPI document', () => {
         expect(document.info).toEqual(expect.objectContaining({ title: 'Requirements Backend API', version: '0.0.1' }));
         expect(Object.keys(document.paths)).toEqual(
             expect.arrayContaining([
+                '/projects',
+                '/projects/{id}',
                 '/categories',
                 '/categories/{id}',
                 '/requirements',
@@ -30,12 +32,26 @@ describe('OpenAPI document', () => {
 
         const requirementList = document.paths['/requirements'] as { get: { parameters: Array<{ name: string }> } };
         expect(requirementList.get.parameters.map((parameter) => parameter.name)).toEqual([
+            'projectId',
             'includeRejected',
             'type',
             'categoryId',
             'status',
             'owner',
         ]);
+
+        const createRequirement = document.components?.schemas?.CreateRequirementDto as { required: string[] };
+        expect(createRequirement.required).toEqual(expect.arrayContaining(['projectId']));
+
+        const updateRequirement = document.components?.schemas?.UpdateRequirementDto as {
+            properties: Record<string, unknown>;
+        };
+        expect(updateRequirement.properties.projectId).toBeUndefined();
+
+        const projectResponse = document.components?.schemas?.ProjectResponseDto as {
+            properties: Record<string, unknown>;
+        };
+        expect(projectResponse.properties.requirementCount).toBeDefined();
 
         expect(document.components?.schemas?.RequirementStatus).toEqual(
             expect.objectContaining({ enum: ['draft', 'approved', 'implemented', 'obsolete', 'rejected', 'deleted'] }),

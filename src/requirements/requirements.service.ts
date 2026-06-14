@@ -1,3 +1,4 @@
+import { Project } from '@/projects/project.entity';
 import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
 import type { MarkObsoleteRequirementDto } from '@/requirements/dto/mark-obsolete-requirement.dto';
 import type { RejectRequirementDto } from '@/requirements/dto/reject-requirement.dto';
@@ -16,7 +17,15 @@ import { DataSource, EntityManager, FindOptionsWhere, Not, Repository } from 'ty
 
 const VISIBLE_KEY_PATTERN = /^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const IMMUTABLE_UPDATE_FIELDS = ['id', 'visibleKey', 'type', 'categoryId', 'sequenceNumber', 'status'] as const;
+const IMMUTABLE_UPDATE_FIELDS = [
+    'id',
+    'visibleKey',
+    'type',
+    'projectId',
+    'categoryId',
+    'sequenceNumber',
+    'status',
+] as const;
 const EDITABLE_UPDATE_FIELDS = ['description', 'priority', 'owner', 'rationale', 'source'] as const;
 const LIFECYCLE_TRANSITIONS: Readonly<Record<RequirementStatus, readonly RequirementStatus[]>> = {
     [RequirementStatus.Draft]: [RequirementStatus.Approved, RequirementStatus.Rejected],
@@ -39,6 +48,8 @@ export class RequirementsService {
         private readonly requirementsRepository: Repository<Requirement>,
         @InjectRepository(RequirementRevision)
         private readonly requirementRevisionsRepository: Repository<RequirementRevision>,
+        @InjectRepository(Project)
+        private readonly projectsRepository: Repository<Project>,
         @InjectDataSource()
         private readonly dataSource: DataSource,
         private readonly requirementsKeyAllocatorService: RequirementsKeyAllocatorService,
@@ -60,14 +71,17 @@ export class RequirementsService {
 
         return this.requirementsKeyAllocatorService.runWithAllocationConflictMapping(() =>
             this.dataSource.transaction(async (manager) => {
+                await this.ensureProjectExists(createRequirementDto.projectId);
+
                 const allocation = await this.requirementsKeyAllocatorService.allocateInTransaction(
                     manager,
                     createRequirementDto.categoryId,
+                    createRequirementDto.projectId,
                 );
 
                 const requirement = await manager.findOne(Requirement, {
                     where: { id: allocation.id },
-                    relations: { category: true },
+                    relations: { category: true, project: true },
                 });
 
                 if (requirement === null) {
@@ -97,7 +111,8 @@ export class RequirementsService {
      */
     async findAll(query: RequirementListQueryDto = {}): Promise<RequirementResponseDto[]> {
         const filters = this.toListFilters(query);
-        const where: FindOptionsWhere<Requirement> = { status: RequirementStatus.Draft };
+        await this.ensureProjectExists(filters.projectId);
+        const where: FindOptionsWhere<Requirement> = { status: RequirementStatus.Draft, projectId: filters.projectId };
 
         if (filters.includeRejected) {
             where.status = Not(RequirementStatus.Deleted);
@@ -125,7 +140,7 @@ export class RequirementsService {
 
         const requirements = await this.requirementsRepository.find({
             where,
-            relations: { category: true },
+            relations: { category: true, project: true },
             order: { visibleKey: 'ASC' },
         });
 
@@ -161,7 +176,7 @@ export class RequirementsService {
 
         const requirement = await this.requirementsRepository.findOne({
             where: { visibleKey, status: Not(RequirementStatus.Deleted) },
-            relations: { category: true },
+            relations: { category: true, project: true },
         });
 
         if (requirement === null) {
@@ -361,7 +376,7 @@ export class RequirementsService {
 
         const requirement = await manager.findOne(Requirement, {
             where: { id },
-            relations: { category: true },
+            relations: { category: true, project: true },
             lock: { mode: 'pessimistic_write' },
         });
 
@@ -454,7 +469,16 @@ export class RequirementsService {
             throw new BadRequestException('Requirement owner filter cannot be blank');
         }
 
+        if (query.projectId === undefined) {
+            throw new BadRequestException('Requirement project id filter is required');
+        }
+
+        if (!UUID_PATTERN.test(query.projectId)) {
+            throw new BadRequestException('Requirement project id filter must be a valid UUID');
+        }
+
         return {
+            projectId: query.projectId,
             includeRejected,
             type,
             categoryId: query.categoryId,
@@ -483,6 +507,7 @@ export class RequirementsService {
             revisionNumber: (latestRevision?.revisionNumber ?? 0) + 1,
             visibleKey: requirement.visibleKey,
             type: requirement.category?.type ?? requirement.type,
+            projectId: requirement.projectId,
             categoryId: requirement.categoryId,
             sequenceNumber: requirement.sequenceNumber,
             status: requirement.status,
@@ -510,10 +535,18 @@ export class RequirementsService {
         await this.findActiveOrRejectedRequirementById(id);
     }
 
+    private async ensureProjectExists(projectId: string): Promise<void> {
+        const project = await this.projectsRepository.findOne({ where: { id: projectId } });
+
+        if (project === null) {
+            throw new NotFoundException(`Project "${projectId}" was not found`);
+        }
+    }
+
     private async findActiveOrRejectedRequirementById(id: string): Promise<Requirement> {
         const requirement = await this.requirementsRepository.findOne({
             where: { id, status: Not(RequirementStatus.Deleted) },
-            relations: { category: true },
+            relations: { category: true, project: true },
         });
 
         if (requirement === null) {
@@ -530,6 +563,12 @@ export class RequirementsService {
 
         if ('type' in (createRequirementDto as unknown as Record<string, unknown>)) {
             throw new BadRequestException('Requirement type is derived from category and cannot be submitted');
+        }
+
+        this.validateRequiredString(createRequirementDto.projectId, 'Requirement project id is required');
+
+        if (!UUID_PATTERN.test(createRequirementDto.projectId)) {
+            throw new BadRequestException('Requirement project id must be a valid UUID');
         }
 
         this.validateRequiredString(createRequirementDto.categoryId, 'Requirement category id is required');
@@ -667,6 +706,7 @@ export class RequirementsService {
             id: requirement.id,
             visibleKey: requirement.visibleKey,
             type: requirement.category?.type ?? requirement.type,
+            projectId: requirement.projectId,
             categoryId: requirement.categoryId,
             sequenceNumber: requirement.sequenceNumber,
             status: requirement.status,
@@ -695,6 +735,7 @@ export class RequirementsService {
             revisionNumber: revision.revisionNumber,
             visibleKey: revision.visibleKey,
             type: revision.type,
+            projectId: revision.projectId,
             categoryId: revision.categoryId,
             sequenceNumber: revision.sequenceNumber,
             status: revision.status,

@@ -7,6 +7,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * visible-key allocation before the editable requirement text is persisted.
  */
 export class CreateRequirementDto {
+    @ApiProperty({ description: 'Internal project UUID.', format: 'uuid' })
+    projectId!: string;
+
     @ApiProperty({ description: 'Internal category UUID.', format: 'uuid' })
     categoryId!: string;
 

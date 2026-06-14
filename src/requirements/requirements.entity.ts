@@ -1,4 +1,5 @@
 import { Category } from '@/categories/category.entity';
+import { Project } from '@/projects/project.entity';
 import { RequirementStatus } from '@/requirements/requirement-status-enum';
 import { RequirementType } from '@/requirements/requirement-type-enum';
 import {
@@ -21,6 +22,8 @@ import {
 @Entity({ name: 'requirements' })
 @Index('UQ_requirements_visible_key', ['visibleKey'], { unique: true })
 @Index('UQ_requirements_category_sequence', ['categoryId', 'sequenceNumber'], { unique: true })
+@Index('IDX_requirements_project_id', ['projectId'])
+@Index('UQ_requirements_id_project', ['id', 'projectId'], { unique: true })
 @Check('CHK_requirements_type', `"type" IN ('FR', 'NFR')`)
 @Check('CHK_requirements_status', `"status" IN ('draft', 'approved', 'implemented', 'obsolete', 'rejected', 'deleted')`)
 @Check('CHK_requirements_sequence_number_range', '"sequence_number" > 0 AND "sequence_number" <= 9999')
@@ -32,6 +35,9 @@ export class Requirement {
 
     @Column({ type: 'varchar', length: 3 })
     type!: RequirementType;
+
+    @Column({ type: 'uuid', name: 'project_id' })
+    projectId!: string;
 
     @Column({ type: 'uuid', name: 'category_id' })
     categoryId!: string;
@@ -93,4 +99,8 @@ export class Requirement {
     @ManyToOne(() => Category, { nullable: false, onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'category_id' })
     category!: Category;
+
+    @ManyToOne(() => Project, { nullable: false, onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'project_id' })
+    project!: Project;
 }

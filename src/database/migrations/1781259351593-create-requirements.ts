@@ -25,6 +25,7 @@ export class CreateRequirements1781259351593 implements MigrationInterface {
             `CREATE TABLE "requirements" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
                 "type" character varying(3) NOT NULL,
+                "project_id" uuid NOT NULL,
                 "category_id" uuid NOT NULL,
                 "sequence_number" integer NOT NULL,
                 "visible_key" character varying(13) NOT NULL,
@@ -69,6 +70,16 @@ export class CreateRequirements1781259351593 implements MigrationInterface {
         );
 
         await queryRunner.query(
+            `CREATE INDEX "IDX_requirements_project_id"
+             ON "requirements" ("project_id")`,
+        );
+
+        await queryRunner.query(
+            `CREATE UNIQUE INDEX "UQ_requirements_id_project"
+             ON "requirements" ("id", "project_id")`,
+        );
+
+        await queryRunner.query(
             `CREATE UNIQUE INDEX "UQ_requirements_category_sequence"
              ON "requirements" ("category_id", "sequence_number")`,
         );
@@ -83,6 +94,15 @@ export class CreateRequirements1781259351593 implements MigrationInterface {
              ADD CONSTRAINT "FK_requirements_key_counters_categories"
              FOREIGN KEY ("category_id")
              REFERENCES "categories"("id")
+             ON DELETE RESTRICT
+             ON UPDATE NO ACTION`,
+        );
+
+        await queryRunner.query(
+            `ALTER TABLE "requirements"
+             ADD CONSTRAINT "FK_requirements_project"
+             FOREIGN KEY ("project_id")
+             REFERENCES "projects"("id")
              ON DELETE RESTRICT
              ON UPDATE NO ACTION`,
         );
@@ -104,6 +124,11 @@ export class CreateRequirements1781259351593 implements MigrationInterface {
         );
 
         await queryRunner.query(
+            `ALTER TABLE "requirements"
+             DROP CONSTRAINT "FK_requirements_project"`,
+        );
+
+        await queryRunner.query(
             `ALTER TABLE "requirements_key_counters"
              DROP CONSTRAINT "FK_requirements_key_counters_categories"`,
         );
@@ -111,6 +136,10 @@ export class CreateRequirements1781259351593 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX "public"."UQ_requirements_visible_key"`);
 
         await queryRunner.query(`DROP INDEX "public"."UQ_requirements_category_sequence"`);
+
+        await queryRunner.query(`DROP INDEX "public"."UQ_requirements_id_project"`);
+
+        await queryRunner.query(`DROP INDEX "public"."IDX_requirements_project_id"`);
 
         await queryRunner.query(`DROP TABLE "requirements"`);
 

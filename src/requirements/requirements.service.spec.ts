@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Project } from '@/projects/project.entity';
 import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
 import type { UpdateRequirementDto } from '@/requirements/dto/update-requirement.dto';
 import { RequirementRevision } from '@/requirements/requirements-revision.entity';
@@ -15,6 +16,7 @@ import { RequirementsService } from '@/requirements/requirements.service';
 const baseRequirement: Requirement = {
     id: 'adf3f623-ef79-49f9-8148-2b43efe903bb',
     type: RequirementType.NFR,
+    projectId: '11111111-1111-4111-8111-111111111111',
     categoryId: '57eb6e68-1b15-48ea-b976-8fbdb2bfc802',
     sequenceNumber: 1,
     visibleKey: 'NFR-PERF-0001',
@@ -50,6 +52,7 @@ const baseRevision: RequirementRevision = {
     revisionNumber: 1,
     visibleKey: baseRequirement.visibleKey,
     type: baseRequirement.type,
+    projectId: baseRequirement.projectId,
     categoryId: baseRequirement.categoryId,
     sequenceNumber: baseRequirement.sequenceNumber,
     status: baseRequirement.status,
@@ -77,6 +80,7 @@ describe('RequirementsService', () => {
 
     const requirementsRepositoryMock = { find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
     const requirementRevisionsRepositoryMock = { find: vi.fn(), findOne: vi.fn() };
+    const projectsRepositoryMock = { findOne: vi.fn() };
     const requirementsKeyAllocatorServiceMock = {
         allocateInTransaction: vi.fn(),
         runWithAllocationConflictMapping: vi.fn(),
@@ -90,6 +94,7 @@ describe('RequirementsService', () => {
             Promise.resolve(callback(transactionManagerMock)),
         );
         transactionManagerMock.create.mockImplementation((_entity: unknown, value: unknown) => value);
+        projectsRepositoryMock.findOne.mockResolvedValue({ id: baseRequirement.projectId, name: 'Product A' });
         requirementsKeyAllocatorServiceMock.runWithAllocationConflictMapping.mockImplementation(
             (operation: () => Promise<unknown>) => operation(),
         );
@@ -99,6 +104,7 @@ describe('RequirementsService', () => {
                 RequirementsService,
                 { provide: getRepositoryToken(Requirement), useValue: requirementsRepositoryMock },
                 { provide: getRepositoryToken(RequirementRevision), useValue: requirementRevisionsRepositoryMock },
+                { provide: getRepositoryToken(Project), useValue: projectsRepositoryMock },
                 { provide: getDataSourceToken(), useValue: dataSourceMock },
                 { provide: RequirementsKeyAllocatorService, useValue: requirementsKeyAllocatorServiceMock },
             ],
@@ -109,6 +115,7 @@ describe('RequirementsService', () => {
 
     it('creates a draft requirement with an allocated visible key.', async () => {
         const dto: CreateRequirementDto = {
+            projectId: baseRequirement.projectId,
             categoryId: baseRequirement.categoryId,
             description: ' The API responds quickly. ',
             priority: ' p1 ',
@@ -133,6 +140,7 @@ describe('RequirementsService', () => {
             id: baseRequirement.id,
             visibleKey: baseRequirement.visibleKey,
             type: RequirementType.NFR,
+            projectId: baseRequirement.projectId,
             categoryId: baseRequirement.categoryId,
             sequenceNumber: 1,
             status: RequirementStatus.Draft,
@@ -156,12 +164,17 @@ describe('RequirementsService', () => {
         expect(requirementsKeyAllocatorServiceMock.allocateInTransaction).toHaveBeenCalledWith(
             transactionManagerMock,
             dto.categoryId,
+            dto.projectId,
         );
     });
 
     it('rejects requirement creation with missing required fields.', async () => {
         await expect(
-            service.create({ description: 'Description', priority: 'p1' } as CreateRequirementDto),
+            service.create({
+                categoryId: baseRequirement.categoryId,
+                description: 'Description',
+                priority: 'p1',
+            } as CreateRequirementDto),
         ).rejects.toBeInstanceOf(BadRequestException);
 
         expect(requirementsKeyAllocatorServiceMock.allocateInTransaction).not.toHaveBeenCalled();
@@ -169,7 +182,12 @@ describe('RequirementsService', () => {
 
     it('rejects requirement priorities outside p1, p2, or p3.', async () => {
         await expect(
-            service.create({ categoryId: baseRequirement.categoryId, description: 'Description', priority: 'high' }),
+            service.create({
+                projectId: baseRequirement.projectId,
+                categoryId: baseRequirement.categoryId,
+                description: 'Description',
+                priority: 'high',
+            }),
         ).rejects.toThrow('Requirement priority must be p1, p2, or p3');
 
         await expect(service.update(baseRequirement.id, { priority: 'p4' })).rejects.toThrow(
@@ -202,7 +220,7 @@ describe('RequirementsService', () => {
     it('lists requirements ordered by visible key.', async () => {
         requirementsRepositoryMock.find.mockResolvedValue([baseRequirement]);
 
-        await expect(service.findAll()).resolves.toEqual([
+        await expect(service.findAll({ projectId: baseRequirement.projectId })).resolves.toEqual([
             expect.objectContaining({ id: baseRequirement.id, visibleKey: baseRequirement.visibleKey }),
         ]);
 
@@ -215,9 +233,9 @@ describe('RequirementsService', () => {
         const rejectedRequirement = { ...baseRequirement, status: RequirementStatus.Rejected };
         requirementsRepositoryMock.find.mockResolvedValue([rejectedRequirement]);
 
-        await expect(service.findAll({ includeRejected: 'true' })).resolves.toEqual([
-            expect.objectContaining({ id: baseRequirement.id, status: RequirementStatus.Rejected }),
-        ]);
+        await expect(
+            service.findAll({ projectId: baseRequirement.projectId, includeRejected: 'true' }),
+        ).resolves.toEqual([expect.objectContaining({ id: baseRequirement.id, status: RequirementStatus.Rejected })]);
 
         expect(requirementsRepositoryMock.find).toHaveBeenCalledWith(
             expect.objectContaining({ order: { visibleKey: 'ASC' } }),
@@ -228,9 +246,9 @@ describe('RequirementsService', () => {
         const obsoleteRequirement = { ...baseRequirement, status: RequirementStatus.Obsolete };
         requirementsRepositoryMock.find.mockResolvedValue([obsoleteRequirement]);
 
-        await expect(service.findAll({ status: RequirementStatus.Obsolete })).resolves.toEqual([
-            expect.objectContaining({ id: baseRequirement.id, status: RequirementStatus.Obsolete }),
-        ]);
+        await expect(
+            service.findAll({ projectId: baseRequirement.projectId, status: RequirementStatus.Obsolete }),
+        ).resolves.toEqual([expect.objectContaining({ id: baseRequirement.id, status: RequirementStatus.Obsolete })]);
 
         expect(requirementsRepositoryMock.find).toHaveBeenCalledWith(
             expect.objectContaining({ order: { visibleKey: 'ASC' } }),

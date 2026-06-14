@@ -9,6 +9,7 @@ import { RequirementType } from '@/requirements/requirement-type-enum';
  * hidden even when the deleted status is requested.
  */
 export interface RequirementListQueryDto {
+    projectId?: string;
     includeRejected?: string;
     type?: RequirementType;
     categoryId?: string;
@@ -23,6 +24,7 @@ export interface RequirementListQueryDto {
  * parameters have been normalized and validated.
  */
 export interface RequirementListFilters {
+    projectId: string;
     includeRejected: boolean;
     type?: RequirementType;
     categoryId?: string;
