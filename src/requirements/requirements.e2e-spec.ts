@@ -5,6 +5,14 @@ import { cleanDatabase, closeE2eDataSource } from '@/database/database-test-util
 import { RequirementStatus } from '@/requirements/requirement-status-enum';
 import { RequirementType } from '@/requirements/requirement-type-enum';
 
+interface ProjectApiResponse {
+    id: string;
+    name: string;
+    requirementCount: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
 interface CategoryApiResponse {
     id: string;
     name: string;
@@ -17,6 +25,7 @@ interface RequirementApiResponse {
     id: string;
     visibleKey: string;
     type: RequirementType;
+    projectId: string;
     categoryId: string;
     sequenceNumber: number;
     status: RequirementStatus;
@@ -43,6 +52,7 @@ interface RequirementRevisionApiResponse {
     revisionNumber: number;
     visibleKey: string;
     type: RequirementType;
+    projectId: string;
     categoryId: string;
     sequenceNumber: number;
     status: RequirementStatus;
@@ -64,6 +74,20 @@ interface RequirementRevisionApiResponse {
     createdAt: string;
 }
 
+async function createProject(request: APIRequestContext, name = 'Product A'): Promise<ProjectApiResponse> {
+    const response = await request.post('/projects', { data: { name } });
+
+    expect(response.status()).toBe(201);
+
+    return (await response.json()) as ProjectApiResponse;
+}
+
+function requirementsPath(projectId: string, query = ''): string {
+    const separator = query === '' ? '' : `&${query}`;
+
+    return `/requirements?projectId=${projectId}${separator}`;
+}
+
 async function createCategory(
     request: APIRequestContext,
     name: string,
@@ -79,6 +103,7 @@ async function createCategory(
 
 async function createRequirement(
     request: APIRequestContext,
+    projectId: string,
     categoryId: string,
     overrides: Partial<{
         description: string;
@@ -90,6 +115,7 @@ async function createRequirement(
 ): Promise<RequirementApiResponse> {
     const response = await request.post('/requirements', {
         data: {
+            projectId,
             categoryId,
             description: 'The API should respond quickly for interactive users.',
             priority: 'p3',
@@ -106,11 +132,13 @@ async function createRequirement(
 }
 
 test.describe('requirements API', () => {
+    let project: ProjectApiResponse;
     let category: CategoryApiResponse;
 
     test.beforeEach(async ({ request }) => {
         await cleanDatabase();
 
+        project = await createProject(request);
         category = await createCategory(request, 'Performance', 'PERF');
     });
 
@@ -119,13 +147,14 @@ test.describe('requirements API', () => {
     });
 
     test('Creates a draft requirement.', async ({ request }) => {
-        const created = await createRequirement(request, category.id);
+        const created = await createRequirement(request, project.id, category.id);
 
         expect(created).toEqual(
             expect.objectContaining({
                 id: expect.any(String),
                 visibleKey: 'NFR-PERF-0001',
                 type: RequirementType.NFR,
+                projectId: project.id,
                 categoryId: category.id,
                 sequenceNumber: 1,
                 status: RequirementStatus.Draft,
@@ -134,7 +163,7 @@ test.describe('requirements API', () => {
     });
 
     test('Retrieves a draft requirement by internal ID.', async ({ request }) => {
-        const created = await createRequirement(request, category.id);
+        const created = await createRequirement(request, project.id, category.id);
 
         const response = await request.get(`/requirements/${created.id}`);
 
@@ -147,6 +176,7 @@ test.describe('requirements API', () => {
                 id: created.id,
                 visibleKey: created.visibleKey,
                 type: created.type,
+                projectId: created.projectId,
                 categoryId: created.categoryId,
                 sequenceNumber: created.sequenceNumber,
                 status: RequirementStatus.Draft,
@@ -155,7 +185,7 @@ test.describe('requirements API', () => {
     });
 
     test('Retrieves a draft requirement by its visible key.', async ({ request }) => {
-        const created = await createRequirement(request, category.id);
+        const created = await createRequirement(request, project.id, category.id);
 
         const response = await request.get(`/requirements/key/${created.visibleKey}`);
 
@@ -168,6 +198,7 @@ test.describe('requirements API', () => {
                 id: created.id,
                 visibleKey: created.visibleKey,
                 type: created.type,
+                projectId: created.projectId,
                 categoryId: created.categoryId,
                 sequenceNumber: created.sequenceNumber,
                 status: RequirementStatus.Draft,
@@ -178,12 +209,20 @@ test.describe('requirements API', () => {
     test('Lists requirements.', async ({ request }) => {
         const category = await createCategory(request, 'Security', 'SEC', RequirementType.NFR);
         const createResponse = await request.post('/requirements', {
-            data: { categoryId: category.id, description: 'The system records login events.', priority: 'p2' },
+            data: {
+                projectId: project.id,
+                categoryId: category.id,
+                description: 'The system records login events.',
+                priority: 'p2',
+            },
         });
         expect(createResponse.status()).toBe(201);
 
         const created = (await createResponse.json()) as RequirementApiResponse;
-        const listResponse = await request.get('/requirements');
+        const unscopedListResponse = await request.get('/requirements');
+        expect(unscopedListResponse.status()).toBe(400);
+
+        const listResponse = await request.get(requirementsPath(project.id));
         expect(listResponse.status()).toBe(200);
         const requirements = (await listResponse.json()) as RequirementApiResponse[];
         expect(requirements).toEqual(
@@ -192,7 +231,7 @@ test.describe('requirements API', () => {
     });
 
     test('Deletes a draft requirement while preserving its visible key reservation.', async ({ request }) => {
-        const created = await createRequirement(request, category.id);
+        const created = await createRequirement(request, project.id, category.id);
 
         const deleteResponse = await request.delete(`/requirements/${created.id}`);
         expect(deleteResponse.status()).toBe(204);
@@ -200,7 +239,7 @@ test.describe('requirements API', () => {
         const retrievedResponse = await request.get(`/requirements/${created.id}`);
         expect(retrievedResponse.status()).toBe(404);
 
-        const second = await createRequirement(request, category.id);
+        const second = await createRequirement(request, project.id, category.id);
         expect(second.visibleKey).toBe('NFR-PERF-0002');
         expect(second.sequenceNumber).toBe(2);
     });
@@ -208,7 +247,7 @@ test.describe('requirements API', () => {
     test('Rejects a draft requirement and excludes it from active lists unless explicitly requested.', async ({
         request,
     }) => {
-        const created = await createRequirement(request, category.id);
+        const created = await createRequirement(request, project.id, category.id);
 
         const rejectResponse = await request.patch(`/requirements/${created.id}/reject`, {
             data: { rejectionReason: 'Does not describe observable behavior.', reviewer: 'QA Lead' },
@@ -226,12 +265,12 @@ test.describe('requirements API', () => {
             }),
         );
 
-        const defaultListResponse = await request.get('/requirements');
+        const defaultListResponse = await request.get(requirementsPath(project.id));
         expect(defaultListResponse.status()).toBe(200);
         const defaultList = (await defaultListResponse.json()) as RequirementApiResponse[];
         expect(defaultList).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: created.id })]));
 
-        const includeRejectedResponse = await request.get('/requirements?includeRejected=true');
+        const includeRejectedResponse = await request.get(requirementsPath(project.id, 'includeRejected=true'));
         expect(includeRejectedResponse.status()).toBe(200);
         const includeRejectedList = (await includeRejectedResponse.json()) as RequirementApiResponse[];
         expect(includeRejectedList).toEqual(
@@ -246,7 +285,7 @@ test.describe('requirements API', () => {
     });
 
     test('Requires a rejection reason and prevents deleting rejected requirements.', async ({ request }) => {
-        const created = await createRequirement(request, category.id);
+        const created = await createRequirement(request, project.id, category.id);
 
         const invalidRejectResponse = await request.patch(`/requirements/${created.id}/reject`, {
             data: { rejectionReason: ' ', reviewer: 'QA Lead' },
@@ -265,7 +304,7 @@ test.describe('requirements API', () => {
     test('Approves, implements, and obsoletes controlled requirements while protecting them from deletion.', async ({
         request,
     }) => {
-        const approvedFromDraft = await createRequirement(request, category.id);
+        const approvedFromDraft = await createRequirement(request, project.id, category.id);
         const approveResponse = await request.patch(`/requirements/${approvedFromDraft.id}/approve`);
         expect(approveResponse.status()).toBe(200);
         const approved = (await approveResponse.json()) as RequirementApiResponse;
@@ -318,7 +357,7 @@ test.describe('requirements API', () => {
         });
         expect(implementedUpdateResponse.status()).toBe(409);
 
-        const directObsoleteCandidate = await createRequirement(request, category.id, {
+        const directObsoleteCandidate = await createRequirement(request, project.id, category.id, {
             description: 'The API should include cache hit metrics.',
         });
         const directlyApprovedResponse = await request.patch(`/requirements/${directObsoleteCandidate.id}/approve`);
@@ -346,7 +385,7 @@ test.describe('requirements API', () => {
         const obsoleteApproveResponse = await request.patch(`/requirements/${approvedObsolete.id}/approve`);
         expect(obsoleteApproveResponse.status()).toBe(409);
 
-        const rejectedObsoleteCandidate = await createRequirement(request, category.id, {
+        const rejectedObsoleteCandidate = await createRequirement(request, project.id, category.id, {
             description: 'The API should record queue depth.',
         });
         const rejectedResponse = await request.patch(`/requirements/${rejectedObsoleteCandidate.id}/reject`, {
@@ -365,12 +404,12 @@ test.describe('requirements API', () => {
             }),
         );
 
-        const defaultListResponse = await request.get('/requirements');
+        const defaultListResponse = await request.get(requirementsPath(project.id));
         expect(defaultListResponse.status()).toBe(200);
         const defaultList = (await defaultListResponse.json()) as RequirementApiResponse[];
         expect(defaultList).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: approvedObsolete.id })]));
 
-        const obsoleteStatusResponse = await request.get('/requirements?status=obsolete');
+        const obsoleteStatusResponse = await request.get(requirementsPath(project.id, 'status=obsolete'));
         expect(obsoleteStatusResponse.status()).toBe(200);
         const obsoleteStatusList = (await obsoleteStatusResponse.json()) as RequirementApiResponse[];
         expect(obsoleteStatusList).toEqual(
@@ -382,7 +421,7 @@ test.describe('requirements API', () => {
     });
 
     test('Rejects invalid remaining lifecycle transitions with meaningful errors.', async ({ request }) => {
-        const draft = await createRequirement(request, category.id);
+        const draft = await createRequirement(request, project.id, category.id);
 
         const invalidImplementedResponse = await request.patch(`/requirements/${draft.id}/implemented`);
         expect(invalidImplementedResponse.status()).toBe(409);
@@ -419,7 +458,7 @@ test.describe('requirements API', () => {
     test('Updates editable draft requirement fields while preserving identity and classification.', async ({
         request,
     }) => {
-        const created = await createRequirement(request, category.id, { owner: 'Team A' });
+        const created = await createRequirement(request, project.id, category.id, { owner: 'Team A' });
 
         const response = await request.patch(`/requirements/${created.id}`, {
             data: {
@@ -440,6 +479,7 @@ test.describe('requirements API', () => {
                 id: created.id,
                 visibleKey: created.visibleKey,
                 type: created.type,
+                projectId: created.projectId,
                 categoryId: created.categoryId,
                 sequenceNumber: created.sequenceNumber,
                 description: 'The API should respond within 250 ms.',
@@ -452,7 +492,7 @@ test.describe('requirements API', () => {
     });
 
     test('Creates immutable previous-version snapshots and retrieves revision history.', async ({ request }) => {
-        const created = await createRequirement(request, category.id, { owner: 'Team A' });
+        const created = await createRequirement(request, project.id, category.id, { owner: 'Team A' });
 
         const response = await request.patch(`/requirements/${created.id}`, {
             data: { description: 'The API should respond within 250 ms.', owner: 'Team B', source: 'US-REQ-005' },
@@ -470,6 +510,7 @@ test.describe('requirements API', () => {
                 revisionNumber: 1,
                 visibleKey: created.visibleKey,
                 type: created.type,
+                projectId: created.projectId,
                 categoryId: created.categoryId,
                 sequenceNumber: created.sequenceNumber,
                 description: created.description,
@@ -490,7 +531,7 @@ test.describe('requirements API', () => {
     });
 
     test('Rejects reclassification and identity changes during normal editing.', async ({ request }) => {
-        const created = await createRequirement(request, category.id);
+        const created = await createRequirement(request, project.id, category.id);
 
         const response = await request.patch(`/requirements/${created.id}`, {
             data: { categoryId: category.id, visibleKey: 'NFR-PERF-0001', description: 'Changed' },
@@ -506,6 +547,7 @@ test.describe('requirements API', () => {
                 id: created.id,
                 visibleKey: created.visibleKey,
                 type: created.type,
+                projectId: created.projectId,
                 categoryId: created.categoryId,
                 description: created.description,
             }),
@@ -517,6 +559,7 @@ test.describe('requirements API', () => {
             Array.from({ length: 5 }, (_, index) =>
                 request.post('/requirements', {
                     data: {
+                        projectId: project.id,
                         categoryId: category.id,
                         description: `Concurrent requirement ${index + 1}`,
                         priority: 'p3',
@@ -546,27 +589,29 @@ test.describe('requirements API', () => {
     test('Does not reuse visible keys after deletion, rejection, and a new database connection.', async ({
         request,
     }) => {
-        const deleted = await createRequirement(request, category.id, { description: 'Delete me.' });
+        const deleted = await createRequirement(request, project.id, category.id, { description: 'Delete me.' });
         const deleteResponse = await request.delete(`/requirements/${deleted.id}`);
         expect(deleteResponse.status()).toBe(204);
 
         await closeE2eDataSource();
-        const afterDelete = await createRequirement(request, category.id, { description: 'After delete.' });
+        const afterDelete = await createRequirement(request, project.id, category.id, { description: 'After delete.' });
         expect(afterDelete.id).not.toBe(deleted.id);
         expect(afterDelete.visibleKey).toBe('NFR-PERF-0002');
 
-        const rejected = await createRequirement(request, category.id, { description: 'Reject me.' });
+        const rejected = await createRequirement(request, project.id, category.id, { description: 'Reject me.' });
         const rejectResponse = await request.patch(`/requirements/${rejected.id}/reject`, {
             data: { rejectionReason: 'Superseded before review.', reviewer: 'QA Lead' },
         });
         expect(rejectResponse.status()).toBe(200);
 
         await closeE2eDataSource();
-        const afterReject = await createRequirement(request, category.id, { description: 'After reject.' });
+        const afterReject = await createRequirement(request, project.id, category.id, { description: 'After reject.' });
         expect(afterReject.id).not.toBe(rejected.id);
         expect(afterReject.visibleKey).toBe('NFR-PERF-0004');
 
-        const obsoleteCandidate = await createRequirement(request, category.id, { description: 'Obsolete me.' });
+        const obsoleteCandidate = await createRequirement(request, project.id, category.id, {
+            description: 'Obsolete me.',
+        });
         const approveResponse = await request.patch(`/requirements/${obsoleteCandidate.id}/approve`);
         expect(approveResponse.status()).toBe(200);
         const obsoleteResponse = await request.patch(`/requirements/${obsoleteCandidate.id}/obsolete`, {
@@ -575,7 +620,9 @@ test.describe('requirements API', () => {
         expect(obsoleteResponse.status()).toBe(200);
 
         await closeE2eDataSource();
-        const afterObsolete = await createRequirement(request, category.id, { description: 'After obsolete.' });
+        const afterObsolete = await createRequirement(request, project.id, category.id, {
+            description: 'After obsolete.',
+        });
         expect(afterObsolete.id).not.toBe(obsoleteCandidate.id);
         expect(afterObsolete.visibleKey).toBe('NFR-PERF-0006');
         expect(afterObsolete.sequenceNumber).toBe(6);
@@ -584,13 +631,19 @@ test.describe('requirements API', () => {
     test('Filters requirements by type, category, status, and owner.', async ({ request }) => {
         const security = await createCategory(request, 'Security', 'SEC', RequirementType.NFR);
         const functional = await createCategory(request, 'Functional', 'FUNC', RequirementType.FR);
-        const perfNfr = await createRequirement(request, category.id, { owner: 'Team A', description: 'Perf NFR.' });
-        const perfFr = await createRequirement(request, functional.id, {
+        const perfNfr = await createRequirement(request, project.id, category.id, {
+            owner: 'Team A',
+            description: 'Perf NFR.',
+        });
+        const perfFr = await createRequirement(request, project.id, functional.id, {
             owner: 'Team B',
             description: 'Functional FR.',
         });
-        const secNfr = await createRequirement(request, security.id, { owner: 'Team A', description: 'Sec NFR.' });
-        const rejected = await createRequirement(request, functional.id, {
+        const secNfr = await createRequirement(request, project.id, security.id, {
+            owner: 'Team A',
+            description: 'Sec NFR.',
+        });
+        const rejected = await createRequirement(request, project.id, functional.id, {
             owner: 'Team C',
             description: 'Rejected FR.',
         });
@@ -599,41 +652,43 @@ test.describe('requirements API', () => {
         });
         expect(rejectResponse.status()).toBe(200);
 
-        const byType = await request.get('/requirements?type=NFR');
+        const byType = await request.get(requirementsPath(project.id, 'type=NFR'));
         expect(byType.status()).toBe(200);
         expect(((await byType.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([
             perfNfr.id,
             secNfr.id,
         ]);
 
-        const byTypeFr = await request.get('/requirements?type=FR&includeRejected=true');
+        const byTypeFr = await request.get(requirementsPath(project.id, 'type=FR&includeRejected=true'));
         expect(byTypeFr.status()).toBe(200);
         expect(((await byTypeFr.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([
             perfFr.id,
             rejected.id,
         ]);
 
-        const byCategory = await request.get(`/requirements?categoryId=${security.id}`);
+        const byCategory = await request.get(requirementsPath(project.id, `categoryId=${security.id}`));
         expect(byCategory.status()).toBe(200);
         expect(((await byCategory.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([secNfr.id]);
 
-        const byStatus = await request.get('/requirements?status=rejected');
+        const byStatus = await request.get(requirementsPath(project.id, 'status=rejected'));
         expect(byStatus.status()).toBe(200);
         expect(((await byStatus.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([rejected.id]);
 
-        const combined = await request.get(`/requirements?type=NFR&categoryId=${security.id}&owner=Team%20A`);
+        const combined = await request.get(
+            requirementsPath(project.id, `type=NFR&categoryId=${security.id}&owner=Team%20A`),
+        );
         expect(combined.status()).toBe(200);
         expect(((await combined.json()) as RequirementApiResponse[]).map((item) => item.id)).toEqual([secNfr.id]);
 
-        const empty = await request.get('/requirements?owner=Nobody');
+        const empty = await request.get(requirementsPath(project.id, 'owner=Nobody'));
         expect(empty.status()).toBe(200);
         expect((await empty.json()) as RequirementApiResponse[]).toEqual([]);
 
-        const obsolete = await request.get('/requirements?status=obsolete');
+        const obsolete = await request.get(requirementsPath(project.id, 'status=obsolete'));
         expect(obsolete.status()).toBe(200);
         expect((await obsolete.json()) as RequirementApiResponse[]).toEqual([]);
 
-        const invalid = await request.get('/requirements?status=archived');
+        const invalid = await request.get(requirementsPath(project.id, 'status=archived'));
         expect(invalid.status()).toBe(400);
     });
 
@@ -650,7 +705,7 @@ test.describe('requirements API', () => {
             expect.objectContaining({ statusCode: 404, message: expect.any(String) }),
         );
 
-        const created = await createRequirement(request, category.id);
+        const created = await createRequirement(request, project.id, category.id);
         const rejectResponse = await request.patch(`/requirements/${created.id}/reject`, {
             data: { rejectionReason: 'Duplicate.', reviewer: 'QA Lead' },
         });
@@ -664,13 +719,19 @@ test.describe('requirements API', () => {
 
     test('Rejects invalid requirement creation requests.', async ({ request }) => {
         const invalidTypeResponse = await request.post('/requirements', {
-            data: { type: 'BUG', categoryId: 'missing', description: 'Description', priority: 'p3' },
+            data: {
+                type: 'BUG',
+                projectId: project.id,
+                categoryId: 'missing',
+                description: 'Description',
+                priority: 'p3',
+            },
         });
 
         expect(invalidTypeResponse.status()).toBe(400);
 
         const invalidPriorityResponse = await request.post('/requirements', {
-            data: { categoryId: category.id, description: 'Description', priority: 'high' },
+            data: { projectId: project.id, categoryId: category.id, description: 'Description', priority: 'high' },
         });
 
         expect(invalidPriorityResponse.status()).toBe(400);
