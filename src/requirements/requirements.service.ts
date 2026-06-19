@@ -15,7 +15,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, FindOptionsWhere, Not, Repository } from 'typeorm';
 
-const VISIBLE_KEY_PATTERN = /^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$/;
+const VISIBLE_KEY_PATTERN = /^(FR|NFR)-[A-Z]{2,4}-[0-9]{4}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const IMMUTABLE_UPDATE_FIELDS = [
     'id',
