@@ -34,7 +34,7 @@ export class CreateRequirementRevisions1781280015593 implements MigrationInterfa
 
                 CONSTRAINT "CHK_requirements_revisions_visible_key_format"
                     CHECK (
-                        "visible_key" ~ '^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$'
+                        "visible_key" ~ '^(FR|NFR)-[A-Z]{2,4}-[0-9]{4}$'
                     ),
 
                 CONSTRAINT "CHK_requirements_revisions_revision_number_range"

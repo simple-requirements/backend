@@ -100,8 +100,16 @@ describe('CategoriesService', () => {
         expect(categoriesRepository.save).not.toHaveBeenCalled();
     });
 
+    it.each(['UI', 'AUTH', 'SEC'])('accepts %s as a category key segment.', async (key) => {
+        await expect(service.create({ ...expectedCategory, key })).resolves.toEqual(expect.objectContaining({ key }));
+    });
+
+    it.each(['U', 'USERIF', 'Ui', 'UI1', 'UI_KEY', 'UI-KEY'])('rejects invalid category key %s.', async (key) => {
+        await expect(service.create({ ...expectedCategory, key })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('rejects duplicate category keys', async () => {
-        const key = 'DUPKEY';
+        const key = 'DUP';
         vi.mocked(categoriesRepository.findOne).mockResolvedValue(createCategory({ key }));
 
         await expect(

@@ -160,7 +160,7 @@ export function createOpenApiDocument(): OpenAPIObject {
                             required: true,
                             schema: {
                                 type: 'string',
-                                pattern: '^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$',
+                                pattern: '^(FR|NFR)-[A-Z]{2,4}-[0-9]{4}$',
                                 example: 'NFR-PERF-0001',
                             },
                         },
@@ -389,7 +389,7 @@ export function createOpenApiDocument(): OpenAPIObject {
                     required: ['name', 'key', 'type'],
                     properties: {
                         name: { type: 'string', example: 'Performance' },
-                        key: { type: 'string', pattern: '^[A-Z][A-Z0-9_]*$', example: 'PERF' },
+                        key: { type: 'string', pattern: '^[A-Z]{2,4}$', example: 'PERF' },
                         type: { $ref: '#/components/schemas/RequirementType' },
                     },
                 },

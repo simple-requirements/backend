@@ -8,6 +8,8 @@ import { RequirementsKeyAllocatorService } from '@/requirements/requirements-key
 import { RequirementsKeyCounter } from '@/requirements/requirements-key-counter.entity';
 import { Requirement } from '@/requirements/requirements.entity';
 
+const projectId = '11111111-1111-4111-8111-111111111111';
+
 const category: Category = {
     id: '57eb6e68-1b15-48ea-b976-8fbdb2bfc802',
     name: 'Performance',
@@ -131,7 +133,7 @@ describe('RequirementsKeyAllocatorService', () => {
     it('allocates sequential visible keys for the same type and category.', async () => {
         const { service } = createService();
 
-        await expect(service.allocate(category.id)).resolves.toEqual({
+        await expect(service.allocate(category.id, projectId)).resolves.toEqual({
             id: 'requirement-0',
             type: RequirementType.NFR,
             categoryId: category.id,
@@ -139,7 +141,7 @@ describe('RequirementsKeyAllocatorService', () => {
             visibleKey: 'NFR-PERF-0001',
         });
 
-        await expect(service.allocate(category.id)).resolves.toEqual({
+        await expect(service.allocate(category.id, projectId)).resolves.toEqual({
             id: 'requirement-1',
             type: RequirementType.NFR,
             categoryId: category.id,
@@ -151,9 +153,9 @@ describe('RequirementsKeyAllocatorService', () => {
     it('scopes numbering by type and category.', async () => {
         const { service } = createService();
 
-        await service.allocate(category.id);
+        await service.allocate(category.id, projectId);
 
-        await expect(service.allocate(category.id)).resolves.toEqual({
+        await expect(service.allocate(category.id, projectId)).resolves.toEqual({
             id: 'requirement-1',
             type: RequirementType.NFR,
             categoryId: category.id,
@@ -166,9 +168,9 @@ describe('RequirementsKeyAllocatorService', () => {
         const { service } = createService();
 
         const allocations = await Promise.all([
-            service.allocate(category.id),
-            service.allocate(category.id),
-            service.allocate(category.id),
+            service.allocate(category.id, projectId),
+            service.allocate(category.id, projectId),
+            service.allocate(category.id, projectId),
         ]);
 
         expect(allocations.map((allocation) => allocation.visibleKey)).toEqual([
@@ -179,10 +181,24 @@ describe('RequirementsKeyAllocatorService', () => {
         expect(new Set(allocations.map((allocation) => allocation.visibleKey)).size).toBe(allocations.length);
     });
 
+    it.each([
+        { type: RequirementType.FR, key: 'UI', visibleKey: 'FR-UI-0001' },
+        { type: RequirementType.FR, key: 'AUTH', visibleKey: 'FR-AUTH-0001' },
+        { type: RequirementType.NFR, key: 'SEC', visibleKey: 'NFR-SEC-0001' },
+        { type: RequirementType.NFR, key: 'PERF', visibleKey: 'NFR-PERF-0001' },
+    ])('allocates $visibleKey from category type $type and key $key.', async ({ type, key, visibleKey }) => {
+        const { service } = createService({ findCategory: { ...category, type, key } });
+
+        await expect(service.allocate(category.id, projectId)).resolves.toEqual(
+            expect.objectContaining({ type, sequenceNumber: 1, visibleKey }),
+        );
+        expect(visibleKey).toMatch(/^(FR|NFR)-[A-Z]{2,4}-[0-9]{4}$/);
+    });
+
     it('locks the durable counter row before consuming the next number.', async () => {
         const { service, manager } = createService();
 
-        await service.allocate(category.id);
+        await service.allocate(category.id, projectId);
 
         expect(manager.findOne).toHaveBeenCalledWith(RequirementsKeyCounter, {
             where: { categoryId: category.id },
@@ -193,24 +209,27 @@ describe('RequirementsKeyAllocatorService', () => {
     it('rejects allocation when the sequence range is exhausted.', async () => {
         const { service } = createService({ initialNextNumbers: { [category.id]: 10_000 } });
 
-        await expect(service.allocate(category.id)).rejects.toBeInstanceOf(ConflictException);
+        await expect(service.allocate(category.id, projectId)).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it('rejects categories whose keys cannot be used in requirement visible keys.', async () => {
-        const { service } = createService({ findCategory: { ...category, key: 'LONG_KEY' } });
+    it.each(['U', 'USERIF', 'Ui', 'UI1', 'UI_KEY', 'UI-KEY'])(
+        'rejects category key %s that cannot be used in requirement visible keys.',
+        async (key) => {
+            const { service } = createService({ findCategory: { ...category, key } });
 
-        await expect(service.allocate(category.id)).rejects.toBeInstanceOf(BadRequestException);
-    });
+            await expect(service.allocate(category.id, projectId)).rejects.toBeInstanceOf(BadRequestException);
+        },
+    );
 
     it('rejects malformed category ids.', async () => {
         const { service } = createService();
 
-        await expect(service.allocate('not-a-uuid')).rejects.toBeInstanceOf(BadRequestException);
+        await expect(service.allocate('not-a-uuid', projectId)).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('rejects unknown categories.', async () => {
         const { service } = createService({ findCategory: null });
 
-        await expect(service.allocate(category.id)).rejects.toBeInstanceOf(NotFoundException);
+        await expect(service.allocate(category.id, projectId)).rejects.toBeInstanceOf(NotFoundException);
     });
 });

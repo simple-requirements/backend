@@ -11,8 +11,9 @@ interface CategoryApiResponse {
     updatedAt: string;
 }
 
-const uniqueKey = (prefix: string): string =>
-    `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8).toUpperCase()}`;
+const categoryKeys = ['UI', 'AUTH', 'DATA', 'PERF', 'SEC'];
+let keyIndex = 0;
+const uniqueKey = (): string => categoryKeys[keyIndex++ % categoryKeys.length];
 
 test.describe('categories API', () => {
     let key: string;
@@ -20,7 +21,7 @@ test.describe('categories API', () => {
 
     test.beforeEach(async () => {
         await cleanDatabase();
-        key = uniqueKey('PERF');
+        key = uniqueKey();
     });
 
     test.afterAll(async () => {
@@ -88,7 +89,7 @@ test.describe('categories API', () => {
         });
 
         test('rejects duplicate category keys.', async ({ request }) => {
-            const key = 'DUPKEY';
+            const key = 'DUP';
 
             const firstResponse = await request.post('/categories', {
                 data: { name: categoryName, key, type: RequirementType.NFR },

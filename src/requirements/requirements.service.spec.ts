@@ -13,46 +13,57 @@ import { RequirementsKeyAllocatorService } from '@/requirements/requirements-key
 import { Requirement } from '@/requirements/requirements.entity';
 import { RequirementsService } from '@/requirements/requirements.service';
 
-const project: Project = {
+const fixedDate = new Date('2026-06-12T00:00:00.000Z');
+
+const createProjectFixture = (overrides: Partial<Project> = {}): Project => ({
     id: '11111111-1111-4111-8111-111111111111',
     name: 'Requirements Platform',
-    createdAt: new Date('2026-06-12T00:00:00.000Z'),
-    updatedAt: new Date('2026-06-12T00:00:00.000Z'),
+    createdAt: fixedDate,
+    updatedAt: fixedDate,
+    ...overrides,
+});
+
+const createRequirementFixture = (overrides: Partial<Requirement> = {}): Requirement => {
+    const project = overrides.project ?? createProjectFixture();
+
+    return {
+        id: 'adf3f623-ef79-49f9-8148-2b43efe903bb',
+        type: RequirementType.NFR,
+        projectId: project.id,
+        categoryId: '57eb6e68-1b15-48ea-b976-8fbdb2bfc802',
+        sequenceNumber: 1,
+        visibleKey: 'NFR-PERF-0001',
+        status: RequirementStatus.Draft,
+        description: 'The API responds quickly.',
+        priority: 'p1',
+        owner: 'Team A',
+        rationale: 'Latency impacts users.',
+        source: 'US-REQ-001',
+        rejectionReason: null,
+        reviewer: null,
+        rejectedAt: null,
+        deletedAt: null,
+        approvedAt: null,
+        implementedAt: null,
+        obsolescenceReason: null,
+        obsoleteAt: null,
+        createdAt: fixedDate,
+        updatedAt: fixedDate,
+        category: {
+            id: '57eb6e68-1b15-48ea-b976-8fbdb2bfc802',
+            name: 'Performance',
+            key: 'PERF',
+            createdAt: fixedDate,
+            updatedAt: fixedDate,
+            type: RequirementType.NFR,
+        },
+        project,
+        ...overrides,
+    };
 };
 
-const baseRequirement: Requirement = {
-    id: 'adf3f623-ef79-49f9-8148-2b43efe903bb',
-    type: RequirementType.NFR,
-    projectId: '11111111-1111-4111-8111-111111111111',
-    categoryId: '57eb6e68-1b15-48ea-b976-8fbdb2bfc802',
-    sequenceNumber: 1,
-    visibleKey: 'NFR-PERF-0001',
-    status: RequirementStatus.Draft,
-    description: 'The API responds quickly.',
-    priority: 'p1',
-    owner: 'Team A',
-    rationale: 'Latency impacts users.',
-    source: 'US-REQ-001',
-    rejectionReason: null,
-    reviewer: null,
-    rejectedAt: null,
-    deletedAt: null,
-    approvedAt: null,
-    implementedAt: null,
-    obsolescenceReason: null,
-    obsoleteAt: null,
-    createdAt: new Date('2026-06-12T00:00:00.000Z'),
-    updatedAt: new Date('2026-06-12T00:00:00.000Z'),
-    category: {
-        id: '57eb6e68-1b15-48ea-b976-8fbdb2bfc802',
-        name: 'Performance',
-        key: 'PERF',
-        createdAt: new Date('2026-06-12T00:00:00.000Z'),
-        updatedAt: new Date('2026-06-12T00:00:00.000Z'),
-        type: RequirementType.NFR,
-    },
-    project,
-};
+const project = createProjectFixture();
+const baseRequirement = createRequirementFixture({ project });
 
 const baseRevision: RequirementRevision = {
     id: '31f99575-e1f5-4c1f-a7bb-490f7f1661e4',
@@ -102,7 +113,7 @@ describe('RequirementsService', () => {
             Promise.resolve(callback(transactionManagerMock)),
         );
         transactionManagerMock.create.mockImplementation((_entity: unknown, value: unknown) => value);
-        projectsRepositoryMock.findOne.mockResolvedValue({ id: baseRequirement.projectId, name: 'Product A' });
+        projectsRepositoryMock.findOne.mockResolvedValue(project);
         requirementsKeyAllocatorServiceMock.runWithAllocationConflictMapping.mockImplementation(
             (operation: () => Promise<unknown>) => operation(),
         );
@@ -119,6 +130,15 @@ describe('RequirementsService', () => {
         }).compile();
 
         service = module.get<RequirementsService>(RequirementsService);
+    });
+
+    it('builds requirement fixtures with matching project ownership.', () => {
+        const requirement = createRequirementFixture();
+
+        expect(requirement.projectId).toBe(requirement.project.id);
+        expect(requirement.projectId).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        );
     });
 
     it('creates a draft requirement with an allocated visible key.', async () => {
@@ -174,6 +194,10 @@ describe('RequirementsService', () => {
             dto.categoryId,
             dto.projectId,
         );
+        expect(transactionManagerMock.findOne).toHaveBeenCalledWith(
+            Requirement,
+            expect.objectContaining({ relations: { category: true, project: true } }),
+        );
     });
 
     it('rejects requirement creation with missing required fields.', async () => {
@@ -221,8 +245,28 @@ describe('RequirementsService', () => {
         );
     });
 
-    it('rejects malformed visible keys.', async () => {
-        await expect(service.findByVisibleKey('invalid-key')).rejects.toBeInstanceOf(BadRequestException);
+    it.each(['FR-UI-0001', 'FR-AUTH-0001', 'NFR-SEC-0001', 'NFR-PERF-9999'])(
+        'accepts valid visible key %s for exact lookup validation.',
+        async (visibleKey) => {
+            requirementsRepositoryMock.findOne.mockResolvedValue(createRequirementFixture({ visibleKey }));
+
+            await expect(service.findByVisibleKey(visibleKey)).resolves.toEqual(
+                expect.objectContaining({ visibleKey }),
+            );
+        },
+    );
+
+    it.each([
+        'FR-U-0001',
+        'FR-USERIF-0001',
+        'FR-ui-0001',
+        'FR-UI1-0001',
+        'FR-UI_0001',
+        'FR-UI-000',
+        'FR-UI-10000',
+        'REQ-UI-0001',
+    ])('rejects malformed visible key %s.', async (visibleKey) => {
+        await expect(service.findByVisibleKey(visibleKey)).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('lists requirements ordered by visible key.', async () => {
@@ -298,6 +342,7 @@ describe('RequirementsService', () => {
                 owner: 'Team B',
                 rationale: 'Updated rationale.',
                 source: 'US-REQ-005',
+                projectId: baseRequirement.projectId,
             }),
         );
 
@@ -316,12 +361,14 @@ describe('RequirementsService', () => {
     });
 
     it('rejects updates that try to change immutable requirement identity or classification fields.', async () => {
-        await expect(
-            service.update(baseRequirement.id, {
-                type: RequirementType.FR,
-                description: 'Updated',
-            } as unknown as UpdateRequirementDto),
-        ).rejects.toBeInstanceOf(BadRequestException);
+        const updateDtoWithImmutableType: UpdateRequirementDto & { type: RequirementType } = {
+            type: RequirementType.FR,
+            description: 'Updated',
+        };
+
+        await expect(service.update(baseRequirement.id, updateDtoWithImmutableType)).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
 
         expect(dataSourceMock.transaction).not.toHaveBeenCalled();
     });
@@ -526,12 +573,14 @@ describe('RequirementsService', () => {
     it.each([RequirementStatus.Approved, RequirementStatus.Rejected, RequirementStatus.Implemented])(
         'prevents %s requirements from returning to draft through the generic update path.',
         async () => {
-            await expect(
-                service.update(baseRequirement.id, {
-                    status: RequirementStatus.Draft,
-                    description: 'Back to draft.',
-                } as unknown as UpdateRequirementDto),
-            ).rejects.toBeInstanceOf(BadRequestException);
+            const updateDtoWithImmutableStatus: UpdateRequirementDto & { status: RequirementStatus } = {
+                status: RequirementStatus.Draft,
+                description: 'Back to draft.',
+            };
+
+            await expect(service.update(baseRequirement.id, updateDtoWithImmutableStatus)).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
 
             expect(dataSourceMock.transaction).not.toHaveBeenCalled();
         },
