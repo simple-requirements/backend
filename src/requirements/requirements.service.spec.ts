@@ -13,6 +13,13 @@ import { RequirementsKeyAllocatorService } from '@/requirements/requirements-key
 import { Requirement } from '@/requirements/requirements.entity';
 import { RequirementsService } from '@/requirements/requirements.service';
 
+const project: Project = {
+    id: '11111111-1111-4111-8111-111111111111',
+    name: 'Requirements Platform',
+    createdAt: new Date('2026-06-12T00:00:00.000Z'),
+    updatedAt: new Date('2026-06-12T00:00:00.000Z'),
+};
+
 const baseRequirement: Requirement = {
     id: 'adf3f623-ef79-49f9-8148-2b43efe903bb',
     type: RequirementType.NFR,
@@ -44,6 +51,7 @@ const baseRequirement: Requirement = {
         updatedAt: new Date('2026-06-12T00:00:00.000Z'),
         type: RequirementType.NFR,
     },
+    project,
 };
 
 const baseRevision: RequirementRevision = {
