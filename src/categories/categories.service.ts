@@ -2,12 +2,12 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { RequirementType } from '@/requirements/requirement-type-enum';
+import { CATEGORY_KEY_PATTERN } from '@/requirements/requirement-key-patterns';
 
 import { Category } from '@/categories/category.entity';
 import type { CategoryResponseDto } from '@/categories/dto/category-response.dto';
 import type { CreateCategoryDto } from '@/categories/dto/create-category.dto';
 
-const CATEGORY_KEY_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 const POSTGRES_UNIQUE_VIOLATION_CODE = '23505';
 
 /**
@@ -99,14 +99,8 @@ export class CategoriesService {
             throw new BadRequestException('Category key is required');
         }
 
-        if (createCategoryDto.key.length > 40) {
-            throw new BadRequestException('Category key must be no longer than 40 characters');
-        }
-
         if (!CATEGORY_KEY_PATTERN.test(createCategoryDto.key)) {
-            throw new BadRequestException(
-                'Category key must be uppercase and contain only A-Z, 0-9, or underscore characters',
-            );
+            throw new BadRequestException('Category key must contain 2 to 4 uppercase letters');
         }
     }
 

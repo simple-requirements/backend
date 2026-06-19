@@ -17,7 +17,7 @@ import { Check, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, 
 )
 @Check('CHK_requirements_revisions_sequence_number_range', '"sequence_number" > 0 AND "sequence_number" <= 9999')
 @Check('CHK_requirements_revisions_revision_number_range', '"revision_number" > 0')
-@Check('CHK_requirements_revisions_visible_key_format', `"visible_key" ~ '^(FR|NFR)-[A-Z]{3,4}-[0-9]{4}$'`)
+@Check('CHK_requirements_revisions_visible_key_format', `"visible_key" ~ '^(FR|NFR)-[A-Z]{2,4}-[0-9]{4}$'`)
 export class RequirementRevision {
     @PrimaryGeneratedColumn('uuid')
     id!: string;

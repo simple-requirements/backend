@@ -9,7 +9,7 @@ import { Check, Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn,
 @Entity({ name: 'categories' })
 @Index('UQ_categories_key', ['key'], { unique: true })
 @Index('UQ_categories_id_type', ['id', 'type'], { unique: true })
-@Check('CHK_categories_key_format', `"key" ~ '^[A-Z][A-Z0-9_]*$'`)
+@Check('CHK_categories_key_format', `"key" ~ '^[A-Z]{2,4}$'`)
 @Check('CHK_categories_type', `"type" IN ('FR', 'NFR')`)
 export class Category {
     @PrimaryGeneratedColumn('uuid')
@@ -18,7 +18,7 @@ export class Category {
     @Column({ type: 'varchar', length: 120 })
     name!: string;
 
-    @Column({ type: 'varchar', length: 40 })
+    @Column({ type: 'varchar', length: 4 })
     key!: string;
 
     @Column({ type: 'varchar', length: 3 })

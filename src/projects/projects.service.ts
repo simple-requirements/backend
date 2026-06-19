@@ -84,13 +84,13 @@ export class ProjectsService {
     }
 
     private async countRequirements(projectId: string): Promise<number> {
-        const row = (await this.projectsRepository.manager
+        const row = await this.projectsRepository.manager
             .createQueryBuilder()
             .select('COUNT(requirement.id)', 'requirement_count')
             .from('requirements', 'requirement')
             .where('requirement.project_id = :projectId', { projectId })
             .andWhere('requirement.status <> :deletedStatus', { deletedStatus: RequirementStatus.Deleted })
-            .getRawOne()) as ProjectCountRow | undefined;
+            .getRawOne<ProjectCountRow>();
 
         return Number(row?.requirement_count ?? 0);
     }

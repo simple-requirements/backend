@@ -5,12 +5,11 @@ import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { Category } from '@/categories/category.entity';
 import type { AllocatedRequirementKeyDto } from '@/requirements/dto/allocated-requirement-key.dto';
 import { RequirementType } from '@/requirements/requirement-type-enum';
+import { CATEGORY_KEY_PATTERN, MAX_REQUIREMENT_SEQUENCE_NUMBER } from '@/requirements/requirement-key-patterns';
 import { RequirementsKeyCounter } from '@/requirements/requirements-key-counter.entity';
 import { Requirement } from '@/requirements/requirements.entity';
 
-const MAX_REQUIREMENT_SEQUENCE_NUMBER = 9_999;
 const POSTGRES_UNIQUE_VIOLATION_CODE = '23505';
-const REQUIREMENT_CATEGORY_KEY_PATTERN = /^[A-Z]{3,4}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
@@ -68,8 +67,8 @@ export class RequirementsKeyAllocatorService {
             throw new NotFoundException(`Category "${categoryId}" was not found`);
         }
 
-        if (!REQUIREMENT_CATEGORY_KEY_PATTERN.test(category.key)) {
-            throw new BadRequestException('Requirement category key must contain 3 or 4 uppercase letters');
+        if (!CATEGORY_KEY_PATTERN.test(category.key)) {
+            throw new BadRequestException('Requirement category key must contain 2 to 4 uppercase letters');
         }
 
         await manager
