@@ -141,6 +141,94 @@ export function createOpenApiDocument(): OpenAPIObject {
                     },
                 },
             },
+
+            '/metrics': {
+                post: {
+                    tags: ['metrics'],
+                    summary: 'Create a project-scoped metric.',
+                    requestBody: {
+                        required: true,
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateMetricDto' } } },
+                    },
+                    responses: {
+                        '201': {
+                            description: 'Metric created.',
+                            content: {
+                                'application/json': { schema: { $ref: '#/components/schemas/MetricResponseDto' } },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                        '409': { $ref: '#/components/responses/Conflict' },
+                    },
+                },
+                get: {
+                    tags: ['metrics'],
+                    summary: 'List metrics by project.',
+                    parameters: [
+                        { name: 'projectId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Metrics.',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'array',
+                                        items: { $ref: '#/components/schemas/MetricResponseDto' },
+                                    },
+                                },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
+            '/metrics/key/{key}': {
+                get: {
+                    tags: ['metrics'],
+                    summary: 'Retrieve a metric by key within a project.',
+                    parameters: [
+                        {
+                            name: 'key',
+                            in: 'path',
+                            required: true,
+                            schema: { type: 'string', pattern: '^MET-[0-9]{4}$', example: 'MET-0001' },
+                        },
+                        { name: 'projectId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Metric.',
+                            content: {
+                                'application/json': { schema: { $ref: '#/components/schemas/MetricResponseDto' } },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
+            '/metrics/{id}': {
+                get: {
+                    tags: ['metrics'],
+                    summary: 'Retrieve a metric by UUID.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Metric.',
+                            content: {
+                                'application/json': { schema: { $ref: '#/components/schemas/MetricResponseDto' } },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
             '/requirements': {
                 post: {
                     tags: ['requirements'],
@@ -430,6 +518,43 @@ export function createOpenApiDocument(): OpenAPIObject {
         },
         components: {
             schemas: {
+                CreateMetricDto: {
+                    type: 'object',
+                    required: ['projectId', 'key', 'value'],
+                    properties: {
+                        projectId: { type: 'string', format: 'uuid' },
+                        key: { type: 'string', pattern: '^MET-[0-9]{4}$', example: 'MET-0001' },
+                        value: { type: 'string', minLength: 1, example: '2000 ms' },
+                        description: { type: 'string', nullable: true, example: 'Max. latency' },
+                    },
+                },
+                MetricResponseDto: {
+                    type: 'object',
+                    required: ['id', 'projectId', 'key', 'value', 'description', 'createdAt', 'updatedAt'],
+                    properties: {
+                        id: { type: 'string', format: 'uuid' },
+                        projectId: { type: 'string', format: 'uuid' },
+                        key: { type: 'string', pattern: '^MET-[0-9]{4}$', example: 'MET-0001' },
+                        value: { type: 'string', example: '2000 ms' },
+                        description: { type: 'string', nullable: true },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                },
+                MetricReferenceResponseDto: {
+                    type: 'object',
+                    required: ['id', 'key', 'value', 'description', 'resolved'],
+                    properties: {
+                        id: { type: 'string', format: 'uuid', nullable: true },
+                        key: { type: 'string', pattern: '^MET-[0-9]{4}$', example: 'MET-0001' },
+                        value: { type: 'string', nullable: true },
+                        description: { type: 'string', nullable: true },
+                        resolved: {
+                            type: 'boolean',
+                            description: 'Whether the reference resolved within the requirement project.',
+                        },
+                    },
+                },
                 RequirementType: {
                     type: 'string',
                     enum: ['FR', 'NFR'],
@@ -467,7 +592,11 @@ export function createOpenApiDocument(): OpenAPIObject {
                     properties: {
                         projectId: { type: 'string', format: 'uuid' },
                         categoryId: { type: 'string', format: 'uuid' },
-                        description: { type: 'string' },
+                        description: {
+                            type: 'string',
+                            description:
+                                'Canonical code/source text. Metric references use [~MET-0001]; inline definition syntax such as [~MET-0001 := 2000 ms] is unsupported and rejected.',
+                        },
                         priority: { type: 'string', example: 'p3' },
                         owner: { type: 'string', nullable: true },
                         rationale: { type: 'string', nullable: true },
@@ -493,7 +622,11 @@ export function createOpenApiDocument(): OpenAPIObject {
                 UpdateRequirementDto: {
                     type: 'object',
                     properties: {
-                        description: { type: 'string' },
+                        description: {
+                            type: 'string',
+                            description:
+                                'Canonical code/source text. Metric references use [~MET-0001]; inline metric definitions are unsupported and are not used to create or update metrics.',
+                        },
                         priority: { type: 'string' },
                         owner: { type: 'string', nullable: true },
                         rationale: { type: 'string', nullable: true },
@@ -538,6 +671,8 @@ export function createOpenApiDocument(): OpenAPIObject {
                         'obsoleteAt',
                         'createdAt',
                         'updatedAt',
+                        'renderedDescription',
+                        'metricReferences',
                     ],
                     properties: {
                         id: { type: 'string', format: 'uuid' },
@@ -555,7 +690,15 @@ export function createOpenApiDocument(): OpenAPIObject {
                         categoryId: { type: 'string', format: 'uuid' },
                         sequenceNumber: { type: 'integer', minimum: 1, maximum: 9999 },
                         status: { $ref: '#/components/schemas/RequirementStatus' },
-                        description: { type: 'string' },
+                        description: { type: 'string', description: 'Canonical code/source text for code mode.' },
+                        renderedDescription: {
+                            type: 'string',
+                            description: 'Display text with resolved metric references substituted for visual mode.',
+                        },
+                        metricReferences: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/MetricReferenceResponseDto' },
+                        },
                         priority: { type: 'string' },
                         owner: { type: 'string', nullable: true },
                         rationale: { type: 'string', nullable: true },

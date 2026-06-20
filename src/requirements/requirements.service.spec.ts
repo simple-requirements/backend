@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Metric } from '@/metrics/metric.entity';
+import { RequirementMetricLink } from '@/metrics/requirement-metric-link.entity';
 import { Project } from '@/projects/project.entity';
 import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
 import type { UpdateRequirementDto } from '@/requirements/dto/update-requirement.dto';
@@ -65,6 +67,17 @@ const createRequirementFixture = (overrides: Partial<Requirement> = {}): Require
 const project = createProjectFixture();
 const baseRequirement = createRequirementFixture({ project });
 
+const baseMetric: Metric = {
+    id: '22222222-2222-4222-8222-222222222222',
+    projectId: project.id,
+    key: 'MET-0001',
+    value: '2000 ms',
+    description: 'Max. latency',
+    createdAt: fixedDate,
+    updatedAt: fixedDate,
+    project,
+};
+
 const baseRevision: RequirementRevision = {
     id: '31f99575-e1f5-4c1f-a7bb-490f7f1661e4',
     requirementId: baseRequirement.id,
@@ -104,8 +117,9 @@ describe('RequirementsService', () => {
         allocateInTransaction: vi.fn(),
         runWithAllocationConflictMapping: vi.fn(),
     };
-    const transactionManagerMock = { findOne: vi.fn(), create: vi.fn(), save: vi.fn() };
-    const dataSourceMock = { transaction: vi.fn() };
+    const transactionManagerMock = { findOne: vi.fn(), create: vi.fn(), save: vi.fn(), delete: vi.fn() };
+    const dataSourceManagerMock = { findOne: vi.fn() };
+    const dataSourceMock = { transaction: vi.fn(), manager: dataSourceManagerMock };
 
     beforeEach(async () => {
         vi.clearAllMocks();
@@ -113,6 +127,8 @@ describe('RequirementsService', () => {
             Promise.resolve(callback(transactionManagerMock)),
         );
         transactionManagerMock.create.mockImplementation((_entity: unknown, value: unknown) => value);
+        transactionManagerMock.delete.mockResolvedValue({ affected: 0 });
+        dataSourceManagerMock.findOne.mockResolvedValue(null);
         projectsRepositoryMock.findOne.mockResolvedValue(project);
         requirementsKeyAllocatorServiceMock.runWithAllocationConflictMapping.mockImplementation(
             (operation: () => Promise<unknown>) => operation(),
@@ -173,6 +189,8 @@ describe('RequirementsService', () => {
             sequenceNumber: 1,
             status: RequirementStatus.Draft,
             description: 'The API responds quickly.',
+            renderedDescription: 'The API responds quickly.',
+            metricReferences: [],
             priority: 'p1',
             owner: null,
             rationale: 'Latency impacts users.',
@@ -197,6 +215,91 @@ describe('RequirementsService', () => {
         expect(transactionManagerMock.findOne).toHaveBeenCalledWith(
             Requirement,
             expect.objectContaining({ relations: { category: true, project: true } }),
+        );
+    });
+
+    it('creates a requirement with an existing plain metric reference without mutating metrics.', async () => {
+        const dto: CreateRequirementDto = {
+            projectId: baseRequirement.projectId,
+            categoryId: baseRequirement.categoryId,
+            description: 'Latency shall be [ ~MET-0001 ].',
+            priority: 'p1',
+        };
+
+        requirementsKeyAllocatorServiceMock.allocateInTransaction.mockResolvedValue({
+            id: baseRequirement.id,
+            type: baseRequirement.type,
+            categoryId: baseRequirement.categoryId,
+            sequenceNumber: baseRequirement.sequenceNumber,
+            visibleKey: baseRequirement.visibleKey,
+        });
+        transactionManagerMock.findOne.mockImplementation((entity: unknown) => {
+            if (entity === Requirement)
+                return Promise.resolve({ ...baseRequirement, description: null, priority: null });
+            if (entity === Metric) return Promise.resolve(baseMetric);
+            return Promise.resolve(null);
+        });
+        transactionManagerMock.save.mockImplementation(
+            (entity: unknown, value: Requirement | RequirementMetricLink) => {
+                if (entity === RequirementMetricLink) return Promise.resolve(value);
+                return Promise.resolve({ ...value, updatedAt: new Date('2026-06-12T00:00:01.000Z') });
+            },
+        );
+
+        await expect(service.create(dto)).resolves.toEqual(
+            expect.objectContaining({
+                description: 'Latency shall be [~MET-0001].',
+                renderedDescription: 'Latency shall be 2000 ms.',
+                metricReferences: [
+                    {
+                        id: baseMetric.id,
+                        key: 'MET-0001',
+                        value: '2000 ms',
+                        description: 'Max. latency',
+                        resolved: true,
+                    },
+                ],
+            }),
+        );
+        expect(transactionManagerMock.save).not.toHaveBeenCalledWith(Metric, expect.anything());
+        expect(transactionManagerMock.save).toHaveBeenCalledWith(
+            RequirementMetricLink,
+            expect.objectContaining({ requirementId: baseRequirement.id, metricId: baseMetric.id }),
+        );
+    });
+
+    it('rejects unsupported inline definitions and never creates metrics from requirement text.', async () => {
+        const dto: CreateRequirementDto = {
+            projectId: baseRequirement.projectId,
+            categoryId: baseRequirement.categoryId,
+            description: 'Latency shall be [~MET-0001 := 2000 ms | Max. latency].',
+            priority: 'p1',
+        };
+
+        requirementsKeyAllocatorServiceMock.allocateInTransaction.mockResolvedValue({
+            id: baseRequirement.id,
+            type: baseRequirement.type,
+            categoryId: baseRequirement.categoryId,
+            sequenceNumber: baseRequirement.sequenceNumber,
+            visibleKey: baseRequirement.visibleKey,
+        });
+        transactionManagerMock.findOne.mockResolvedValue({ ...baseRequirement, description: null, priority: null });
+
+        await expect(service.create(dto)).rejects.toBeInstanceOf(BadRequestException);
+        expect(transactionManagerMock.save).not.toHaveBeenCalledWith(Metric, expect.anything());
+    });
+
+    it('renders unresolved references on existing requirement reads without mutating stored text.', async () => {
+        const requirement = createRequirementFixture({ description: 'Latency shall be [~MET-9999].' });
+        requirementsRepositoryMock.findOne.mockResolvedValue(requirement);
+        dataSourceManagerMock.findOne.mockResolvedValue(null);
+
+        await expect(service.findOne(requirement.id)).resolves.toEqual(
+            expect.objectContaining({
+                description: 'Latency shall be [~MET-9999].',
+                renderedDescription: 'Latency shall be [~MET-9999].',
+                metricReferences: [{ id: null, key: 'MET-9999', value: null, description: null, resolved: false }],
+            }),
         );
     });
 
@@ -339,6 +442,8 @@ describe('RequirementsService', () => {
                 categoryId: baseRequirement.categoryId,
                 sequenceNumber: baseRequirement.sequenceNumber,
                 description: 'Updated description.',
+                renderedDescription: 'Updated description.',
+                metricReferences: [],
                 owner: 'Team B',
                 rationale: 'Updated rationale.',
                 source: 'US-REQ-005',

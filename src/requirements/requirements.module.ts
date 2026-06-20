@@ -1,3 +1,5 @@
+import { Metric } from '@/metrics/metric.entity';
+import { RequirementMetricLink } from '@/metrics/requirement-metric-link.entity';
 import { Project } from '@/projects/project.entity';
 import { Category } from '@/categories/category.entity';
 import { Module } from '@nestjs/common';
@@ -15,7 +17,17 @@ import { RequirementsService } from '@/requirements/requirements.service';
  * The module registers all requirement-related repositories so services can run transactional allocation and mutation logic against PostgreSQL.
  */
 @Module({
-    imports: [TypeOrmModule.forFeature([Category, Project, Requirement, RequirementRevision, RequirementsKeyCounter])],
+    imports: [
+        TypeOrmModule.forFeature([
+            Category,
+            Project,
+            Requirement,
+            RequirementRevision,
+            RequirementsKeyCounter,
+            Metric,
+            RequirementMetricLink,
+        ]),
+    ],
     controllers: [RequirementsController],
     providers: [RequirementsKeyAllocatorService, RequirementsService],
     exports: [RequirementsKeyAllocatorService, RequirementsService],

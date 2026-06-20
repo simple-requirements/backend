@@ -1,3 +1,4 @@
+import { MetricReferenceResponseDto } from '@/metrics/dto/metric-reference-response.dto';
 import { ApiProperty } from '@nestjs/swagger';
 
 import { RequirementStatus } from '@/requirements/requirement-status-enum';
@@ -30,8 +31,18 @@ export class RequirementResponseDto {
     sequenceNumber!: number;
     @ApiProperty({ description: 'Requirement lifecycle status.', enum: RequirementStatus })
     status!: RequirementStatus;
-    @ApiProperty({ description: 'Requirement statement.' })
+    @ApiProperty({
+        description:
+            'Canonical stored requirement statement for code mode. Metric references use [~MET-0001]; inline metric definitions are unsupported.',
+    })
     description!: string;
+    @ApiProperty({
+        description: 'Rendered requirement statement with metric references resolved to values.',
+        example: 'The API shall respond within 2000 ms.',
+    })
+    renderedDescription!: string;
+    @ApiProperty({ description: 'Metrics referenced by this requirement.', type: [MetricReferenceResponseDto] })
+    metricReferences!: MetricReferenceResponseDto[];
     @ApiProperty({ description: 'Priority label.', example: 'p3' })
     priority!: string;
     @ApiProperty({ description: 'Requirement owner.', nullable: true })
