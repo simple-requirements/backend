@@ -37,6 +37,8 @@ export async function cleanDatabase(): Promise<void> {
 
     await db.query(`
         TRUNCATE TABLE
+            requirement_metric_links,
+            metrics,
             categories,
             projects,
             requirements,
