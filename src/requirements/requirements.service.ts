@@ -1,3 +1,6 @@
+import { Metric } from '@/metrics/metric.entity';
+import { RequirementMetricLink } from '@/metrics/requirement-metric-link.entity';
+import { parseInlineMetrics } from '@/metrics/inline/metric-inline-parser';
 import { Project } from '@/projects/project.entity';
 import type { CreateRequirementDto } from '@/requirements/dto/create-requirement.dto';
 import type { MarkObsoleteRequirementDto } from '@/requirements/dto/mark-obsolete-requirement.dto';
@@ -89,13 +92,32 @@ export class RequirementsService {
                 }
 
                 requirement.status = RequirementStatus.Draft;
-                requirement.description = createRequirementDto.description.trim();
+                const metricContext = await this.resolveMetricReferences(
+                    manager,
+                    createRequirementDto.projectId,
+                    createRequirementDto.description.trim(),
+                );
+                requirement.description = metricContext.normalizedDescription;
                 requirement.priority = createRequirementDto.priority.trim();
                 requirement.owner = this.toOptionalTrimmedString(createRequirementDto.owner);
                 requirement.rationale = this.toOptionalTrimmedString(createRequirementDto.rationale);
                 requirement.source = this.toOptionalTrimmedString(createRequirementDto.source);
 
-                return this.toResponseDto(await manager.save(Requirement, requirement));
+                const savedRequirement = await manager.save(Requirement, requirement);
+                await this.replaceMetricLinks(manager, savedRequirement.id, metricContext.metrics);
+                return this.toResponseDto(savedRequirement, {
+                    renderedDescription: this.renderDescription(
+                        savedRequirement.description ?? '',
+                        new Map(metricContext.metrics.map((metric) => [metric.key, metric])),
+                    ),
+                    metricReferences: metricContext.metrics.map((metric) => ({
+                        id: metric.id,
+                        key: metric.key,
+                        value: metric.value,
+                        description: metric.description,
+                        resolved: true,
+                    })),
+                });
             }),
         );
     }
@@ -144,7 +166,7 @@ export class RequirementsService {
             order: { visibleKey: 'ASC' },
         });
 
-        return requirements.map((requirement) => this.toResponseDto(requirement));
+        return Promise.all(requirements.map((requirement) => this.toResponseDtoWithResolvedMetrics(requirement)));
     }
 
     /**
@@ -158,7 +180,7 @@ export class RequirementsService {
     async findOne(id: string): Promise<RequirementResponseDto> {
         const requirement = await this.findActiveOrRejectedRequirementById(id);
 
-        return this.toResponseDto(requirement);
+        return this.toResponseDtoWithResolvedMetrics(requirement);
     }
 
     /**
@@ -183,7 +205,7 @@ export class RequirementsService {
             throw new NotFoundException(`Requirement "${visibleKey}" was not found`);
         }
 
-        return this.toResponseDto(requirement);
+        return this.toResponseDtoWithResolvedMetrics(requirement);
     }
 
     /**
@@ -210,9 +232,15 @@ export class RequirementsService {
             }
 
             await this.createRevisionSnapshot(manager, requirement);
+            let metricContext: { normalizedDescription: string; metrics: Metric[] } | undefined;
 
             if (updateRequirementDto.description !== undefined) {
-                requirement.description = updateRequirementDto.description.trim();
+                metricContext = await this.resolveMetricReferences(
+                    manager,
+                    requirement.projectId,
+                    updateRequirementDto.description.trim(),
+                );
+                requirement.description = metricContext.normalizedDescription;
             }
 
             if (updateRequirementDto.priority !== undefined) {
@@ -231,7 +259,24 @@ export class RequirementsService {
                 requirement.source = this.toOptionalTrimmedString(updateRequirementDto.source);
             }
 
-            return this.toResponseDto(await manager.save(Requirement, requirement));
+            const savedRequirement = await manager.save(Requirement, requirement);
+            if (metricContext !== undefined) {
+                await this.replaceMetricLinks(manager, savedRequirement.id, metricContext.metrics);
+                return this.toResponseDto(savedRequirement, {
+                    renderedDescription: this.renderDescription(
+                        savedRequirement.description ?? '',
+                        new Map(metricContext.metrics.map((metric) => [metric.key, metric])),
+                    ),
+                    metricReferences: metricContext.metrics.map((metric) => ({
+                        id: metric.id,
+                        key: metric.key,
+                        value: metric.value,
+                        description: metric.description,
+                        resolved: true,
+                    })),
+                });
+            }
+            return this.toResponseDto(savedRequirement);
         });
     }
 
@@ -556,6 +601,94 @@ export class RequirementsService {
         return requirement;
     }
 
+    private async resolveMetricReferences(
+        manager: EntityManager,
+        projectId: string,
+        description: string,
+    ): Promise<{ normalizedDescription: string; metrics: Metric[] }> {
+        const parsed = parseInlineMetrics(description);
+
+        if (parsed.parseErrors.length > 0) {
+            throw new BadRequestException({
+                message: 'Requirement description contains invalid or unsupported metric syntax',
+                invalidTokens: parsed.invalidTokens,
+            });
+        }
+
+        const metrics: Metric[] = [];
+        const keys = [...new Set(parsed.references.map((reference) => reference.key))];
+
+        for (const key of keys) {
+            const existing = await manager.findOne(Metric, { where: { projectId, key } });
+
+            if (existing === null) {
+                throw new NotFoundException({
+                    message: `Metric reference "${key}" was not found in this project`,
+                    unresolvedMetricReference: { key, projectId },
+                });
+            }
+
+            metrics.push(existing);
+        }
+
+        return { normalizedDescription: parsed.normalizedText, metrics };
+    }
+
+    private async buildRenderingContext(
+        projectId: string,
+        description: string,
+    ): Promise<{ renderedDescription: string; metricReferences: RequirementResponseDto['metricReferences'] }> {
+        const parsed = parseInlineMetrics(description);
+        const references = [...new Set(parsed.references.map((reference) => reference.key))];
+        const resolvedMetrics = new Map<string, Metric>();
+
+        for (const key of references) {
+            const metric = await this.dataSource.manager.findOne(Metric, { where: { projectId, key } });
+            if (metric !== null) {
+                resolvedMetrics.set(key, metric);
+            }
+        }
+
+        return {
+            renderedDescription: this.renderDescription(description, resolvedMetrics),
+            metricReferences: references.map((key) => {
+                const metric = resolvedMetrics.get(key);
+                return {
+                    id: metric?.id ?? null,
+                    key,
+                    value: metric?.value ?? null,
+                    description: metric?.description ?? null,
+                    resolved: metric !== undefined,
+                };
+            }),
+        };
+    }
+
+    private async toResponseDtoWithResolvedMetrics(requirement: Requirement): Promise<RequirementResponseDto> {
+        const renderingContext = await this.buildRenderingContext(requirement.projectId, requirement.description ?? '');
+        return this.toResponseDto(requirement, renderingContext);
+    }
+
+    private async replaceMetricLinks(manager: EntityManager, requirementId: string, metrics: Metric[]): Promise<void> {
+        if ('delete' in manager && typeof manager.delete === 'function') {
+            await manager.delete(RequirementMetricLink, { requirementId });
+        }
+        for (const metric of metrics) {
+            await manager.save(
+                RequirementMetricLink,
+                manager.create(RequirementMetricLink, { requirementId, metricId: metric.id }),
+            );
+        }
+    }
+
+    private renderDescription(description: string, metrics: Map<string, Metric>): string {
+        const valuesByKey = new Map([...metrics.values()].map((metric) => [metric.key, metric.value]));
+        return description.replace(
+            /\[\s*~\s*(MET-[0-9]{4})\s*\]/g,
+            (_token, key: string) => valuesByKey.get(key) ?? `[~${key}]`,
+        );
+    }
+
     private validateCreateRequirementDto(createRequirementDto: CreateRequirementDto): void {
         if (typeof createRequirementDto !== 'object' || createRequirementDto === null) {
             throw new BadRequestException('Requirement request body is required');
@@ -701,7 +834,13 @@ export class RequirementsService {
         return value.trim();
     }
 
-    private toResponseDto(requirement: Requirement): RequirementResponseDto {
+    private toResponseDto(
+        requirement: Requirement,
+        renderingContext: {
+            renderedDescription: string;
+            metricReferences: RequirementResponseDto['metricReferences'];
+        } = { renderedDescription: requirement.description ?? '', metricReferences: [] },
+    ): RequirementResponseDto {
         return {
             id: requirement.id,
             visibleKey: requirement.visibleKey,
@@ -711,6 +850,8 @@ export class RequirementsService {
             sequenceNumber: requirement.sequenceNumber,
             status: requirement.status,
             description: requirement.description ?? '',
+            renderedDescription: renderingContext.renderedDescription,
+            metricReferences: renderingContext.metricReferences,
             priority: requirement.priority ?? '',
             owner: requirement.owner,
             rationale: requirement.rationale,

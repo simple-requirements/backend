@@ -6,6 +6,7 @@ import { AppController } from '@/app.controller';
 import { AppService } from '@/app.service';
 import { CategoriesModule } from '@/categories/categories.module';
 import { ProjectsModule } from '@/projects/projects.module';
+import { MetricsModule } from '@/metrics/metrics.module';
 import { RequirementsModule } from '@/requirements/requirements.module';
 import databaseConfig from '@/database/database.config';
 
@@ -44,6 +45,7 @@ import databaseConfig from '@/database/database.config';
 
         CategoriesModule,
         ProjectsModule,
+        MetricsModule,
         RequirementsModule,
     ],
     controllers: [AppController],
