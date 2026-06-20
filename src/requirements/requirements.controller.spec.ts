@@ -18,10 +18,13 @@ describe('RequirementsController', () => {
         id: 'adf3f623-ef79-49f9-8148-2b43efe903bb',
         visibleKey: 'NFR-PERF-0001',
         type: RequirementType.NFR,
+        projectId: '11111111-1111-4111-8111-111111111111',
         categoryId: '57eb6e68-1b15-48ea-b976-8fbdb2bfc802',
         sequenceNumber: 1,
         status: RequirementStatus.Draft,
         description: 'The API responds quickly.',
+        renderedDescription: 'The API responds quickly.',
+        metricReferences: [],
         priority: 'p1',
         owner: null,
         rationale: 'Latency impacts users.',
@@ -30,6 +33,10 @@ describe('RequirementsController', () => {
         reviewer: null,
         rejectedAt: null,
         deletedAt: null,
+        approvedAt: null,
+        implementedAt: null,
+        obsolescenceReason: null,
+        obsoleteAt: null,
         createdAt: '2026-06-12T00:00:00.000Z',
         updatedAt: '2026-06-12T00:00:00.000Z',
     };
@@ -40,6 +47,7 @@ describe('RequirementsController', () => {
         revisionNumber: 1,
         visibleKey: requirement.visibleKey,
         type: requirement.type,
+        projectId: requirement.projectId,
         categoryId: requirement.categoryId,
         sequenceNumber: requirement.sequenceNumber,
         status: requirement.status,
@@ -89,7 +97,7 @@ describe('RequirementsController', () => {
 
     it('delegates draft requirement creation to the service.', async () => {
         const dto: CreateRequirementDto = {
-            type: RequirementType.NFR,
+            projectId: requirement.projectId,
             categoryId: requirement.categoryId,
             description: requirement.description,
             priority: requirement.priority,

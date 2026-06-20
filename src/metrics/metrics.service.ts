@@ -8,12 +8,20 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+/**
+ * Coordinates project-scoped metric persistence and lookup.
+ *
+ * Metrics are created only through explicit metric API operations; requirement text resolution can reference existing metrics but must not create or update them implicitly.
+ */
 @Injectable()
 export class MetricsService {
     constructor(
         @InjectRepository(Metric) private readonly metricsRepository: Repository<Metric>,
         @InjectRepository(Project) private readonly projectsRepository: Repository<Project>,
     ) {}
+    /**
+     * Creates a metric after validating the project scope, key format, non-blank value, and per-project key uniqueness.
+     */
     async create(dto: CreateMetricDto): Promise<MetricResponseDto> {
         this.validate(dto);
         await this.ensureProject(dto.projectId);
@@ -32,6 +40,9 @@ export class MetricsService {
             ),
         );
     }
+    /**
+     * Lists metrics for a single project in key order so callers never mix metrics across project boundaries.
+     */
     async findAll(projectId: string): Promise<MetricResponseDto[]> {
         this.validateProjectId(projectId);
         await this.ensureProject(projectId);
@@ -39,12 +50,18 @@ export class MetricsService {
             this.toDto(m),
         );
     }
+    /**
+     * Retrieves one metric by immutable internal UUID.
+     */
     async findOne(id: string): Promise<MetricResponseDto> {
         this.validateProjectId(id, 'Metric id must be a valid UUID');
         const metric = await this.metricsRepository.findOne({ where: { id } });
         if (!metric) throw new NotFoundException(`Metric "${id}" was not found`);
         return this.toDto(metric);
     }
+    /**
+     * Retrieves one metric by project scope and user-facing metric key.
+     */
     async findByKey(projectId: string, key: string): Promise<MetricResponseDto> {
         this.validateProjectId(projectId);
         if (!METRIC_KEY_PATTERN.test(key)) throw new BadRequestException('Metric key must match MET-0001');

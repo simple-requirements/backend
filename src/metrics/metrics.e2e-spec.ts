@@ -48,7 +48,7 @@ test.describe('metrics API', () => {
         await closeE2eDataSource();
     });
 
-    test('creates, lists, and retrieves project-scoped metrics.', async ({ request }) => {
+    test('creates project-scoped metrics.', async ({ request }) => {
         const project = await createProject(request);
         const metric = await createMetric(request, project.id);
 
@@ -61,40 +61,59 @@ test.describe('metrics API', () => {
                 description: 'Max. latency',
             }),
         );
-
-        const listResponse = await request.get(`/metrics?projectId=${project.id}`);
-        expect(listResponse.status()).toBe(200);
-        expect((await listResponse.json()) as MetricApiResponse[]).toEqual(
-            expect.arrayContaining([expect.objectContaining({ id: metric.id, key: 'MET-0001' })]),
-        );
-
-        const byIdResponse = await request.get(`/metrics/${metric.id}`);
-        expect(byIdResponse.status()).toBe(200);
-        expect((await byIdResponse.json()) as MetricApiResponse).toEqual(expect.objectContaining({ id: metric.id }));
-
-        const byKeyResponse = await request.get(`/metrics/key/MET-0001?projectId=${project.id}`);
-        expect(byKeyResponse.status()).toBe(200);
-        expect((await byKeyResponse.json()) as MetricApiResponse).toEqual(expect.objectContaining({ id: metric.id }));
     });
 
-    test('validates keys, blank values, and duplicate keys within a project.', async ({ request }) => {
+    test('lists metrics by project.', async ({ request }) => {
         const project = await createProject(request);
+        const metric = await createMetric(request, project.id);
 
-        const invalidKeyResponse = await request.post('/metrics', {
-            data: { projectId: project.id, key: 'met-0001', value: '2000 ms' },
+        const response = await request.get(`/metrics?projectId=${project.id}`);
+        expect(response.status()).toBe(200);
+        expect((await response.json()) as MetricApiResponse[]).toEqual(
+            expect.arrayContaining([expect.objectContaining({ id: metric.id, key: 'MET-0001' })]),
+        );
+    });
+
+    test('retrieves metrics by id.', async ({ request }) => {
+        const project = await createProject(request);
+        const metric = await createMetric(request, project.id);
+
+        const response = await request.get(`/metrics/${metric.id}`);
+        expect(response.status()).toBe(200);
+        expect((await response.json()) as MetricApiResponse).toEqual(expect.objectContaining({ id: metric.id }));
+    });
+
+    test('retrieves metrics by key within a project.', async ({ request }) => {
+        const project = await createProject(request);
+        const metric = await createMetric(request, project.id);
+
+        const response = await request.get(`/metrics/key/MET-0001?projectId=${project.id}`);
+        expect(response.status()).toBe(200);
+        expect((await response.json()) as MetricApiResponse).toEqual(expect.objectContaining({ id: metric.id }));
+    });
+
+    for (const invalidCase of [
+        { name: 'invalid key', data: { key: 'met-0001', value: '2000 ms' } },
+        { name: 'blank value', data: { key: 'MET-0001', value: '   ' } },
+    ]) {
+        test(`rejects ${invalidCase.name}.`, async ({ request }) => {
+            const project = await createProject(request);
+
+            const response = await request.post('/metrics', { data: { projectId: project.id, ...invalidCase.data } });
+
+            expect(response.status()).toBe(400);
         });
-        expect(invalidKeyResponse.status()).toBe(400);
+    }
 
-        const blankValueResponse = await request.post('/metrics', {
-            data: { projectId: project.id, key: 'MET-0001', value: '   ' },
-        });
-        expect(blankValueResponse.status()).toBe(400);
-
+    test('rejects duplicate metric keys within a project.', async ({ request }) => {
+        const project = await createProject(request);
         await createMetric(request, project.id, 'MET-0001');
-        const duplicateResponse = await request.post('/metrics', {
+
+        const response = await request.post('/metrics', {
             data: { projectId: project.id, key: 'MET-0001', value: '1500 ms' },
         });
-        expect(duplicateResponse.status()).toBe(409);
+
+        expect(response.status()).toBe(409);
     });
 
     test('allows the same key in different projects.', async ({ request }) => {
