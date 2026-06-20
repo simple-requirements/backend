@@ -1,3 +1,4 @@
+import { UUID_PATTERN } from '@/common/uuid';
 import { Project } from '@/projects/project.entity';
 import { METRIC_KEY_PATTERN } from '@/metrics/metric-key';
 import { CreateMetricDto } from '@/metrics/dto/create-metric.dto';
@@ -7,7 +8,6 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 @Injectable()
 export class MetricsService {
     constructor(

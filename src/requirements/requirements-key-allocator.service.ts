@@ -1,3 +1,4 @@
+import { UUID_PATTERN } from '@/common/uuid';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
@@ -10,7 +11,6 @@ import { RequirementsKeyCounter } from '@/requirements/requirements-key-counter.
 import { Requirement } from '@/requirements/requirements.entity';
 
 const POSTGRES_UNIQUE_VIOLATION_CODE = '23505';
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Allocates durable visible keys for requirements.

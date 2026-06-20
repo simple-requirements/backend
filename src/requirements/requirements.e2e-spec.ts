@@ -44,6 +44,26 @@ interface RequirementApiResponse {
     obsoleteAt: string | null;
     createdAt: string;
     updatedAt: string;
+    renderedDescription: string;
+    metricReferences: MetricReferenceApiResponse[];
+}
+
+interface MetricReferenceApiResponse {
+    id: string | null;
+    key: string;
+    value: string | null;
+    description: string | null;
+    resolved: boolean;
+}
+
+interface MetricApiResponse {
+    id: string;
+    projectId: string;
+    key: string;
+    value: string;
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 interface RequirementRevisionApiResponse {
@@ -99,6 +119,20 @@ async function createCategory(
     expect(response.status()).toBe(201);
 
     return (await response.json()) as CategoryApiResponse;
+}
+
+async function createMetric(
+    request: APIRequestContext,
+    projectId: string,
+    key = 'MET-0001',
+    value = '2000 ms',
+    description: string | null = 'Max. latency',
+): Promise<MetricApiResponse> {
+    const response = await request.post('/metrics', { data: { projectId, key, value, description } });
+
+    expect(response.status()).toBe(201);
+
+    return (await response.json()) as MetricApiResponse;
 }
 
 async function createRequirement(
@@ -228,6 +262,77 @@ test.describe('requirements API', () => {
         expect(requirements).toEqual(
             expect.arrayContaining([expect.objectContaining({ id: created.id, visibleKey: created.visibleKey })]),
         );
+    });
+
+    test('Creates and reads requirements with metric reference rendering data.', async ({ request }) => {
+        const metric = await createMetric(request, project.id);
+        const created = await createRequirement(request, project.id, category.id, {
+            description: 'The API shall respond within [ ~MET-0001 ].',
+        });
+
+        expect(created).toEqual(
+            expect.objectContaining({
+                description: 'The API shall respond within [~MET-0001].',
+                renderedDescription: 'The API shall respond within 2000 ms.',
+                metricReferences: [
+                    { id: metric.id, key: 'MET-0001', value: '2000 ms', description: 'Max. latency', resolved: true },
+                ],
+            }),
+        );
+
+        const retrieveResponse = await request.get(`/requirements/${created.id}`);
+        expect(retrieveResponse.status()).toBe(200);
+        expect((await retrieveResponse.json()) as RequirementApiResponse).toEqual(
+            expect.objectContaining({
+                description: 'The API shall respond within [~MET-0001].',
+                renderedDescription: 'The API shall respond within 2000 ms.',
+                metricReferences: [expect.objectContaining({ id: metric.id, key: 'MET-0001', resolved: true })],
+            }),
+        );
+    });
+
+    test('Rejects missing or unsupported metric references without creating metrics from requirement text.', async ({
+        request,
+    }) => {
+        const missingResponse = await request.post('/requirements', {
+            data: {
+                projectId: project.id,
+                categoryId: category.id,
+                description: 'The API shall respond within [~MET-9999].',
+                priority: 'p3',
+            },
+        });
+        expect(missingResponse.status()).toBe(404);
+
+        const unsupportedDefinitionResponse = await request.post('/requirements', {
+            data: {
+                projectId: project.id,
+                categoryId: category.id,
+                description: 'The API shall respond within [~MET-0001 := 2000 ms | Max. latency].',
+                priority: 'p3',
+            },
+        });
+        expect(unsupportedDefinitionResponse.status()).toBe(400);
+
+        const listMetricsResponse = await request.get(`/metrics?projectId=${project.id}`);
+        expect(listMetricsResponse.status()).toBe(200);
+        expect((await listMetricsResponse.json()) as MetricApiResponse[]).toEqual([]);
+    });
+
+    test('Rejects cross-project metric references as unresolved in the requirement project.', async ({ request }) => {
+        const otherProject = await createProject(request, 'Other Product');
+        await createMetric(request, otherProject.id, 'MET-0001');
+
+        const response = await request.post('/requirements', {
+            data: {
+                projectId: project.id,
+                categoryId: category.id,
+                description: 'The API shall respond within [~MET-0001].',
+                priority: 'p3',
+            },
+        });
+
+        expect(response.status()).toBe(404);
     });
 
     test('Deletes a draft requirement while preserving its visible key reservation.', async ({ request }) => {

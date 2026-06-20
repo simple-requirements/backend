@@ -1,3 +1,4 @@
+import { UUID_PATTERN } from '@/common/uuid';
 import type { CreateProjectDto } from '@/projects/dto/create-project.dto';
 import type { ProjectResponseDto } from '@/projects/dto/project-response.dto';
 import { Project } from '@/projects/project.entity';
@@ -6,7 +7,6 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PROJECT_CREATE_FIELDS = ['name'] as const;
 
 interface ProjectListRow {
