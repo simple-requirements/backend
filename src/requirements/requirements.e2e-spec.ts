@@ -291,10 +291,8 @@ test.describe('requirements API', () => {
         );
     });
 
-    test('Rejects missing or unsupported metric references without creating metrics from requirement text.', async ({
-        request,
-    }) => {
-        const missingResponse = await request.post('/requirements', {
+    test('Rejects missing metric references.', async ({ request }) => {
+        const response = await request.post('/requirements', {
             data: {
                 projectId: project.id,
                 categoryId: category.id,
@@ -302,9 +300,14 @@ test.describe('requirements API', () => {
                 priority: 'p3',
             },
         });
-        expect(missingResponse.status()).toBe(404);
 
-        const unsupportedDefinitionResponse = await request.post('/requirements', {
+        expect(response.status()).toBe(404);
+    });
+
+    test('Rejects unsupported inline definitions without creating metrics from requirement text.', async ({
+        request,
+    }) => {
+        const response = await request.post('/requirements', {
             data: {
                 projectId: project.id,
                 categoryId: category.id,
@@ -312,7 +315,7 @@ test.describe('requirements API', () => {
                 priority: 'p3',
             },
         });
-        expect(unsupportedDefinitionResponse.status()).toBe(400);
+        expect(response.status()).toBe(400);
 
         const listMetricsResponse = await request.get(`/metrics?projectId=${project.id}`);
         expect(listMetricsResponse.status()).toBe(200);

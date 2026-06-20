@@ -6,6 +6,7 @@ import { CategoriesController } from '@/categories/categories.controller';
 import { CategoriesService } from '@/categories/categories.service';
 import type { CategoryResponseDto } from '@/categories/dto/category-response.dto';
 import type { CreateCategoryDto } from '@/categories/dto/create-category.dto';
+import { RequirementType } from '@/requirements/requirement-type-enum';
 
 describe('CategoriesController', () => {
     let controller: CategoriesController;
@@ -16,6 +17,7 @@ describe('CategoriesController', () => {
         key: 'PERF',
         createdAt: '2026-06-07T00:00:00.000Z',
         updatedAt: '2026-06-07T00:00:00.000Z',
+        type: RequirementType.NFR,
     };
 
     const categoriesServiceMock = { create: vi.fn(), findAll: vi.fn(), findOne: vi.fn() };
@@ -32,7 +34,7 @@ describe('CategoriesController', () => {
     });
 
     it('delegates category creation to the service', async () => {
-        const dto: CreateCategoryDto = { name: 'Performance', key: 'PERF' };
+        const dto: CreateCategoryDto = { name: 'Performance', key: 'PERF', type: RequirementType.NFR };
 
         categoriesServiceMock.create.mockResolvedValue(category);
 
