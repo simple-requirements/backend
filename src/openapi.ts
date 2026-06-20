@@ -86,6 +86,61 @@ export function createOpenApiDocument(): OpenAPIObject {
                     },
                 },
             },
+            '/projects': {
+                post: {
+                    tags: ['projects'],
+                    summary: 'Create a project.',
+                    requestBody: {
+                        required: true,
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateProjectDto' } } },
+                    },
+                    responses: {
+                        '201': {
+                            description: 'Project created.',
+                            content: {
+                                'application/json': { schema: { $ref: '#/components/schemas/ProjectResponseDto' } },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                    },
+                },
+                get: {
+                    tags: ['projects'],
+                    summary: 'List projects with non-deleted requirement counts.',
+                    responses: {
+                        '200': {
+                            description: 'Projects.',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'array',
+                                        items: { $ref: '#/components/schemas/ProjectResponseDto' },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            '/projects/{id}': {
+                get: {
+                    tags: ['projects'],
+                    summary: 'Retrieve a project by UUID.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Project.',
+                            content: {
+                                'application/json': { schema: { $ref: '#/components/schemas/ProjectResponseDto' } },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
             '/requirements': {
                 post: {
                     tags: ['requirements'],
@@ -112,6 +167,7 @@ export function createOpenApiDocument(): OpenAPIObject {
                     tags: ['requirements'],
                     summary: 'List requirements with optional filters.',
                     parameters: [
+                        { name: 'projectId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
                         { name: 'includeRejected', in: 'query', required: false, schema: { type: 'boolean' } },
                         {
                             name: 'type',
@@ -407,14 +463,31 @@ export function createOpenApiDocument(): OpenAPIObject {
                 },
                 CreateRequirementDto: {
                     type: 'object',
-                    required: ['categoryId', 'description', 'priority'],
+                    required: ['projectId', 'categoryId', 'description', 'priority'],
                     properties: {
+                        projectId: { type: 'string', format: 'uuid' },
                         categoryId: { type: 'string', format: 'uuid' },
                         description: { type: 'string' },
                         priority: { type: 'string', example: 'p3' },
                         owner: { type: 'string', nullable: true },
                         rationale: { type: 'string', nullable: true },
                         source: { type: 'string', nullable: true },
+                    },
+                },
+                CreateProjectDto: {
+                    type: 'object',
+                    required: ['name'],
+                    properties: { name: { type: 'string', example: 'Platform Modernization' } },
+                },
+                ProjectResponseDto: {
+                    type: 'object',
+                    required: ['id', 'name', 'requirementCount', 'createdAt', 'updatedAt'],
+                    properties: {
+                        id: { type: 'string', format: 'uuid' },
+                        name: { type: 'string' },
+                        requirementCount: { type: 'integer', minimum: 0 },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' },
                     },
                 },
                 UpdateRequirementDto: {
@@ -446,6 +519,7 @@ export function createOpenApiDocument(): OpenAPIObject {
                         'id',
                         'visibleKey',
                         'type',
+                        'projectId',
                         'categoryId',
                         'sequenceNumber',
                         'status',
@@ -477,6 +551,7 @@ export function createOpenApiDocument(): OpenAPIObject {
                             readOnly: true,
                             description: 'Derived from the assigned category.',
                         },
+                        projectId: { type: 'string', format: 'uuid' },
                         categoryId: { type: 'string', format: 'uuid' },
                         sequenceNumber: { type: 'integer', minimum: 1, maximum: 9999 },
                         status: { $ref: '#/components/schemas/RequirementStatus' },
