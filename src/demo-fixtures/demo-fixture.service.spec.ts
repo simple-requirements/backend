@@ -63,7 +63,35 @@ describe('DemoFixtureService', () => {
         await expect(createService({ projects }).seed()).rejects.toThrow(ConflictException);
     });
 
-    it('reuses compatible categories and rejects incompatible category duplicates.', async () => {
+    it('reuses compatible categories with existing database ids.', async () => {
+        const categories = repository();
+        const existingAuthId = crypto.randomUUID();
+        categories.findOne.mockImplementation((_, options: { where: Array<{ key?: string }> }) => {
+            const fixtureCategory = DEMO_FIXTURE_CATEGORIES.find((category) =>
+                options.where.some((where) => where.key === category.key),
+            );
+            return Promise.resolve(
+                fixtureCategory ?
+                    { ...fixtureCategory, id: fixtureCategory.key === 'AUTH' ? existingAuthId : fixtureCategory.id }
+                :   null,
+            );
+        });
+
+        const categoryIdsByFixtureId = await (
+            createService({ categories }) as unknown as {
+                ensureCategories(manager: {
+                    findOne: typeof categories.findOne;
+                    save: typeof categories.save;
+                    create: typeof categories.create;
+                }): Promise<Map<string, string>>;
+            }
+        ).ensureCategories({ findOne: categories.findOne, save: categories.save, create: categories.create });
+
+        expect(categoryIdsByFixtureId.get(DEMO_FIXTURE_CATEGORIES[0].id)).toBe(existingAuthId);
+        expect(categories.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects incompatible category duplicates.', async () => {
         const categories = repository();
         categories.findOne.mockResolvedValueOnce({
             id: crypto.randomUUID(),
@@ -74,7 +102,7 @@ describe('DemoFixtureService', () => {
         await expect(
             (
                 createService({ categories }) as unknown as {
-                    ensureCategories(manager: { findOne: typeof categories.findOne }): Promise<void>;
+                    ensureCategories(manager: { findOne: typeof categories.findOne }): Promise<Map<string, string>>;
                 }
             ).ensureCategories({ findOne: categories.findOne }),
         ).rejects.toThrow(ConflictException);

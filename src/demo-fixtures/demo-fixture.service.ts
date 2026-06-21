@@ -92,7 +92,7 @@ export class DemoFixtureService {
 
     private async createFixtureData(manager: EntityManager): Promise<DemoFixtureResult> {
         await this.ensureNoFixtureIdConflicts(manager);
-        await this.ensureCategories(manager);
+        const categoryIdsByFixtureId = await this.ensureCategories(manager);
         await manager.save(
             Project,
             DEMO_FIXTURE_PROJECTS.map((project) =>
@@ -119,6 +119,8 @@ export class DemoFixtureService {
             DEMO_FIXTURE_REQUIREMENTS.map((fixtureRequirement) =>
                 manager.create(Requirement, {
                     ...fixtureRequirement,
+                    categoryId:
+                        categoryIdsByFixtureId.get(fixtureRequirement.categoryId) ?? fixtureRequirement.categoryId,
                     description: this.descriptionFor(fixtureRequirement.legacyId, fixtureRequirement.description),
                     rejectionReason:
                         fixtureRequirement.status === RequirementStatus.Rejected ? 'Demo rejected state.' : null,
@@ -146,8 +148,8 @@ export class DemoFixtureService {
             ),
         );
         await this.createMetricLinks(manager);
-        await this.createRevisions(manager);
-        await this.createCounters(manager);
+        await this.createRevisions(manager, categoryIdsByFixtureId);
+        await this.createCounters(manager, categoryIdsByFixtureId);
         return this.result();
     }
 
@@ -166,24 +168,26 @@ export class DemoFixtureService {
         }
     }
 
-    private async ensureCategories(manager: EntityManager): Promise<void> {
+    private async ensureCategories(manager: EntityManager): Promise<Map<string, string>> {
+        const categoryIdsByFixtureId = new Map<string, string>();
         for (const fixtureCategory of DEMO_FIXTURE_CATEGORIES) {
             const existing = await manager.findOne(Category, {
                 where: [{ id: fixtureCategory.id }, { key: fixtureCategory.key }],
             });
             if (existing) {
-                if (
-                    existing.id !== fixtureCategory.id
-                    || existing.name !== fixtureCategory.name
-                    || existing.key !== fixtureCategory.key
-                    || existing.type !== fixtureCategory.type
-                ) {
+                if (existing.key !== fixtureCategory.key) {
+                    throw new ConflictException(
+                        `Demo category id "${fixtureCategory.id}" conflicts with existing category key "${existing.key}".`,
+                    );
+                }
+                if (existing.name !== fixtureCategory.name || existing.type !== fixtureCategory.type) {
                     throw new ConflictException(
                         `Category key "${fixtureCategory.key}" conflicts with existing category data.`,
                     );
                 }
+                categoryIdsByFixtureId.set(fixtureCategory.id, existing.id);
             } else {
-                await manager.save(
+                const created = await manager.save(
                     Category,
                     manager.create(Category, {
                         ...fixtureCategory,
@@ -191,8 +195,10 @@ export class DemoFixtureService {
                         updatedAt: DEMO_FIXTURE_TIMESTAMP,
                     }),
                 );
+                categoryIdsByFixtureId.set(fixtureCategory.id, created.id);
             }
         }
+        return categoryIdsByFixtureId;
     }
 
     private async createMetricLinks(manager: EntityManager): Promise<void> {
@@ -214,7 +220,10 @@ export class DemoFixtureService {
         );
     }
 
-    private async createRevisions(manager: EntityManager): Promise<void> {
+    private async createRevisions(
+        manager: EntityManager,
+        categoryIdsByFixtureId: ReadonlyMap<string, string>,
+    ): Promise<void> {
         const transitionedRequirements = DEMO_FIXTURE_REQUIREMENTS.filter(
             (requirement) => requirement.status !== RequirementStatus.Draft,
         );
@@ -228,7 +237,7 @@ export class DemoFixtureService {
                     visibleKey: requirement.visibleKey,
                     type: requirement.type,
                     projectId: requirement.projectId,
-                    categoryId: requirement.categoryId,
+                    categoryId: categoryIdsByFixtureId.get(requirement.categoryId) ?? requirement.categoryId,
                     sequenceNumber: requirement.sequenceNumber,
                     status: RequirementStatus.Draft,
                     description: this.descriptionFor(requirement.legacyId, requirement.description),
@@ -252,7 +261,10 @@ export class DemoFixtureService {
         );
     }
 
-    private async createCounters(manager: EntityManager): Promise<void> {
+    private async createCounters(
+        manager: EntityManager,
+        categoryIdsByFixtureId: ReadonlyMap<string, string>,
+    ): Promise<void> {
         await manager.save(
             RequirementsKeyCounter,
             DEMO_FIXTURE_CATEGORIES.map((category) => {
@@ -265,7 +277,7 @@ export class DemoFixtureService {
                     ) + 1;
                 return manager.create(RequirementsKeyCounter, {
                     id: this.fixedId('counter', category.key),
-                    categoryId: category.id,
+                    categoryId: categoryIdsByFixtureId.get(category.id) ?? category.id,
                     nextNumber,
                 });
             }),
@@ -287,7 +299,9 @@ export class DemoFixtureService {
         await manager.delete(Requirement, { id: In(DEMO_FIXTURE_REQUIREMENTS.map((r) => r.id)) });
         await manager.delete(Metric, { id: In(DEMO_FIXTURE_METRICS.map((m) => m.id)) });
         await manager.delete(Project, { id: In(projectIds) });
-        await manager.delete(RequirementsKeyCounter, { categoryId: In(fixtureCategoryIds) });
+        await manager.delete(RequirementsKeyCounter, {
+            id: In(DEMO_FIXTURE_CATEGORIES.map((category) => this.fixedId('counter', category.key))),
+        });
     }
 
     private fixedId(kind: string, key: string): string {
