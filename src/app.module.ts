@@ -7,6 +7,7 @@ import { AppService } from '@/app.service';
 import { CategoriesModule } from '@/categories/categories.module';
 import { ProjectsModule } from '@/projects/projects.module';
 import { MetricsModule } from '@/metrics/metrics.module';
+import { DemoFixtureModule } from '@/demo-fixtures/demo-fixture.module';
 import { RequirementsModule } from '@/requirements/requirements.module';
 import databaseConfig from '@/database/database.config';
 
@@ -47,6 +48,7 @@ import databaseConfig from '@/database/database.config';
         ProjectsModule,
         MetricsModule,
         RequirementsModule,
+        DemoFixtureModule,
     ],
     controllers: [AppController],
     providers: [AppService],

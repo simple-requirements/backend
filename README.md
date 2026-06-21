@@ -96,3 +96,28 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## Demo fixture data
+
+The backend owns deterministic demo/test fixture data for local frontend development, API tests, and manual UI testing. This is not production seed data.
+
+The fixture recreates the recovered frontend demo workspace: 8 projects, 7 categories, 151 requirements, and one `MET-0001` metric per demo project. Requirement descriptions for each project's first seeded requirement include a canonical `[~MET-0001]` reference so API responses can render metric values through the normal requirement metric-link path.
+
+### Seed demo data when missing
+
+```bash
+pnpm migration:run
+pnpm demo:seed
+```
+
+`pnpm demo:seed` refuses to run if any recovered demo project already exists. Use reset when you want to recreate the fixture.
+
+### Reset demo data
+
+Reset is guarded and deletes only data attached to the exact recovered demo project names. It also refuses to reset if non-demo requirements use the fixture categories, because requirement key counters are category-scoped.
+
+```bash
+REQUIREMENTS_ALLOW_DEMO_RESET=true pnpm demo:reset
+```
+
+Without `REQUIREMENTS_ALLOW_DEMO_RESET=true`, reset aborts before deleting anything. Frontend developers can refresh local data by running migrations and then the guarded reset command above.
