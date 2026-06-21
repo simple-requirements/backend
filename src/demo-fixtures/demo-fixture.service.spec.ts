@@ -26,32 +26,9 @@ const repository = () => ({
 });
 
 function createService(overrides: Partial<Record<string, ReturnType<typeof repository>>> = {}): DemoFixtureService {
-    const repos = {
-        projects: repository(),
-        categories: repository(),
-        metrics: repository(),
-        requirements: repository(),
-        revisions: repository(),
-        links: repository(),
-        counters: repository(),
-        ...overrides,
-    };
-    return new DemoFixtureService(
-        repos.projects as never,
-        repos.categories as never,
-        repos.metrics as never,
-        repos.requirements as never,
-        repos.revisions as never,
-        repos.links as never,
-        repos.counters as never,
-        {
-            create: vi.fn().mockResolvedValue({ id: crypto.randomUUID(), visibleKey: 'FR-DATA-0001' }),
-            approve: vi.fn().mockResolvedValue(undefined),
-            markImplemented: vi.fn().mockResolvedValue(undefined),
-            reject: vi.fn().mockResolvedValue(undefined),
-            markObsolete: vi.fn().mockResolvedValue(undefined),
-        } as never,
-    );
+    const repos = { projects: repository(), categories: repository(), ...overrides };
+    const dataSource = { transaction: vi.fn() };
+    return new DemoFixtureService(repos.projects as never, repos.categories as never, dataSource as never);
 }
 
 describe('DemoFixtureService', () => {
@@ -69,7 +46,7 @@ describe('DemoFixtureService', () => {
         expect(DEMO_FIXTURE_REQUIREMENTS).toHaveLength(151);
         expect(DEMO_FIXTURE_REQUIREMENTS[0]).toMatchObject({
             legacyId: 'project-alpha-req-1',
-            frontendVisibleKey: 'FR-DATA-0001',
+            visibleKey: 'FR-DATA-0001',
             status: RequirementStatus.Approved,
         });
         expect(() => createService().validateManifest()).not.toThrow();
@@ -94,6 +71,12 @@ describe('DemoFixtureService', () => {
             name: 'Different',
             type: 'FR',
         });
-        await expect(createService({ categories }).seed()).rejects.toThrow(ConflictException);
+        await expect(
+            (
+                createService({ categories }) as unknown as {
+                    ensureCategories(manager: { findOne: typeof categories.findOne }): Promise<void>;
+                }
+            ).ensureCategories({ findOne: categories.findOne }),
+        ).rejects.toThrow(ConflictException);
     });
 });
