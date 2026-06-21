@@ -101,7 +101,7 @@ Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 The backend owns deterministic demo/test fixture data for local frontend development, API tests, and manual UI testing. This is not production seed data.
 
-The fixture recreates the recovered frontend demo workspace: 8 projects, 7 categories, 151 requirements, and one `MET-0001` metric per demo project. Requirement descriptions for each project's first seeded requirement include a canonical `[~MET-0001]` reference so API responses can render metric values through the normal requirement metric-link path.
+The fixture recreates the recovered frontend demo workspace as a fixed dataset: 8 projects, 7 categories, 151 requirements, and one `MET-0001` metric per demo project. Project IDs, category IDs, requirement IDs, metric IDs, visible keys, timestamps, lifecycle fields, revisions, and metric links are deterministic on every reset. Requirement descriptions for each project's first seeded requirement include a canonical `[~MET-0001]` reference so API responses can render metric values through the normal requirement metric-link path.
 
 ### Seed demo data when missing
 

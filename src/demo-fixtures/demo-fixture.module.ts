@@ -5,7 +5,6 @@ import { Project } from '@/projects/project.entity';
 import { RequirementsKeyCounter } from '@/requirements/requirements-key-counter.entity';
 import { RequirementRevision } from '@/requirements/requirements-revision.entity';
 import { Requirement } from '@/requirements/requirements.entity';
-import { RequirementsModule } from '@/requirements/requirements.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DemoFixtureService } from './demo-fixture.service';
@@ -21,7 +20,6 @@ import { DemoFixtureService } from './demo-fixture.service';
             RequirementMetricLink,
             RequirementsKeyCounter,
         ]),
-        RequirementsModule,
     ],
     providers: [DemoFixtureService],
     exports: [DemoFixtureService],
