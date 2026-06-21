@@ -21,7 +21,9 @@
         "test:e2e": "playwright test --config playwright.config.mts",
         "test:e2e:report": "playwright show-report",
         "test": "vitest run",
-        "docs:api": "typedoc"
+        "docs:api": "typedoc",
+        "demo:seed": "NODE_OPTIONS='-r tsconfig-paths/register' ts-node src/demo-fixtures/demo-fixture.command.ts seed",
+        "demo:reset": "NODE_OPTIONS='-r tsconfig-paths/register' ts-node src/demo-fixtures/demo-fixture.command.ts reset"
     },
     "dependencies": {
         "@nestjs/common": "^11.0.1",
