@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import {
     ApiBadRequestResponse,
     ApiBody,
@@ -12,6 +12,11 @@ import {
     ApiTags,
 } from '@nestjs/swagger';
 import { RequirementLinkResponseDto, RequirementLinkTargetDto } from '@/requirements/dto/requirement-link.dto';
+import {
+    RequirementLinkChangesResponseDto,
+    RequirementLinkHistoryResponseDto,
+    RequirementRevisionLinksResponseDto,
+} from '@/requirements/dto/requirement-link-history.dto';
 import { RequirementLinksService } from '@/requirements/requirement-links.service';
 
 @ApiTags('requirement-links')
@@ -31,6 +36,40 @@ export class RequirementLinksController {
     @ApiConflictResponse({ description: 'Duplicate active references link.' })
     create(@Param('id') id: string, @Body() dto: RequirementLinkTargetDto): Promise<RequirementLinkResponseDto> {
         return this.requirementLinksService.create(id, dto);
+    }
+
+    @Get('requirements/:id/link-history')
+    @ApiOperation({ summary: 'List auditable requirement link lifecycle events involving a requirement.' })
+    @ApiOkResponse({ type: [RequirementLinkHistoryResponseDto] })
+    @ApiBadRequestResponse({ description: 'Invalid UUID.' })
+    @ApiNotFoundResponse({ description: 'Requirement was not found.' })
+    listHistory(@Param('id') id: string): Promise<RequirementLinkHistoryResponseDto[]> {
+        return this.requirementLinksService.listHistory(id);
+    }
+
+    @Get('requirements/:id/revisions/:revisionNumber/links')
+    @ApiOperation({ summary: 'List incoming and outgoing links active at a requirement revision timestamp.' })
+    @ApiOkResponse({ type: RequirementRevisionLinksResponseDto })
+    @ApiBadRequestResponse({ description: 'Invalid UUID or revision number.' })
+    @ApiNotFoundResponse({ description: 'Requirement or revision was not found.' })
+    listRevisionLinks(
+        @Param('id') id: string,
+        @Param('revisionNumber', ParseIntPipe) revisionNumber: number,
+    ): Promise<RequirementRevisionLinksResponseDto> {
+        return this.requirementLinksService.listRevisionLinks(id, revisionNumber);
+    }
+
+    @Get('requirements/:id/link-changes')
+    @ApiOperation({ summary: 'Compare requirement link state between two requirement revisions.' })
+    @ApiOkResponse({ type: RequirementLinkChangesResponseDto })
+    @ApiBadRequestResponse({ description: 'Invalid or missing revision range.' })
+    @ApiNotFoundResponse({ description: 'Requirement or revision was not found.' })
+    listChanges(
+        @Param('id') id: string,
+        @Query('fromRevision', ParseIntPipe) fromRevision: number,
+        @Query('toRevision', ParseIntPipe) toRevision: number,
+    ): Promise<RequirementLinkChangesResponseDto> {
+        return this.requirementLinksService.listChanges(id, fromRevision, toRevision);
     }
 
     @Get('requirements/:id/links/outgoing')

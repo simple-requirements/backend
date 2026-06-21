@@ -58,7 +58,7 @@ export const DEMO_FIXTURE_REQUIREMENT_LINKS: readonly DemoFixtureRequirementLink
         id: '10000000-0000-4000-8000-000000000002',
         projectId: 'd0bc5572-274e-4e32-848e-b2ede1d98402',
         sourceRequirementId: '50be1af6-7c8a-4861-8c7f-6b73770841cb',
-        targetRequirementId: '866bebb1-b1ac-4417-809a-85a540d9aa62',
+        targetRequirementId: 'caac140c-c731-4761-8749-ba820bd7a41b',
     },
     {
         id: '10000000-0000-4000-8000-000000000003',

@@ -145,4 +145,26 @@ curl -X POST http://localhost:3000/requirements/<source-id>/links \
   -d '{ "targetVisibleKey": "NFR-PERF-0001" }'
 ```
 
-Demo fixture reset seeds deterministic requirement links after all demo requirements exist, including FR-to-FR, FR-to-NFR, multiple outgoing, and multiple incoming examples. Requirement revision snapshots do not yet embed link deltas; link audit data is currently available from link `createdAt`, `updatedAt`, and `deletedAt` timestamps.
+Demo fixture reset seeds deterministic requirement links after all demo requirements exist, including FR-to-FR, FR-to-NFR, multiple outgoing, multiple incoming, created, removed, and corrected-link examples. The fixture stores link history events around the first revision timestamp so frontend comparison tests can assert that current links differ from earlier revision links.
+
+### Requirement link history and revision-aware links
+
+Link changes are audited separately from requirement content revisions. Requirement revisions remain immutable snapshots of requirement fields captured before edits or lifecycle transitions; creating, correcting, or deleting a link does not create a requirement revision. Link history records are stored in `requirement_link_history` with `created`, `target_changed`, and `deleted` event types, fixed `references` relationship type, source requirement, old target, new target, occurrence timestamp, actor, and reason.
+
+Historical link reconstruction uses link history events at a requirement revision's `createdAt` timestamp. A link creation or target correction at exactly the revision timestamp is included in that revision state (`occurredAt <= revisionCreatedAt`); a deletion at or before the timestamp is excluded because the latest event has no active target. Corrected links compare as the old target being removed and the new target being added. Both outgoing and incoming historical state are reconstructed from the same project-scoped history events.
+
+Additional API endpoints:
+
+- `GET /requirements/{id}/link-history` lists link history events involving the requirement as source, old target, or new target.
+- `GET /requirements/{id}/revisions/{revisionNumber}/links` returns outgoing and incoming links active at that revision timestamp.
+- `GET /requirements/{id}/link-changes?fromRevision=1&toRevision=2` returns added, removed, and unchanged outgoing and incoming links between two revision timestamps.
+
+Examples:
+
+```bash
+curl http://localhost:3000/requirements/<id>/link-history
+
+curl http://localhost:3000/requirements/<id>/revisions/1/links
+
+curl "http://localhost:3000/requirements/<id>/link-changes?fromRevision=1&toRevision=2"
+```

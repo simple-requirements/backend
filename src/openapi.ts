@@ -171,6 +171,78 @@ export function createOpenApiDocument(): OpenAPIObject {
                     },
                 },
             },
+
+            '/requirements/{id}/link-history': {
+                get: {
+                    tags: ['requirement-links'],
+                    summary: 'List auditable requirement link lifecycle events involving a requirement.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Requirement link history ordered by occurrence time and id.',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'array',
+                                        items: { $ref: '#/components/schemas/RequirementLinkHistoryResponseDto' },
+                                    },
+                                },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
+            '/requirements/{id}/revisions/{revisionNumber}/links': {
+                get: {
+                    tags: ['requirement-links'],
+                    summary: 'List incoming and outgoing links active at a requirement revision timestamp.',
+                    description:
+                        'Historical reconstruction treats created events at the exact revision timestamp as active (inclusive) and deleted events at the exact timestamp as inactive for later states.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                        { name: 'revisionNumber', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Revision-aware link state.',
+                            content: {
+                                'application/json': {
+                                    schema: { $ref: '#/components/schemas/RequirementRevisionLinksResponseDto' },
+                                },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
+            '/requirements/{id}/link-changes': {
+                get: {
+                    tags: ['requirement-links'],
+                    summary: 'Compare requirement link state between two requirement revisions.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                        { name: 'fromRevision', in: 'query', required: true, schema: { type: 'integer', minimum: 1 } },
+                        { name: 'toRevision', in: 'query', required: true, schema: { type: 'integer', minimum: 1 } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Added, removed, and unchanged incoming/outgoing links.',
+                            content: {
+                                'application/json': {
+                                    schema: { $ref: '#/components/schemas/RequirementLinkChangesResponseDto' },
+                                },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
             '/requirements/{id}/links/outgoing': {
                 get: {
                     tags: ['requirement-links'],
@@ -834,6 +906,108 @@ export function createOpenApiDocument(): OpenAPIObject {
                         targetStatus: { $ref: '#/components/schemas/RequirementStatus' },
                         createdAt: { type: 'string', format: 'date-time' },
                         updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                },
+
+                RequirementLinkHistoryResponseDto: {
+                    type: 'object',
+                    required: [
+                        'id',
+                        'linkId',
+                        'projectId',
+                        'eventType',
+                        'relationshipType',
+                        'sourceRequirementId',
+                        'sourceVisibleKey',
+                        'oldTargetRequirementId',
+                        'oldTargetVisibleKey',
+                        'newTargetRequirementId',
+                        'newTargetVisibleKey',
+                        'occurredAt',
+                        'actor',
+                        'reason',
+                    ],
+                    properties: {
+                        id: { type: 'string', format: 'uuid' },
+                        linkId: { type: 'string', format: 'uuid' },
+                        projectId: { type: 'string', format: 'uuid' },
+                        eventType: { type: 'string', enum: ['created', 'target_changed', 'deleted'] },
+                        relationshipType: { type: 'string', enum: ['references'] },
+                        sourceRequirementId: { type: 'string', format: 'uuid' },
+                        sourceVisibleKey: { type: 'string' },
+                        oldTargetRequirementId: { type: 'string', format: 'uuid', nullable: true },
+                        oldTargetVisibleKey: { type: 'string', nullable: true },
+                        newTargetRequirementId: { type: 'string', format: 'uuid', nullable: true },
+                        newTargetVisibleKey: { type: 'string', nullable: true },
+                        occurredAt: { type: 'string', format: 'date-time' },
+                        actor: { type: 'string', nullable: true },
+                        reason: { type: 'string', nullable: true },
+                    },
+                },
+                RequirementRevisionLinksResponseDto: {
+                    type: 'object',
+                    required: [
+                        'requirementId',
+                        'revisionNumber',
+                        'revisionCreatedAt',
+                        'outgoingLinks',
+                        'incomingLinks',
+                    ],
+                    properties: {
+                        requirementId: { type: 'string', format: 'uuid' },
+                        revisionNumber: { type: 'integer', minimum: 1 },
+                        revisionCreatedAt: { type: 'string', format: 'date-time' },
+                        outgoingLinks: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                        },
+                        incomingLinks: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                        },
+                    },
+                },
+                RequirementLinkChangesResponseDto: {
+                    type: 'object',
+                    required: [
+                        'requirementId',
+                        'fromRevision',
+                        'toRevision',
+                        'addedOutgoingLinks',
+                        'removedOutgoingLinks',
+                        'unchangedOutgoingLinks',
+                        'addedIncomingLinks',
+                        'removedIncomingLinks',
+                        'unchangedIncomingLinks',
+                    ],
+                    properties: {
+                        requirementId: { type: 'string', format: 'uuid' },
+                        fromRevision: { type: 'integer', minimum: 1 },
+                        toRevision: { type: 'integer', minimum: 1 },
+                        addedOutgoingLinks: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                        },
+                        removedOutgoingLinks: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                        },
+                        unchangedOutgoingLinks: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                        },
+                        addedIncomingLinks: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                        },
+                        removedIncomingLinks: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                        },
+                        unchangedIncomingLinks: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                        },
                     },
                 },
                 RequirementResponseDto: {

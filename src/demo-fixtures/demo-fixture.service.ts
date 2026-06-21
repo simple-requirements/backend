@@ -5,6 +5,10 @@ import { Metric } from '@/metrics/metric.entity';
 import { RequirementMetricLink } from '@/metrics/requirement-metric-link.entity';
 import { Project } from '@/projects/project.entity';
 import { RequirementLink, RequirementLinkRelationshipType } from '@/requirements/requirement-link.entity';
+import {
+    RequirementLinkHistory,
+    RequirementLinkHistoryEventType,
+} from '@/requirements/requirement-link-history.entity';
 import { RequirementStatus } from '@/requirements/requirement-status-enum';
 import { RequirementsKeyCounter } from '@/requirements/requirements-key-counter.entity';
 import { RequirementRevision } from '@/requirements/requirements-revision.entity';
@@ -225,18 +229,87 @@ export class DemoFixtureService {
     }
 
     private async createRequirementLinks(manager: EntityManager): Promise<void> {
+        const beforeRevision = new Date(DEMO_FIXTURE_TIMESTAMP.getTime() - 60_000);
+        const afterRevision = new Date(DEMO_FIXTURE_TIMESTAMP.getTime() + 60_000);
         await manager.save(
             RequirementLink,
             DEMO_FIXTURE_REQUIREMENT_LINKS.map((link) =>
                 manager.create(RequirementLink, {
                     ...link,
                     relationshipType: RequirementLinkRelationshipType.References,
-                    deletedAt: null,
-                    createdAt: DEMO_FIXTURE_TIMESTAMP,
-                    updatedAt: DEMO_FIXTURE_TIMESTAMP,
+                    deletedAt: link.id === '10000000-0000-4000-8000-000000000003' ? afterRevision : null,
+                    createdAt: beforeRevision,
+                    updatedAt: link.id === '10000000-0000-4000-8000-000000000001' ? beforeRevision : afterRevision,
                 }),
             ),
         );
+        await manager.save(RequirementLinkHistory, [
+            manager.create(RequirementLinkHistory, {
+                id: this.fixedId('link-history', 'link-1-created'),
+                linkId: '10000000-0000-4000-8000-000000000001',
+                projectId: 'd0bc5572-274e-4e32-848e-b2ede1d98402',
+                sourceRequirementId: '50be1af6-7c8a-4861-8c7f-6b73770841cb',
+                oldTargetRequirementId: null,
+                newTargetRequirementId: '8fc55859-5f2d-40ee-8eb2-f954032374ba',
+                relationshipType: RequirementLinkRelationshipType.References,
+                eventType: RequirementLinkHistoryEventType.Created,
+                occurredAt: beforeRevision,
+                actor: 'system',
+                reason: 'Demo fixture initial link.',
+            }),
+            manager.create(RequirementLinkHistory, {
+                id: this.fixedId('link-history', 'link-2-created'),
+                linkId: '10000000-0000-4000-8000-000000000002',
+                projectId: 'd0bc5572-274e-4e32-848e-b2ede1d98402',
+                sourceRequirementId: '50be1af6-7c8a-4861-8c7f-6b73770841cb',
+                oldTargetRequirementId: null,
+                newTargetRequirementId: '866bebb1-b1ac-4417-809a-85a540d9aa62',
+                relationshipType: RequirementLinkRelationshipType.References,
+                eventType: RequirementLinkHistoryEventType.Created,
+                occurredAt: beforeRevision,
+                actor: 'system',
+                reason: 'Demo fixture initial link before correction.',
+            }),
+            manager.create(RequirementLinkHistory, {
+                id: this.fixedId('link-history', 'link-3-created'),
+                linkId: '10000000-0000-4000-8000-000000000003',
+                projectId: 'd0bc5572-274e-4e32-848e-b2ede1d98402',
+                sourceRequirementId: '8386b0c9-e800-4970-8ea8-58b6faa98b1c',
+                oldTargetRequirementId: null,
+                newTargetRequirementId: '866bebb1-b1ac-4417-809a-85a540d9aa62',
+                relationshipType: RequirementLinkRelationshipType.References,
+                eventType: RequirementLinkHistoryEventType.Created,
+                occurredAt: beforeRevision,
+                actor: 'system',
+                reason: 'Demo fixture initial link before removal.',
+            }),
+            manager.create(RequirementLinkHistory, {
+                id: this.fixedId('link-history', 'link-2-corrected'),
+                linkId: '10000000-0000-4000-8000-000000000002',
+                projectId: 'd0bc5572-274e-4e32-848e-b2ede1d98402',
+                sourceRequirementId: '50be1af6-7c8a-4861-8c7f-6b73770841cb',
+                oldTargetRequirementId: '866bebb1-b1ac-4417-809a-85a540d9aa62',
+                newTargetRequirementId: 'caac140c-c731-4761-8749-ba820bd7a41b',
+                relationshipType: RequirementLinkRelationshipType.References,
+                eventType: RequirementLinkHistoryEventType.TargetChanged,
+                occurredAt: afterRevision,
+                actor: 'system',
+                reason: 'Demo fixture corrected link target.',
+            }),
+            manager.create(RequirementLinkHistory, {
+                id: this.fixedId('link-history', 'link-3-deleted'),
+                linkId: '10000000-0000-4000-8000-000000000003',
+                projectId: 'd0bc5572-274e-4e32-848e-b2ede1d98402',
+                sourceRequirementId: '8386b0c9-e800-4970-8ea8-58b6faa98b1c',
+                oldTargetRequirementId: '866bebb1-b1ac-4417-809a-85a540d9aa62',
+                newTargetRequirementId: null,
+                relationshipType: RequirementLinkRelationshipType.References,
+                eventType: RequirementLinkHistoryEventType.Deleted,
+                occurredAt: afterRevision,
+                actor: 'system',
+                reason: 'Demo fixture removed link.',
+            }),
+        ]);
     }
 
     private async createRevisions(
@@ -314,6 +387,9 @@ export class DemoFixtureService {
         if (nonFixtureUse > 0)
             throw new ConflictException('Cannot reset demo fixture while non-demo requirements use demo categories.');
         await manager.delete(RequirementMetricLink, { requirementId: In(DEMO_FIXTURE_REQUIREMENTS.map((r) => r.id)) });
+        await manager.delete(RequirementLinkHistory, {
+            linkId: In(DEMO_FIXTURE_REQUIREMENT_LINKS.map((link) => link.id)),
+        });
         await manager.delete(RequirementLink, { id: In(DEMO_FIXTURE_REQUIREMENT_LINKS.map((link) => link.id)) });
         await manager.delete(RequirementRevision, { requirementId: In(DEMO_FIXTURE_REQUIREMENTS.map((r) => r.id)) });
         await manager.delete(Requirement, { id: In(DEMO_FIXTURE_REQUIREMENTS.map((r) => r.id)) });

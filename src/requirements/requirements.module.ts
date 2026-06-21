@@ -11,6 +11,7 @@ import { RequirementRevision } from '@/requirements/requirements-revision.entity
 import { Requirement } from '@/requirements/requirements.entity';
 import { RequirementsService } from '@/requirements/requirements.service';
 import { RequirementLink } from '@/requirements/requirement-link.entity';
+import { RequirementLinkHistory } from '@/requirements/requirement-link-history.entity';
 import { RequirementLinksController } from '@/requirements/requirement-links.controller';
 import { RequirementLinksService } from '@/requirements/requirement-links.service';
 
@@ -30,6 +31,7 @@ import { RequirementLinksService } from '@/requirements/requirement-links.servic
             Metric,
             RequirementMetricLink,
             RequirementLink,
+            RequirementLinkHistory,
         ]),
     ],
     controllers: [RequirementsController, RequirementLinksController],
