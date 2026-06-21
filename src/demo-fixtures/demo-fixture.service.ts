@@ -4,6 +4,7 @@ import { Category } from '@/categories/category.entity';
 import { Metric } from '@/metrics/metric.entity';
 import { RequirementMetricLink } from '@/metrics/requirement-metric-link.entity';
 import { Project } from '@/projects/project.entity';
+import { RequirementLink, RequirementLinkRelationshipType } from '@/requirements/requirement-link.entity';
 import { RequirementStatus } from '@/requirements/requirement-status-enum';
 import { RequirementsKeyCounter } from '@/requirements/requirements-key-counter.entity';
 import { RequirementRevision } from '@/requirements/requirements-revision.entity';
@@ -15,6 +16,7 @@ import {
     DEMO_FIXTURE_CATEGORIES,
     DEMO_FIXTURE_METRICS,
     DEMO_FIXTURE_PROJECTS,
+    DEMO_FIXTURE_REQUIREMENT_LINKS,
     DEMO_FIXTURE_REQUIREMENTS,
     DEMO_FIXTURE_RESET_ENV,
     DEMO_FIXTURE_TIMESTAMP,
@@ -24,6 +26,7 @@ export interface DemoFixtureResult {
     projects: number;
     categories: number;
     requirements: number;
+    requirementLinks: number;
     metrics: number;
     visibleKeys: string[];
 }
@@ -148,6 +151,7 @@ export class DemoFixtureService {
             ),
         );
         await this.createMetricLinks(manager);
+        await this.createRequirementLinks(manager);
         await this.createRevisions(manager, categoryIdsByFixtureId);
         await this.createCounters(manager, categoryIdsByFixtureId);
         return this.result();
@@ -215,6 +219,21 @@ export class DemoFixtureService {
                     requirementId: firstRequirementByProject.get(metric.projectId),
                     metricId: metric.id,
                     createdAt: DEMO_FIXTURE_TIMESTAMP,
+                }),
+            ),
+        );
+    }
+
+    private async createRequirementLinks(manager: EntityManager): Promise<void> {
+        await manager.save(
+            RequirementLink,
+            DEMO_FIXTURE_REQUIREMENT_LINKS.map((link) =>
+                manager.create(RequirementLink, {
+                    ...link,
+                    relationshipType: RequirementLinkRelationshipType.References,
+                    deletedAt: null,
+                    createdAt: DEMO_FIXTURE_TIMESTAMP,
+                    updatedAt: DEMO_FIXTURE_TIMESTAMP,
                 }),
             ),
         );
@@ -295,6 +314,7 @@ export class DemoFixtureService {
         if (nonFixtureUse > 0)
             throw new ConflictException('Cannot reset demo fixture while non-demo requirements use demo categories.');
         await manager.delete(RequirementMetricLink, { requirementId: In(DEMO_FIXTURE_REQUIREMENTS.map((r) => r.id)) });
+        await manager.delete(RequirementLink, { id: In(DEMO_FIXTURE_REQUIREMENT_LINKS.map((link) => link.id)) });
         await manager.delete(RequirementRevision, { requirementId: In(DEMO_FIXTURE_REQUIREMENTS.map((r) => r.id)) });
         await manager.delete(Requirement, { id: In(DEMO_FIXTURE_REQUIREMENTS.map((r) => r.id)) });
         await manager.delete(Metric, { id: In(DEMO_FIXTURE_METRICS.map((m) => m.id)) });
@@ -318,6 +338,7 @@ export class DemoFixtureService {
             projects: DEMO_FIXTURE_PROJECTS.length,
             categories: DEMO_FIXTURE_CATEGORIES.length,
             requirements: DEMO_FIXTURE_REQUIREMENTS.length,
+            requirementLinks: DEMO_FIXTURE_REQUIREMENT_LINKS.length,
             metrics: DEMO_FIXTURE_METRICS.length,
             visibleKeys: DEMO_FIXTURE_REQUIREMENTS.map((requirement) => requirement.visibleKey),
         };
