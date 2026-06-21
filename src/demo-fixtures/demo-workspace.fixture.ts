@@ -20,6 +20,12 @@ export interface DemoFixtureMetric {
     value: string;
     description: string | null;
 }
+export interface DemoFixtureRequirementLink {
+    id: string;
+    projectId: string;
+    sourceRequirementId: string;
+    targetRequirementId: string;
+}
 export interface DemoFixtureRequirement {
     id: string;
     legacyId: string;
@@ -40,6 +46,27 @@ export interface DemoFixtureRequirement {
 
 export const DEMO_FIXTURE_RESET_ENV = 'REQUIREMENTS_ALLOW_DEMO_RESET';
 export const DEMO_FIXTURE_TIMESTAMP = new Date('2024-01-01T00:00:00.000Z');
+
+export const DEMO_FIXTURE_REQUIREMENT_LINKS: readonly DemoFixtureRequirementLink[] = [
+    {
+        id: '10000000-0000-4000-8000-000000000001',
+        projectId: 'd0bc5572-274e-4e32-848e-b2ede1d98402',
+        sourceRequirementId: '50be1af6-7c8a-4861-8c7f-6b73770841cb',
+        targetRequirementId: '8fc55859-5f2d-40ee-8eb2-f954032374ba',
+    },
+    {
+        id: '10000000-0000-4000-8000-000000000002',
+        projectId: 'd0bc5572-274e-4e32-848e-b2ede1d98402',
+        sourceRequirementId: '50be1af6-7c8a-4861-8c7f-6b73770841cb',
+        targetRequirementId: '866bebb1-b1ac-4417-809a-85a540d9aa62',
+    },
+    {
+        id: '10000000-0000-4000-8000-000000000003',
+        projectId: 'd0bc5572-274e-4e32-848e-b2ede1d98402',
+        sourceRequirementId: '8386b0c9-e800-4970-8ea8-58b6faa98b1c',
+        targetRequirementId: '866bebb1-b1ac-4417-809a-85a540d9aa62',
+    },
+] as const;
 
 export const DEMO_FIXTURE_PROJECTS: readonly DemoFixtureProject[] = [
     {

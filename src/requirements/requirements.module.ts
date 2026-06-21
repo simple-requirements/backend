@@ -10,6 +10,9 @@ import { RequirementsController } from '@/requirements/requirements.controller';
 import { RequirementRevision } from '@/requirements/requirements-revision.entity';
 import { Requirement } from '@/requirements/requirements.entity';
 import { RequirementsService } from '@/requirements/requirements.service';
+import { RequirementLink } from '@/requirements/requirement-link.entity';
+import { RequirementLinksController } from '@/requirements/requirement-links.controller';
+import { RequirementLinksService } from '@/requirements/requirement-links.service';
 
 /**
  * NestJS feature module for requirement allocation, lifecycle, and revision components.
@@ -26,10 +29,11 @@ import { RequirementsService } from '@/requirements/requirements.service';
             RequirementsKeyCounter,
             Metric,
             RequirementMetricLink,
+            RequirementLink,
         ]),
     ],
-    controllers: [RequirementsController],
-    providers: [RequirementsKeyAllocatorService, RequirementsService],
+    controllers: [RequirementsController, RequirementLinksController],
+    providers: [RequirementsKeyAllocatorService, RequirementsService, RequirementLinksService],
     exports: [RequirementsKeyAllocatorService, RequirementsService],
 })
 export class RequirementsModule {}

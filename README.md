@@ -121,3 +121,28 @@ REQUIREMENTS_ALLOW_DEMO_RESET=true pnpm demo:reset
 ```
 
 Without `REQUIREMENTS_ALLOW_DEMO_RESET=true`, reset aborts before deleting anything. Frontend developers can refresh local data by running migrations and then the guarded reset command above.
+
+## Requirement links
+
+Requirement links are structured, project-scoped records that connect a source requirement to a target requirement without reading or mutating requirement description text. The first release supports only the fixed relationship type `references`.
+
+API endpoints:
+
+- `POST /requirements/{id}/links` creates an active link from source `{id}` to a target selected by exactly one of `targetRequirementId` or `targetVisibleKey`.
+- `GET /requirements/{id}/links/outgoing` lists active links from a requirement.
+- `GET /requirements/{id}/links/incoming` lists active links to a requirement.
+- `GET /projects/{projectId}/requirement-links` lists active links in a project.
+- `PATCH /requirement-links/{linkId}` corrects a link target; source and relationship type do not change.
+- `DELETE /requirement-links/{linkId}` soft-removes a link.
+
+Duplicate active `references` links with the same source and target are rejected. Self-links and cross-project links are rejected. Removed links disappear from active list endpoints, and a removed link can be recreated as a new active link.
+
+Example:
+
+```bash
+curl -X POST http://localhost:3000/requirements/<source-id>/links \
+  -H 'Content-Type: application/json' \
+  -d '{ "targetVisibleKey": "NFR-PERF-0001" }'
+```
+
+Demo fixture reset seeds deterministic requirement links after all demo requirements exist, including FR-to-FR, FR-to-NFR, multiple outgoing, and multiple incoming examples. Requirement revision snapshots do not yet embed link deltas; link audit data is currently available from link `createdAt`, `updatedAt`, and `deletedAt` timestamps.

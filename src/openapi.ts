@@ -142,6 +142,148 @@ export function createOpenApiDocument(): OpenAPIObject {
                 },
             },
 
+            '/requirements/{id}/links': {
+                post: {
+                    tags: ['requirement-links'],
+                    summary:
+                        'Create an explicit fixed-type references link from a source requirement to a target requirement.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': { schema: { $ref: '#/components/schemas/RequirementLinkTargetDto' } },
+                        },
+                    },
+                    responses: {
+                        '201': {
+                            description: 'Requirement link created.',
+                            content: {
+                                'application/json': {
+                                    schema: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                                },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                        '409': { $ref: '#/components/responses/Conflict' },
+                    },
+                },
+            },
+            '/requirements/{id}/links/outgoing': {
+                get: {
+                    tags: ['requirement-links'],
+                    summary: 'List active outgoing requirement links.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Active outgoing links.',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'array',
+                                        items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                                    },
+                                },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
+            '/requirements/{id}/links/incoming': {
+                get: {
+                    tags: ['requirement-links'],
+                    summary: 'List active incoming requirement links.',
+                    parameters: [
+                        { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Active incoming links.',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'array',
+                                        items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                                    },
+                                },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
+            '/projects/{projectId}/requirement-links': {
+                get: {
+                    tags: ['requirement-links'],
+                    summary: 'List active requirement links for a project.',
+                    parameters: [
+                        { name: 'projectId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Project requirement links.',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'array',
+                                        items: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                                    },
+                                },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
+            '/requirement-links/{linkId}': {
+                patch: {
+                    tags: ['requirement-links'],
+                    summary: 'Correct an active requirement link target.',
+                    parameters: [
+                        { name: 'linkId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': { schema: { $ref: '#/components/schemas/RequirementLinkTargetDto' } },
+                        },
+                    },
+                    responses: {
+                        '200': {
+                            description: 'Requirement link updated.',
+                            content: {
+                                'application/json': {
+                                    schema: { $ref: '#/components/schemas/RequirementLinkResponseDto' },
+                                },
+                            },
+                        },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                        '409': { $ref: '#/components/responses/Conflict' },
+                    },
+                },
+                delete: {
+                    tags: ['requirement-links'],
+                    summary: 'Soft-remove an active requirement link.',
+                    parameters: [
+                        { name: 'linkId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                    ],
+                    responses: {
+                        '204': { description: 'Requirement link removed.' },
+                        '400': { $ref: '#/components/responses/BadRequest' },
+                        '404': { $ref: '#/components/responses/NotFound' },
+                    },
+                },
+            },
+
             '/metrics': {
                 post: {
                     tags: ['metrics'],
@@ -645,6 +787,54 @@ export function createOpenApiDocument(): OpenAPIObject {
                     type: 'object',
                     required: ['obsolescenceReason'],
                     properties: { obsolescenceReason: { type: 'string', example: 'Superseded by NFR-PERF-0002.' } },
+                },
+                RequirementLinkTargetDto: {
+                    type: 'object',
+                    properties: {
+                        targetRequirementId: { type: 'string', format: 'uuid' },
+                        targetVisibleKey: { type: 'string', example: 'NFR-PERF-0001' },
+                    },
+                    description:
+                        'Provide exactly one of targetRequirementId or targetVisibleKey. Relationship type is fixed to references; self-links, duplicate active links, and cross-project links are rejected.',
+                },
+                RequirementLinkResponseDto: {
+                    type: 'object',
+                    required: [
+                        'id',
+                        'projectId',
+                        'relationshipType',
+                        'sourceRequirementId',
+                        'sourceVisibleKey',
+                        'sourceType',
+                        'sourceCategoryId',
+                        'sourceStatus',
+                        'targetRequirementId',
+                        'targetVisibleKey',
+                        'targetType',
+                        'targetCategoryId',
+                        'targetStatus',
+                        'createdAt',
+                        'updatedAt',
+                    ],
+                    properties: {
+                        id: { type: 'string', format: 'uuid' },
+                        projectId: { type: 'string', format: 'uuid' },
+                        relationshipType: { type: 'string', enum: ['references'] },
+                        sourceRequirementId: { type: 'string', format: 'uuid' },
+                        sourceVisibleKey: { type: 'string' },
+                        sourceType: { $ref: '#/components/schemas/RequirementType' },
+                        sourceCategoryId: { type: 'string', format: 'uuid' },
+                        sourceCategoryKey: { type: 'string' },
+                        sourceStatus: { $ref: '#/components/schemas/RequirementStatus' },
+                        targetRequirementId: { type: 'string', format: 'uuid' },
+                        targetVisibleKey: { type: 'string' },
+                        targetType: { $ref: '#/components/schemas/RequirementType' },
+                        targetCategoryId: { type: 'string', format: 'uuid' },
+                        targetCategoryKey: { type: 'string' },
+                        targetStatus: { $ref: '#/components/schemas/RequirementStatus' },
+                        createdAt: { type: 'string', format: 'date-time' },
+                        updatedAt: { type: 'string', format: 'date-time' },
+                    },
                 },
                 RequirementResponseDto: {
                     type: 'object',
