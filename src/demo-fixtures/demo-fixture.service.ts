@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { Category } from '@/categories/category.entity';
 import { Metric } from '@/metrics/metric.entity';
 import { RequirementMetricLink } from '@/metrics/requirement-metric-link.entity';
@@ -16,7 +18,6 @@ import {
     DEMO_FIXTURE_REQUIREMENTS,
     DEMO_FIXTURE_RESET_ENV,
     DEMO_FIXTURE_TIMESTAMP,
-    demoFixtureId,
 } from './demo-workspace.fixture';
 
 export interface DemoFixtureResult {
@@ -221,7 +222,7 @@ export class DemoFixtureService {
             RequirementRevision,
             transitionedRequirements.map((requirement) =>
                 manager.create(RequirementRevision, {
-                    id: demoFixtureId('revision', `${requirement.legacyId}:1`),
+                    id: this.fixedId('revision', `${requirement.legacyId}:1`),
                     requirementId: requirement.id,
                     revisionNumber: 1,
                     visibleKey: requirement.visibleKey,
@@ -263,7 +264,7 @@ export class DemoFixtureService {
                         ).map((requirement) => requirement.sequenceNumber),
                     ) + 1;
                 return manager.create(RequirementsKeyCounter, {
-                    id: demoFixtureId('counter', category.key),
+                    id: this.fixedId('counter', category.key),
                     categoryId: category.id,
                     nextNumber,
                 });
@@ -287,6 +288,11 @@ export class DemoFixtureService {
         await manager.delete(Metric, { id: In(DEMO_FIXTURE_METRICS.map((m) => m.id)) });
         await manager.delete(Project, { id: In(projectIds) });
         await manager.delete(RequirementsKeyCounter, { categoryId: In(fixtureCategoryIds) });
+    }
+
+    private fixedId(kind: string, key: string): string {
+        const hex = createHash('sha256').update(`requirements-demo-fixture:${kind}:${key}`).digest('hex').slice(0, 32);
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
     }
 
     private descriptionFor(legacyId: string, description: string): string {
