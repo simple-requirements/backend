@@ -6,6 +6,8 @@ import { AppController } from '@/app.controller';
 import { AppService } from '@/app.service';
 import databaseConfig from '@/database/database.config';
 
+import { ProjectsModule } from '@/projects/projects.module';
+
 @Module({
     imports: [
         ConfigModule.forRoot({ isGlobal: true, load: [databaseConfig] }),
@@ -34,6 +36,7 @@ import databaseConfig from '@/database/database.config';
                 logging: false,
             }),
         }),
+        ProjectsModule,
     ],
     controllers: [AppController],
     providers: [AppService],
