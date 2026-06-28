@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from '@/app.module';
+import { setupOpenApi } from '@/openapi';
 
 const DEFAULT_CORS_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173'];
 
@@ -21,6 +22,8 @@ async function bootstrap(): Promise<void> {
         allowedHeaders: ['Accept', 'Authorization', 'Content-Type'],
         optionsSuccessStatus: 204,
     });
+
+    setupOpenApi(app);
 
     const port = Number(process.env.PORT ?? 3000);
 

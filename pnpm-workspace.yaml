@@ -1,4 +1,5 @@
 allowBuilds:
-    '@nestjs/core': set this to true or false
-    '@swc/core': true
-    unrs-resolver: set this to true or false
+  '@nestjs/core': set this to true or false
+  '@scarf/scarf': true
+  '@swc/core': true
+  unrs-resolver: set this to true or false
