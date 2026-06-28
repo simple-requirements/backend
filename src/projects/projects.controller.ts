@@ -1,5 +1,5 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiCreatedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Post } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CreateProjectDto } from '@/projects/dto/create-project.dto';
 import { ProjectResponseDto } from '@/projects/dto/project-response.dto';
@@ -9,6 +9,13 @@ import { ProjectsService } from '@/projects/projects.service';
 @Controller('projects')
 export class ProjectsController {
     constructor(private readonly projectsService: ProjectsService) {}
+
+    @Get()
+    @ApiOperation({ summary: 'List all projects.' })
+    @ApiOkResponse({ description: 'All projects.', type: ProjectResponseDto, isArray: true })
+    async findAll(): Promise<ProjectResponseDto[]> {
+        return this.projectsService.findAll();
+    }
 
     @Post()
     @ApiOperation({ summary: 'Create a project.' })

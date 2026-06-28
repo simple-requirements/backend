@@ -13,8 +13,14 @@ export class ProjectsService {
         private readonly projectsRepository: Repository<Project>,
     ) {}
 
+    async findAll(): Promise<ProjectResponseDto[]> {
+        const projects = await this.projectsRepository.find({ order: { name: 'ASC' } });
+
+        return projects.map((project) => this.toResponseDto(project));
+    }
+
     async create(createProjectDto: CreateProjectDto): Promise<ProjectResponseDto> {
-        const name = createProjectDto.name?.trim();
+        const name = createProjectDto.name.trim();
 
         if (!name) {
             throw new BadRequestException('Project name must not be empty.');

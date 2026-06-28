@@ -6,7 +6,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Project } from '@/projects/projects.entity';
 import { ProjectsService } from '@/projects/projects.service';
 
-type ProjectsRepositoryMock = { create: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
+interface ProjectsRepositoryMock {
+    create: ReturnType<typeof vi.fn>;
+    find: ReturnType<typeof vi.fn>;
+    save: ReturnType<typeof vi.fn>;
+}
 
 function createProjectEntity(overrides: Partial<Project> = {}): Project {
     const project = new Project();
@@ -24,7 +28,7 @@ describe('ProjectsService', () => {
     let projectsRepository: ProjectsRepositoryMock;
 
     beforeEach(async () => {
-        projectsRepository = { create: vi.fn(), save: vi.fn() };
+        projectsRepository = { create: vi.fn(), find: vi.fn(), save: vi.fn() };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [ProjectsService, { provide: getRepositoryToken(Project), useValue: projectsRepository }],
@@ -33,8 +37,43 @@ describe('ProjectsService', () => {
         service = module.get<ProjectsService>(ProjectsService);
     });
 
+    describe('finds', () => {
+        it('all projects ordered by name.', async () => {
+            const alphaProject = createProjectEntity({
+                id: '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2a',
+                name: 'Alpha project',
+            });
+
+            const betaProject = createProjectEntity({
+                id: '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b',
+                name: 'Beta project',
+            });
+
+            projectsRepository.find.mockResolvedValue([alphaProject, betaProject]);
+
+            const result = await service.findAll();
+
+            expect(projectsRepository.find).toHaveBeenCalledWith({ order: { name: 'ASC' } });
+
+            expect(result).toEqual([
+                {
+                    id: '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2a',
+                    name: 'Alpha project',
+                    createdAt: new Date('2026-06-28T10:00:00.000Z'),
+                    updatedAt: new Date('2026-06-28T10:00:00.000Z'),
+                },
+                {
+                    id: '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b',
+                    name: 'Beta project',
+                    createdAt: new Date('2026-06-28T10:00:00.000Z'),
+                    updatedAt: new Date('2026-06-28T10:00:00.000Z'),
+                },
+            ]);
+        });
+    });
+
     describe('creates', () => {
-        it('a project and trimms the name.', async () => {
+        it('a project and trims the name.', async () => {
             const createdProject = createProjectEntity({
                 id: undefined,
                 name: 'Test project',
@@ -50,7 +89,6 @@ describe('ProjectsService', () => {
             const result = await service.create({ name: '  Test project  ' });
 
             expect(projectsRepository.create).toHaveBeenCalledWith({ name: 'Test project' });
-
             expect(projectsRepository.save).toHaveBeenCalledWith(createdProject);
 
             expect(result).toEqual({
