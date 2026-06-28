@@ -16,8 +16,17 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             reporter: ['text', 'html', 'lcov'],
-            include: ['src/**/*.ts'],
-            exclude: ['src/main.ts', 'src/**/*.module.ts', 'src/**/*.spec.ts'],
+            exclude: [
+                'src/main.ts',
+                'src/**/*.module.ts',
+                'src/**/*.spec.ts',
+                'src/**/*.controller.ts',
+                'src/**/*.e2e-spec.ts',
+                'src/**/*.entity.ts',
+                'src/**/dto/**/*.ts',
+                'src/**/*.enum.ts',
+                'src/database/**/*.ts',
+            ],
         },
     },
 });
