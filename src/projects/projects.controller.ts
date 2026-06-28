@@ -11,14 +11,14 @@ export class ProjectsController {
     constructor(private readonly projectsService: ProjectsService) {}
 
     @Get()
-    @ApiOperation({ summary: 'List all projects.' })
+    @ApiOperation({ operationId: 'listProjects', summary: 'List all projects.' })
     @ApiOkResponse({ description: 'All projects.', type: ProjectResponseDto, isArray: true })
     async findAll(): Promise<ProjectResponseDto[]> {
         return this.projectsService.findAll();
     }
 
     @Post()
-    @ApiOperation({ summary: 'Create a project.' })
+    @ApiOperation({ operationId: 'CreateProject', summary: 'Create a project.' })
     @ApiCreatedResponse({ description: 'The project was created.', type: ProjectResponseDto })
     @ApiBadRequestResponse({ description: 'The request body is invalid.' })
     async create(@Body() createProjectDto: CreateProjectDto): Promise<ProjectResponseDto> {
