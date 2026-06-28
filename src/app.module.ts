@@ -7,40 +7,35 @@ import { AppService } from './app.service';
 import databaseConfig from './database/database.config';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: [databaseConfig],
-    }),
+    imports: [
+        ConfigModule.forRoot({ isGlobal: true, load: [databaseConfig] }),
 
-    TypeOrmModule.forRootAsync({
-      inject: [databaseConfig.KEY],
+        TypeOrmModule.forRootAsync({
+            inject: [databaseConfig.KEY],
 
-      useFactory: (
-        database: ConfigType<typeof databaseConfig>,
-      ): TypeOrmModuleOptions => ({
-        type: 'postgres',
+            useFactory: (database: ConfigType<typeof databaseConfig>): TypeOrmModuleOptions => ({
+                type: 'postgres',
 
-        host: database.host,
-        port: database.port,
-        database: database.database,
-        username: database.username,
-        password: database.password,
+                host: database.host,
+                port: database.port,
+                database: database.database,
+                username: database.username,
+                password: database.password,
 
-        autoLoadEntities: true,
+                autoLoadEntities: true,
 
-        // Schema changes are managed through migrations.
-        synchronize: false,
-        migrationsRun: false,
+                // Schema changes are managed through migrations.
+                synchronize: false,
+                migrationsRun: false,
 
-        retryAttempts: 10,
-        retryDelay: 3_000,
+                retryAttempts: 10,
+                retryDelay: 3_000,
 
-        logging: false,
-      }),
-    }),
-  ],
-  controllers: [AppController],
-  providers: [AppService],
+                logging: false,
+            }),
+        }),
+    ],
+    controllers: [AppController],
+    providers: [AppService],
 })
 export class AppModule {}
