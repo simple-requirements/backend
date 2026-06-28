@@ -2,7 +2,7 @@ import { join } from 'node:path';
 
 import { DataSource } from 'typeorm';
 
-import { loadDatabaseConfiguration } from './database.config';
+import { loadDatabaseConfiguration } from '@/database/database.config';
 
 const database = loadDatabaseConfiguration();
 
