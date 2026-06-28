@@ -40,7 +40,7 @@ export default defineConfig(
     },
 
     {
-        files: ['eslint.config.ts'],
+        files: ['eslint.config.mts'],
         rules: {
             '@typescript-eslint/no-unsafe-assignment': 'off',
             '@typescript-eslint/no-unsafe-member-access': 'off',
@@ -48,12 +48,7 @@ export default defineConfig(
     },
 
     {
-        languageOptions: {
-            parserOptions: {
-                projectService: { defaultProject: 'tsconfig.node.json', allowDefaultProject: ['test/*.spec.ts'] },
-                tsconfigRootDir: configDirectory,
-            },
-        },
+        languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: configDirectory } },
         rules: {
             '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
             '@typescript-eslint/no-confusing-void-expression': 'off',
