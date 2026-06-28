@@ -31,5 +31,3 @@ async function bootstrap(): Promise<void> {
 }
 
 void bootstrap();
-
-void bootstrap();
