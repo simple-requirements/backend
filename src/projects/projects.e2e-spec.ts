@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { isValid, parseISO } from 'date-fns';
+import { resetE2eDatabase } from '@/database/seeding/reset-e2e-database';
 
 interface ProjectResponseBody {
     id: string;
@@ -41,6 +42,14 @@ async function createProject(request: APIRequestContext, name: string): Promise<
 }
 
 test.describe('Projects API', () => {
+    test.beforeEach(async () => {
+        await resetE2eDatabase();
+    });
+
+    test.afterAll(async () => {
+        await resetE2eDatabase();
+    });
+
     test('lists all projects.', async ({ request }) => {
         const firstProjectName = `Playwright API list project A ${randomUUID()}`;
         const secondProjectName = `Playwright API list project B ${randomUUID()}`;
