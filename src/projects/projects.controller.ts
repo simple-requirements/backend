@@ -35,7 +35,7 @@ export class ProjectsController {
     }
 
     @Patch(':id')
-    @ApiOperation({ operationId: 'renameProject', summary: 'Rename a project.' })
+    @ApiOperation({ operationId: 'updateProject', summary: 'Rename a project.' })
     @ApiOkResponse({ description: 'The project was renamed.', type: ProjectResponseDto })
     @ApiBadRequestResponse({ description: 'The request body is invalid.' })
     @ApiNotFoundResponse({ description: 'The project was not found.' })
