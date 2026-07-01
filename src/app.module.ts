@@ -5,7 +5,6 @@ import { AppController } from '@/app.controller';
 import { AppService } from '@/app.service';
 import databaseConfig from '@/database/database.config';
 
-import { CategoriesModule } from '@/categories/categories.module';
 import { ProjectsModule } from '@/projects/projects.module';
 
 @Module({
@@ -37,7 +36,6 @@ import { ProjectsModule } from '@/projects/projects.module';
             }),
         }),
         ProjectsModule,
-        CategoriesModule,
     ],
     controllers: [AppController],
     providers: [AppService],

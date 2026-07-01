@@ -1,4 +1,4 @@
-import { Category } from '@/categories/categories.entity';
+import { Category } from '@/projects/categories.entity';
 import {
     Column,
     CreateDateColumn,
