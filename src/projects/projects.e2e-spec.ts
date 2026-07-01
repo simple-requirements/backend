@@ -50,140 +50,148 @@ test.describe('Projects API', () => {
         await resetE2eDatabase();
     });
 
-    test('lists all projects.', async ({ request }) => {
-        const firstProjectName = `Playwright API list project A ${randomUUID()}`;
-        const secondProjectName = `Playwright API list project B ${randomUUID()}`;
+    test.describe('GET /projects', () => {
+        test('lists all projects.', async ({ request }) => {
+            const firstProjectName = `Playwright API list project A ${randomUUID()}`;
+            const secondProjectName = `Playwright API list project B ${randomUUID()}`;
 
-        const firstCreateResponse = await request.post('/projects', { data: { name: firstProjectName } });
-        const secondCreateResponse = await request.post('/projects', { data: { name: secondProjectName } });
+            const firstCreateResponse = await request.post('/projects', { data: { name: firstProjectName } });
+            const secondCreateResponse = await request.post('/projects', { data: { name: secondProjectName } });
 
-        expect(firstCreateResponse.status()).toBe(201);
-        expect(secondCreateResponse.status()).toBe(201);
+            expect(firstCreateResponse.status()).toBe(201);
+            expect(secondCreateResponse.status()).toBe(201);
 
-        const response = await request.get('/projects');
+            const response = await request.get('/projects');
 
-        expect(response.status()).toBe(200);
+            expect(response.status()).toBe(200);
 
-        const body = (await response.json()) as readonly ProjectResponseBody[];
+            const body = (await response.json()) as readonly ProjectResponseBody[];
 
-        expect(Array.isArray(body)).toBe(true);
+            expect(Array.isArray(body)).toBe(true);
 
-        const projectNames = body.map((project) => project.name);
-        const sortedProjectNames = [...projectNames].sort((left, right) => left.localeCompare(right));
+            const projectNames = body.map((project) => project.name);
+            const sortedProjectNames = [...projectNames].sort((left, right) => left.localeCompare(right));
 
-        expect(projectNames).toEqual(sortedProjectNames);
-        expect(projectNames).toContain(firstProjectName);
-        expect(projectNames).toContain(secondProjectName);
+            expect(projectNames).toEqual(sortedProjectNames);
+            expect(projectNames).toContain(firstProjectName);
+            expect(projectNames).toContain(secondProjectName);
 
-        for (const project of body) {
-            expect(project.id).toMatch(UUID_REGEX);
-            expect(typeof project.name).toBe('string');
-            expectIsoDateString(project.createdAt);
-            expectIsoDateString(project.updatedAt);
-        }
+            for (const project of body) {
+                expect(project.id).toMatch(UUID_REGEX);
+                expect(typeof project.name).toBe('string');
+                expectIsoDateString(project.createdAt);
+                expectIsoDateString(project.updatedAt);
+            }
+        });
     });
 
-    test('creates a project.', async ({ request }) => {
-        const projectName = `Playwright API project ${randomUUID()}`;
+    test.describe('POST /projects', () => {
+        test('creates a project.', async ({ request }) => {
+            const projectName = `Playwright API project ${randomUUID()}`;
 
-        const response = await request.post('/projects', { data: { name: `  ${projectName}  ` } });
+            const response = await request.post('/projects', { data: { name: `  ${projectName}  ` } });
 
-        expect(response.status()).toBe(201);
+            expect(response.status()).toBe(201);
 
-        const body = (await response.json()) as ProjectResponseBody;
+            const body = (await response.json()) as ProjectResponseBody;
 
-        expectProjectResponseBody(body, projectName);
-    });
-
-    test('rejects an empty project name.', async ({ request }) => {
-        const response = await request.post('/projects', { data: { name: '   ' } });
-
-        expect(response.status()).toBe(400);
-
-        const body = (await response.json()) as ErrorResponseBody;
-
-        expect(body.statusCode).toBe(400);
-        expect(body.message).toBe('Project name must not be empty.');
-        expect(body.error).toBe('Bad Request');
-    });
-
-    test('updates a project and trims the name.', async ({ request }) => {
-        const originalProjectName = `Playwright API update project ${randomUUID()}`;
-        const updatedProjectName = `Playwright API updated project ${randomUUID()}`;
-
-        const createdProject = await createProject(request, originalProjectName);
-
-        const response = await request.patch(`/projects/${createdProject.id}`, {
-            data: { name: `  ${updatedProjectName}  ` },
+            expectProjectResponseBody(body, projectName);
         });
 
-        expect(response.status()).toBe(200);
+        test('rejects an empty project name.', async ({ request }) => {
+            const response = await request.post('/projects', { data: { name: '   ' } });
 
-        const body = (await response.json()) as ProjectResponseBody;
+            expect(response.status()).toBe(400);
 
-        expect(body.id).toBe(createdProject.id);
-        expect(body.createdAt).toBe(createdProject.createdAt);
-        expectProjectResponseBody(body, updatedProjectName);
+            const body = (await response.json()) as ErrorResponseBody;
+
+            expect(body.statusCode).toBe(400);
+            expect(body.message).toBe('Project name must not be empty.');
+            expect(body.error).toBe('Bad Request');
+        });
     });
 
-    test('rejects an empty project name while updating.', async ({ request }) => {
-        const response = await request.patch(`/projects/${randomUUID()}`, { data: { name: '   ' } });
+    test.describe('PATCH /projects/{id}', () => {
+        test('updates a project and trims the name.', async ({ request }) => {
+            const originalProjectName = `Playwright API update project ${randomUUID()}`;
+            const updatedProjectName = `Playwright API updated project ${randomUUID()}`;
 
-        expect(response.status()).toBe(400);
+            const createdProject = await createProject(request, originalProjectName);
 
-        const body = (await response.json()) as ErrorResponseBody;
+            const response = await request.patch(`/projects/${createdProject.id}`, {
+                data: { name: `  ${updatedProjectName}  ` },
+            });
 
-        expect(body.statusCode).toBe(400);
-        expect(body.message).toBe('Project name must not be empty.');
-        expect(body.error).toBe('Bad Request');
-    });
+            expect(response.status()).toBe(200);
 
-    test('returns 404 when updating an unknown project.', async ({ request }) => {
-        const unknownProjectId = randomUUID();
+            const body = (await response.json()) as ProjectResponseBody;
 
-        const response = await request.patch(`/projects/${unknownProjectId}`, {
-            data: { name: `Playwright API unknown update ${randomUUID()}` },
+            expect(body.id).toBe(createdProject.id);
+            expect(body.createdAt).toBe(createdProject.createdAt);
+            expectProjectResponseBody(body, updatedProjectName);
         });
 
-        expect(response.status()).toBe(404);
+        test('rejects an empty project name while updating.', async ({ request }) => {
+            const response = await request.patch(`/projects/${randomUUID()}`, { data: { name: '   ' } });
 
-        const body = (await response.json()) as ErrorResponseBody;
+            expect(response.status()).toBe(400);
 
-        expect(body.statusCode).toBe(404);
-        expect(body.message).toBe(`Project with id "${unknownProjectId}" was not found.`);
-        expect(body.error).toBe('Not Found');
+            const body = (await response.json()) as ErrorResponseBody;
+
+            expect(body.statusCode).toBe(400);
+            expect(body.message).toBe('Project name must not be empty.');
+            expect(body.error).toBe('Bad Request');
+        });
+
+        test('returns 404 when updating an unknown project.', async ({ request }) => {
+            const unknownProjectId = randomUUID();
+
+            const response = await request.patch(`/projects/${unknownProjectId}`, {
+                data: { name: `Playwright API unknown update ${randomUUID()}` },
+            });
+
+            expect(response.status()).toBe(404);
+
+            const body = (await response.json()) as ErrorResponseBody;
+
+            expect(body.statusCode).toBe(404);
+            expect(body.message).toBe(`Project with id "${unknownProjectId}" was not found.`);
+            expect(body.error).toBe('Not Found');
+        });
     });
 
-    test('deletes a project.', async ({ request }) => {
-        const projectName = `Playwright API delete project ${randomUUID()}`;
+    test.describe('DELETE /projects/{id}', () => {
+        test('deletes a project.', async ({ request }) => {
+            const projectName = `Playwright API delete project ${randomUUID()}`;
 
-        const createdProject = await createProject(request, projectName);
+            const createdProject = await createProject(request, projectName);
 
-        const deleteResponse = await request.delete(`/projects/${createdProject.id}`);
+            const deleteResponse = await request.delete(`/projects/${createdProject.id}`);
 
-        expect(deleteResponse.status()).toBe(204);
-        expect(await deleteResponse.text()).toBe('');
+            expect(deleteResponse.status()).toBe(204);
+            expect(await deleteResponse.text()).toBe('');
 
-        const listResponse = await request.get('/projects');
+            const listResponse = await request.get('/projects');
 
-        expect(listResponse.status()).toBe(200);
+            expect(listResponse.status()).toBe(200);
 
-        const projects = (await listResponse.json()) as readonly ProjectResponseBody[];
+            const projects = (await listResponse.json()) as readonly ProjectResponseBody[];
 
-        expect(projects.some((project) => project.id === createdProject.id)).toBe(false);
-    });
+            expect(projects.some((project) => project.id === createdProject.id)).toBe(false);
+        });
 
-    test('returns 404 when deleting an unknown project.', async ({ request }) => {
-        const unknownProjectId = randomUUID();
+        test('returns 404 when deleting an unknown project.', async ({ request }) => {
+            const unknownProjectId = randomUUID();
 
-        const response = await request.delete(`/projects/${unknownProjectId}`);
+            const response = await request.delete(`/projects/${unknownProjectId}`);
 
-        expect(response.status()).toBe(404);
+            expect(response.status()).toBe(404);
 
-        const body = (await response.json()) as ErrorResponseBody;
+            const body = (await response.json()) as ErrorResponseBody;
 
-        expect(body.statusCode).toBe(404);
-        expect(body.message).toBe(`Project with id "${unknownProjectId}" was not found.`);
-        expect(body.error).toBe('Not Found');
+            expect(body.statusCode).toBe(404);
+            expect(body.message).toBe(`Project with id "${unknownProjectId}" was not found.`);
+            expect(body.error).toBe('Not Found');
+        });
     });
 });
