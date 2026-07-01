@@ -1,7 +1,17 @@
-import type { DataSource, EntityMetadata } from 'typeorm';
+import type { DataSource, EntityMetadata, ObjectLiteral } from 'typeorm';
 
+import { demoCategories } from '@/database/seeding/demo-categories';
 import { demoProjects } from '@/database/seeding/demo-projects';
 import { Project } from '@/projects/projects.entity';
+import type { RequirementType } from '@/requirements/requirement-type.enum';
+
+type SeedCategoryEntity = ObjectLiteral & {
+    id: string;
+    projectId: string;
+    name: string;
+    key: string;
+    type: RequirementType;
+};
 
 function quotePostgresIdentifier(identifier: string): string {
     return `"${identifier.replaceAll('"', '""')}"`;
@@ -29,11 +39,18 @@ async function deleteDatabaseContent(dataSource: DataSource): Promise<void> {
 
 export async function seedDemoData(dataSource: DataSource): Promise<void> {
     await dataSource.transaction(async (transactionalEntityManager) => {
-        await deleteDatabaseContent(transactionalEntityManager.connection);
+        await deleteDatabaseContent(transactionalEntityManager.dataSource);
 
         const projectsRepository = transactionalEntityManager.getRepository(Project);
         const projects = demoProjects.map((demoProject) => projectsRepository.create(demoProject));
 
         await projectsRepository.save(projects);
+
+        const categoriesRepository = transactionalEntityManager.getRepository<SeedCategoryEntity>('categories');
+        const categories = demoCategories.map(({ projectId, ...demoCategory }) =>
+            categoriesRepository.create({ ...demoCategory, projectId }),
+        );
+
+        await categoriesRepository.save(categories);
     });
 }
