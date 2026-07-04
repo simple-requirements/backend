@@ -10,11 +10,18 @@ import {
     ApiTags,
 } from '@nestjs/swagger';
 
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
 import { CategoryResponseDto } from '@/projects/dto/category-response.dto';
 import { CreateCategoryDto } from '@/projects/dto/create-category.dto';
 import { UpdateCategoryDto } from '@/projects/dto/update-category.dto';
 import { CreateProjectDto } from '@/projects/dto/create-project.dto';
 import { ProjectResponseDto } from '@/projects/dto/project-response.dto';
+import {
+    createCategorySchema,
+    createProjectSchema,
+    updateCategorySchema,
+    updateProjectSchema,
+} from '@/projects/dto/project.schemas';
 import { UpdateProjectDto } from '@/projects/dto/update-project.dto';
 import { ProjectsService } from '@/projects/projects.service';
 
@@ -43,7 +50,9 @@ export class ProjectsController {
     @ApiOperation({ operationId: 'CreateProject', summary: 'Create a project.' })
     @ApiCreatedResponse({ description: 'The project was created.', type: ProjectResponseDto })
     @ApiBadRequestResponse({ description: 'The request body is invalid.' })
-    async create(@Body() createProjectDto: CreateProjectDto): Promise<ProjectResponseDto> {
+    async create(
+        @Body(new ZodValidationPipe(createProjectSchema)) createProjectDto: CreateProjectDto,
+    ): Promise<ProjectResponseDto> {
         return this.projectsService.create(createProjectDto);
     }
 
@@ -52,7 +61,10 @@ export class ProjectsController {
     @ApiOkResponse({ description: 'The project was renamed.', type: ProjectResponseDto })
     @ApiBadRequestResponse({ description: 'The request body is invalid.' })
     @ApiNotFoundResponse({ description: 'The project was not found.' })
-    async update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto): Promise<ProjectResponseDto> {
+    async update(
+        @Param('id') id: string,
+        @Body(new ZodValidationPipe(updateProjectSchema)) updateProjectDto: UpdateProjectDto,
+    ): Promise<ProjectResponseDto> {
         return this.projectsService.update(id, updateProjectDto);
     }
 
@@ -82,7 +94,7 @@ export class ProjectsController {
     @ApiNotFoundResponse({ description: 'The project was not found.' })
     async createCategory(
         @Param('projectId') projectId: string,
-        @Body() createCategoryDto: CreateCategoryDto,
+        @Body(new ZodValidationPipe(createCategorySchema)) createCategoryDto: CreateCategoryDto,
     ): Promise<CategoryResponseDto> {
         return this.projectsService.createCategory(projectId, createCategoryDto);
     }
@@ -97,7 +109,7 @@ export class ProjectsController {
     async updateCategory(
         @Param('projectId') projectId: string,
         @Param('categoryId') categoryId: string,
-        @Body() updateCategoryDto: UpdateCategoryDto,
+        @Body(new ZodValidationPipe(updateCategorySchema)) updateCategoryDto: UpdateCategoryDto,
     ): Promise<CategoryResponseDto> {
         return this.projectsService.updateCategory(projectId, categoryId, updateCategoryDto);
     }

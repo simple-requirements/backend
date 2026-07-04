@@ -144,7 +144,7 @@ describe('ProjectsService', () => {
     });
 
     describe('creates', () => {
-        it('a project and trims the name.', async () => {
+        it('a project.', async () => {
             const createdProject = createProjectEntity({
                 id: undefined,
                 name: 'Test project',
@@ -157,7 +157,7 @@ describe('ProjectsService', () => {
             projectsRepository.create.mockReturnValue(createdProject);
             projectsRepository.save.mockResolvedValue(savedProject);
 
-            const result = await service.create({ name: '  Test project  ' });
+            const result = await service.create({ name: 'Test project' });
 
             expect(projectsRepository.create).toHaveBeenCalledWith({ name: 'Test project' });
             expect(projectsRepository.save).toHaveBeenCalledWith(createdProject);
@@ -172,7 +172,7 @@ describe('ProjectsService', () => {
     });
 
     describe('updates', () => {
-        it('a project and trims the name.', async () => {
+        it('a project.', async () => {
             const projectId = '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b';
 
             const existingProject = createProjectEntity({ id: projectId, name: 'Old project name' });
@@ -186,7 +186,7 @@ describe('ProjectsService', () => {
             projectsRepository.findOne.mockResolvedValue(existingProject);
             projectsRepository.save.mockResolvedValue(savedProject);
 
-            const result = await service.update(projectId, { name: '  New project name  ' });
+            const result = await service.update(projectId, { name: 'New project name' });
 
             expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: projectId } });
             expect(existingProject.name).toBe('New project name');
@@ -233,40 +233,6 @@ describe('ProjectsService', () => {
             await expect(service.delete(projectId)).rejects.toBeInstanceOf(NotFoundException);
 
             expect(projectsRepository.delete).toHaveBeenCalledWith({ id: projectId });
-        });
-    });
-
-    describe('throws BadRequestException', () => {
-        it('if the project name is empty while creating.', async () => {
-            await expect(service.create({ name: '' })).rejects.toBeInstanceOf(BadRequestException);
-
-            expect(projectsRepository.create).not.toHaveBeenCalled();
-            expect(projectsRepository.save).not.toHaveBeenCalled();
-        });
-
-        it('if the project name contains only whitespace while creating.', async () => {
-            await expect(service.create({ name: '   ' })).rejects.toBeInstanceOf(BadRequestException);
-
-            expect(projectsRepository.create).not.toHaveBeenCalled();
-            expect(projectsRepository.save).not.toHaveBeenCalled();
-        });
-
-        it('if the project name is empty while updating.', async () => {
-            await expect(service.update('9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b', { name: '' })).rejects.toBeInstanceOf(
-                BadRequestException,
-            );
-
-            expect(projectsRepository.findOne).not.toHaveBeenCalled();
-            expect(projectsRepository.save).not.toHaveBeenCalled();
-        });
-
-        it('if the project name contains only whitespace while updating.', async () => {
-            await expect(
-                service.update('9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b', { name: '   ' }),
-            ).rejects.toBeInstanceOf(BadRequestException);
-
-            expect(projectsRepository.findOne).not.toHaveBeenCalled();
-            expect(projectsRepository.save).not.toHaveBeenCalled();
         });
     });
 
@@ -384,44 +350,6 @@ describe('ProjectsService', () => {
                 });
             });
 
-            it('trims the category name.', async () => {
-                const createdCategory = createCategoryEntity({ name: 'Authentication' });
-                const savedCategory = createCategoryEntity({ name: 'Authentication' });
-
-                projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                categoriesRepository.findOne.mockResolvedValue(null);
-                categoriesRepository.create.mockReturnValue(createdCategory);
-                categoriesRepository.save.mockResolvedValue(savedCategory);
-
-                await service.createCategory(PROJECT_ID, createCreateCategoryDto({ name: '  Authentication  ' }));
-
-                expect(categoriesRepository.create).toHaveBeenCalledWith({
-                    projectId: PROJECT_ID,
-                    name: 'Authentication',
-                    key: 'AUTH',
-                    type: RequirementType.FR,
-                });
-            });
-
-            it('trims and uppercases the category key.', async () => {
-                const createdCategory = createCategoryEntity({ key: 'AUTH' });
-                const savedCategory = createCategoryEntity({ key: 'AUTH' });
-
-                projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                categoriesRepository.findOne.mockResolvedValue(null);
-                categoriesRepository.create.mockReturnValue(createdCategory);
-                categoriesRepository.save.mockResolvedValue(savedCategory);
-
-                await service.createCategory(PROJECT_ID, createCreateCategoryDto({ key: '  auth  ' }));
-
-                expect(categoriesRepository.create).toHaveBeenCalledWith({
-                    projectId: PROJECT_ID,
-                    name: 'Authentication',
-                    key: 'AUTH',
-                    type: RequirementType.FR,
-                });
-            });
-
             describe('throws', () => {
                 it('NotFoundException when the project does not exist.', async () => {
                     projectsRepository.findOne.mockResolvedValue(null);
@@ -435,65 +363,6 @@ describe('ProjectsService', () => {
                     expect(categoriesRepository.create).not.toHaveBeenCalled();
                     expect(categoriesRepository.save).not.toHaveBeenCalled();
                 });
-                it('BadRequestException when the category name is empty.', async () => {
-                    projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-
-                    await expect(
-                        service.createCategory(PROJECT_ID, createCreateCategoryDto({ name: '   ' })),
-                    ).rejects.toBeInstanceOf(BadRequestException);
-
-                    expect(categoriesRepository.create).not.toHaveBeenCalled();
-                    expect(categoriesRepository.save).not.toHaveBeenCalled();
-                });
-
-                it('BadRequestException when the category name is not a string.', async () => {
-                    projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-
-                    await expect(
-                        service.createCategory(PROJECT_ID, createCreateCategoryDto({ name: 123 as unknown as string })),
-                    ).rejects.toBeInstanceOf(BadRequestException);
-
-                    expect(categoriesRepository.create).not.toHaveBeenCalled();
-                    expect(categoriesRepository.save).not.toHaveBeenCalled();
-                });
-
-                it('BadRequestException when the category key is not a string.', async () => {
-                    projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-
-                    await expect(
-                        service.createCategory(PROJECT_ID, createCreateCategoryDto({ key: 123 as unknown as string })),
-                    ).rejects.toBeInstanceOf(BadRequestException);
-
-                    expect(categoriesRepository.create).not.toHaveBeenCalled();
-                    expect(categoriesRepository.save).not.toHaveBeenCalled();
-                });
-
-                it.for([
-                    { testName: 'too short', key: 'A' },
-                    { testName: 'too long', key: 'ABCDE' },
-                    { testName: 'contains digits', key: 'A11Y' },
-                ])('BadRequestException when the category key is invalid because it is $testName.', async ({ key }) => {
-                    projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-
-                    await expect(
-                        service.createCategory(PROJECT_ID, createCreateCategoryDto({ key })),
-                    ).rejects.toBeInstanceOf(BadRequestException);
-
-                    expect(categoriesRepository.create).not.toHaveBeenCalled();
-                    expect(categoriesRepository.save).not.toHaveBeenCalled();
-                });
-
-                it('BadRequestException when the category type is invalid.', async () => {
-                    projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-
-                    await expect(
-                        service.createCategory(PROJECT_ID, createCreateCategoryDto({ type: 'BUG' as RequirementType })),
-                    ).rejects.toBeInstanceOf(BadRequestException);
-
-                    expect(categoriesRepository.create).not.toHaveBeenCalled();
-                    expect(categoriesRepository.save).not.toHaveBeenCalled();
-                });
-
                 it('BadRequestException when the category name already exists in the project.', async () => {
                     const duplicateCategory = createCategoryEntity({
                         id: '2d7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d12',
@@ -652,32 +521,6 @@ describe('ProjectsService', () => {
                 });
             });
 
-            it('trims the category name.', async () => {
-                const existingCategory = createCategoryEntity({ name: 'Old name' });
-                const savedCategory = createCategoryEntity({ name: 'New name' });
-
-                projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                categoriesRepository.findOne.mockResolvedValueOnce(existingCategory).mockResolvedValueOnce(null);
-                categoriesRepository.save.mockResolvedValue(savedCategory);
-
-                await service.updateCategory(PROJECT_ID, CATEGORY_ID, { name: '  New name  ' });
-
-                expect(existingCategory.name).toBe('New name');
-            });
-
-            it('trims and uppercases the category key.', async () => {
-                const existingCategory = createCategoryEntity({ key: 'OLD' });
-                const savedCategory = createCategoryEntity({ key: 'AUTH' });
-
-                projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                categoriesRepository.findOne.mockResolvedValueOnce(existingCategory).mockResolvedValueOnce(null);
-                categoriesRepository.save.mockResolvedValue(savedCategory);
-
-                await service.updateCategory(PROJECT_ID, CATEGORY_ID, { key: '  auth  ' });
-
-                expect(existingCategory.key).toBe('AUTH');
-            });
-
             it('allows keeping the same name and key on the same category.', async () => {
                 const existingCategory = createCategoryEntity({ name: 'Authentication', key: 'AUTH' });
 
@@ -721,54 +564,6 @@ describe('ProjectsService', () => {
                     expect(categoriesRepository.findOne).toHaveBeenCalledWith({
                         where: { id: CATEGORY_ID, projectId: PROJECT_ID },
                     });
-                    expect(categoriesRepository.save).not.toHaveBeenCalled();
-                });
-
-                it('BadRequestException when the request body is empty.', async () => {
-                    projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                    categoriesRepository.findOne.mockResolvedValue(createCategoryEntity());
-
-                    await expect(service.updateCategory(PROJECT_ID, CATEGORY_ID, {})).rejects.toBeInstanceOf(
-                        BadRequestException,
-                    );
-
-                    expect(categoriesRepository.save).not.toHaveBeenCalled();
-                });
-
-                it('BadRequestException when the updated name is empty.', async () => {
-                    projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                    categoriesRepository.findOne.mockResolvedValue(createCategoryEntity());
-
-                    await expect(
-                        service.updateCategory(PROJECT_ID, CATEGORY_ID, { name: '   ' }),
-                    ).rejects.toBeInstanceOf(BadRequestException);
-
-                    expect(categoriesRepository.save).not.toHaveBeenCalled();
-                });
-
-                it.for([
-                    { testName: 'too short', key: 'A' },
-                    { testName: 'too long', key: 'ABCDE' },
-                    { testName: 'contains digits', key: 'A11Y' },
-                ])('BadRequestException when the updated key is invalid because it is $testName.', async ({ key }) => {
-                    projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                    categoriesRepository.findOne.mockResolvedValue(createCategoryEntity());
-
-                    await expect(service.updateCategory(PROJECT_ID, CATEGORY_ID, { key })).rejects.toBeInstanceOf(
-                        BadRequestException,
-                    );
-
-                    expect(categoriesRepository.save).not.toHaveBeenCalled();
-                });
-
-                it('BadRequestException when the updated type is invalid.', async () => {
-                    projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                    categoriesRepository.findOne.mockResolvedValue(createCategoryEntity());
-
-                    await expect(
-                        service.updateCategory(PROJECT_ID, CATEGORY_ID, { type: 'BUG' as RequirementType }),
-                    ).rejects.toBeInstanceOf(BadRequestException);
-
                     expect(categoriesRepository.save).not.toHaveBeenCalled();
                 });
 

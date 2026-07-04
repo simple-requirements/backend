@@ -6,8 +6,8 @@
     "license": "MIT",
     "scripts": {
         "build": "nest build",
-        "format": "prettier --write \"src/**/*.ts\"",
-        "lint": "eslint \"{src,apps,libs}/**/*.ts\" --fix",
+        "format": "prettier --write \"src/**/*.ts\" \"*.config.mts\"",
+        "lint": "eslint \"src/**/*.ts\" \"*.config.mts\" --fix",
         "migration:generate": "NODE_OPTIONS='-r tsconfig-paths/register' typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
         "migration:run": "NODE_OPTIONS='-r tsconfig-paths/register' typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
         "migration:revert": "NODE_OPTIONS='-r tsconfig-paths/register' typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
@@ -34,11 +34,10 @@
         "pg": "^8.21.0",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.1",
-        "typeorm": "^1.0.0"
+        "typeorm": "^1.0.0",
+        "zod": "^4.4.3"
     },
     "devDependencies": {
-        "@eslint/config-helpers": "^0.6.0",
-        "@eslint/eslintrc": "^3.2.0",
         "@eslint/js": "^9.18.0",
         "@nestjs/cli": "^11.0.0",
         "@nestjs/schematics": "^11.0.0",
@@ -50,9 +49,6 @@
         "@vitest/coverage-istanbul": "^4.1.8",
         "eslint": "^9.18.0",
         "eslint-config-prettier": "^10.0.1",
-        "eslint-plugin-prettier": "^5.2.2",
-        "eslint-plugin-react-hooks": "^7.1.1",
-        "eslint-plugin-react-refresh": "^0.5.3",
         "globals": "^17.0.0",
         "prettier": "^3.4.2",
         "source-map-support": "^0.5.21",
