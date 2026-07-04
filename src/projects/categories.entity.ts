@@ -1,5 +1,5 @@
 import { Project } from '@/projects/projects.entity';
-import { RequirementType } from '@/requirements/requirement-type.enum';
+import { CategoryType } from '@/projects/category-type.enum';
 import {
     Check,
     Column,
@@ -40,7 +40,7 @@ export class Category {
     key!: string;
 
     @Column({ type: 'varchar', length: 3 })
-    type!: RequirementType;
+    type!: CategoryType;
 
     @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
     createdAt!: Date;

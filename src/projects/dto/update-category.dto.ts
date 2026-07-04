@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
-import { RequirementType } from '@/requirements/requirement-type.enum';
+import { CategoryType } from '@/projects/category-type.enum';
 
 export class UpdateCategoryDto {
     @ApiPropertyOptional({ example: 'Authentication', description: 'Human-readable category name.' })
@@ -10,9 +10,9 @@ export class UpdateCategoryDto {
     key?: string;
 
     @ApiPropertyOptional({
-        enum: RequirementType,
-        example: RequirementType.FR,
+        enum: CategoryType,
+        example: CategoryType.FR,
         description: 'Requirement type handled by this category.',
     })
-    type?: RequirementType;
+    type?: CategoryType;
 }

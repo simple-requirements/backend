@@ -7,6 +7,7 @@ type ZodParseResult<TOutput> =
     | Readonly<{ success: false; error: Readonly<{ issues: readonly ZodValidationIssue[] }> }>;
 
 export interface ZodValidationSchema<TOutput> {
+    parse(value: unknown): TOutput;
     safeParse(value: unknown): ZodParseResult<TOutput>;
 }
 

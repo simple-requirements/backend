@@ -4,6 +4,8 @@
         "node_modules",
         "test",
         "dist",
-        "**/*spec.ts"
+        "**/*spec.ts",
+        "**/*.e2e-helpers.ts",
+        "**/*.e2e-fixtures.ts"
     ]
 }

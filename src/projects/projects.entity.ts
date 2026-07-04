@@ -1,4 +1,5 @@
 import { Category } from '@/projects/categories.entity';
+import { Requirement } from '@/projects/requirements.entity';
 import {
     Column,
     CreateDateColumn,
@@ -27,4 +28,7 @@ export class Project {
 
     @OneToMany(() => Category, (category) => category.project)
     categories!: Relation<Category>[];
+
+    @OneToMany(() => Requirement, (requirement) => requirement.project)
+    requirements!: Relation<Requirement>[];
 }

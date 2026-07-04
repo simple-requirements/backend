@@ -14,8 +14,8 @@ export default defineConfig({
         include: ['src/**/*.spec.ts'],
 
         coverage: {
-            provider: 'v8',
-            reporter: ['text', 'html', 'lcov'],
+            provider: 'istanbul',
+            reporter: ['text', 'html', 'clover'],
             exclude: [
                 'src/main.ts',
                 'src/**/*.module.ts',
