@@ -4,13 +4,13 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
+import sonarjs from 'eslint-plugin-sonarjs';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
 const configDirectory = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig(
-    {
-        ignores: ['coverage/**', 'dist/**', 'playwright-report/**', 'test-results/**'],
-    },
+    { ignores: ['coverage/**', 'dist/**', 'playwright-report/**', 'test-results/**'] },
 
     js.configs.recommended,
 
@@ -42,4 +42,6 @@ export default defineConfig(
             '@typescript-eslint/no-unsafe-argument': 'off',
         },
     },
+    eslintConfigPrettier,
+    sonarjs.configs.recommended,
 );
