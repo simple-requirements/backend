@@ -1,11 +1,12 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, type ConfigType } from '@nestjs/config';
-import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AppController } from '@/app.controller';
 import { AppService } from '@/app.service';
 import databaseConfig from '@/database/database.config';
+import { Module } from '@nestjs/common';
+import { ConfigModule, type ConfigType } from '@nestjs/config';
+import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 import { ProjectsModule } from '@/projects/projects.module';
+import { RequirementReviewsModule } from '@/requirement-reviews/requirement-reviews.module';
 
 @Module({
     imports: [
@@ -36,6 +37,7 @@ import { ProjectsModule } from '@/projects/projects.module';
             }),
         }),
         ProjectsModule,
+        RequirementReviewsModule,
     ],
     controllers: [AppController],
     providers: [AppService],

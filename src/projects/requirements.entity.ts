@@ -2,6 +2,7 @@ import { Category } from '@/projects/categories.entity';
 import { Project } from '@/projects/projects.entity';
 import { RequirementRevision } from '@/projects/requirement-revisions.entity';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
+import { RequirementReviewComment } from '@/requirement-reviews/requirement-review-comment.entity';
 import {
     Check,
     Column,
@@ -104,4 +105,7 @@ export class Requirement {
 
     @OneToMany(() => RequirementRevision, (revision) => revision.requirement)
     revisions!: Relation<RequirementRevision>[];
+
+    @OneToMany(() => RequirementReviewComment, (comment) => comment.requirement)
+    reviewComments!: Relation<RequirementReviewComment>[];
 }
