@@ -17,6 +17,7 @@ type DemoRequirement = Pick<
     | 'source'
     | 'rejectionReason'
     | 'reviewer'
+    | 'obsoletedBy'
     | 'rejectedAt'
     | 'deletedAt'
     | 'approvedAt'
@@ -43,6 +44,7 @@ export const demoRequirements: readonly DemoRequirement[] = [
         source: 'Security workshop',
         rejectionReason: null,
         reviewer: null,
+        obsoletedBy: null,
         rejectedAt: null,
         deletedAt: null,
         approvedAt: null,
@@ -67,6 +69,7 @@ export const demoRequirements: readonly DemoRequirement[] = [
         source: 'Compliance baseline',
         rejectionReason: null,
         reviewer: 'Jane Reviewer',
+        obsoletedBy: null,
         rejectedAt: null,
         deletedAt: null,
         approvedAt: new Date('2026-06-21T12:00:00.000Z'),
@@ -91,6 +94,7 @@ export const demoRequirements: readonly DemoRequirement[] = [
         source: 'Legacy backlog',
         rejectionReason: null,
         reviewer: null,
+        obsoletedBy: null,
         rejectedAt: null,
         deletedAt: new Date('2026-06-23T08:00:00.000Z'),
         approvedAt: null,
@@ -115,6 +119,7 @@ export const demoRequirements: readonly DemoRequirement[] = [
         source: 'Import design review',
         rejectionReason: null,
         reviewer: 'Jane Reviewer',
+        obsoletedBy: null,
         rejectedAt: null,
         deletedAt: null,
         approvedAt: new Date('2026-06-21T14:00:00.000Z'),

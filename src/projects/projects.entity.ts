@@ -19,6 +19,8 @@ export class Project {
 
     @Column({ type: 'varchar', length: 255 })
     name!: string;
+    @Column({ type: 'text', name: 'ticket_url_template', nullable: true })
+    ticketUrlTemplate!: string | null;
 
     @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
     createdAt!: Date;

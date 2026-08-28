@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { RequirementReviewCommentCloseReason } from '@/requirement-reviews/requirement-review-comment-close-reason.enum';
 import { RequirementReviewCommentStatus } from '@/requirement-reviews/requirement-review-comment-status.enum';
+import { RequirementReviewCommentReplyResponseDto } from '@/requirement-reviews/dto/requirement-review-comment-reply-response.dto';
 
 export class RequirementReviewCommentResponseDto {
     @ApiProperty({ example: '8b7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d14' })
@@ -42,4 +43,7 @@ export class RequirementReviewCommentResponseDto {
 
     @ApiProperty({ example: '2026-06-28T10:00:00.000Z' })
     updatedAt!: Date;
+
+    @ApiProperty({ type: RequirementReviewCommentReplyResponseDto, isArray: true })
+    replies!: RequirementReviewCommentReplyResponseDto[];
 }

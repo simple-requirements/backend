@@ -6,7 +6,9 @@ import {
     createProjectSchema,
     createRequirementSchema,
     requirementRevisionQuerySchema,
+    implementationTicketSchema,
     updateCategorySchema,
+    updateProjectSchema,
     updateRequirementSchema,
 } from '@/projects/dto/project.schemas';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
@@ -20,6 +22,21 @@ describe('project request schemas', () => {
         expect(result).toEqual({ name: 'Test project' });
     });
 
+    it('accepts an absolute ticket URL template with exactly one placeholder.', () => {
+        expect(updateProjectSchema.parse({ ticketUrlTemplate: ' https://github.com/acme/issues/{ticket-id} ' }))
+            .toEqual({ ticketUrlTemplate: 'https://github.com/acme/issues/{ticket-id}' });
+    });
+
+    it('rejects a ticket URL template without the ticket placeholder.', () => {
+        expect(updateProjectSchema.safeParse({ ticketUrlTemplate: 'https://github.com/acme/issues' }).success).toBe(false);
+    });
+
+    it('normalizes a complete implementation ticket.', () => {
+        expect(implementationTicketSchema.parse({
+            ticketId: ' SOLAR-4711 ', completedBy: ' Ada Lovelace ', completedAt: '2026-08-26',
+        })).toEqual({ ticketId: 'SOLAR-4711', completedBy: 'Ada Lovelace', completedAt: '2026-08-26' });
+    });
+
     it('normalizes a category name and key.', () => {
         const result = createCategorySchema.parse({
             name: '  Authentication  ',
@@ -27,7 +44,11 @@ describe('project request schemas', () => {
             type: CategoryType.FR,
         });
 
-        expect(result).toEqual({ name: 'Authentication', key: 'AUTH', type: CategoryType.FR });
+        expect(result).toEqual({
+            name: 'Authentication',
+            key: 'AUTH',
+            type: CategoryType.FR,
+        });
     });
 
     it('rejects an empty category patch.', () => {
@@ -43,7 +64,11 @@ describe('project request schemas', () => {
     });
 
     it('rejects an invalid category key.', () => {
-        const result = createCategorySchema.safeParse({ name: 'Authentication', key: 'A11Y', type: CategoryType.FR });
+        const result = createCategorySchema.safeParse({
+            name: 'Authentication',
+            key: 'A11Y',
+            type: CategoryType.FR,
+        });
 
         expect(result.success).toBe(false);
 
@@ -73,7 +98,9 @@ describe('project request schemas', () => {
     });
 
     it('rejects a requirement body with an invalid category id.', () => {
-        const result = createRequirementSchema.safeParse({ categoryId: 'not-a-uuid' });
+        const result = createRequirementSchema.safeParse({
+            categoryId: 'not-a-uuid',
+        });
 
         expect(result.success).toBe(false);
 
@@ -90,7 +117,24 @@ describe('project request schemas', () => {
             reviewer: '  Jane Reviewer  ',
         });
 
-        expect(result).toEqual({ status: RequirementStatus.Approved, reviewer: 'Jane Reviewer' });
+        expect(result).toEqual({
+            status: RequirementStatus.Approved,
+            reviewer: 'Jane Reviewer',
+        });
+    });
+
+    it('normalizes dedicated obsolescence metadata in a status patch.', () => {
+        const result = updateRequirementSchema.parse({
+            status: RequirementStatus.Obsolete,
+            obsoletedBy: '  Olivia Owner  ',
+            obsolescenceReason: '  Superseded by FR-AUTH-0002.  ',
+        });
+
+        expect(result).toEqual({
+            status: RequirementStatus.Obsolete,
+            obsoletedBy: 'Olivia Owner',
+            obsolescenceReason: 'Superseded by FR-AUTH-0002.',
+        });
     });
 
     it('rejects a requirement patch that mixes content and status changes.', () => {
@@ -106,9 +150,7 @@ describe('project request schemas', () => {
             throw new Error('Expected Zod parsing to fail.');
         }
 
-        expect(result.error.issues[0]?.message).toBe(
-            'Requirement content changes and status changes must be sent separately.',
-        );
+        expect(result.error.issues[0]?.message).toBe('Requirement content changes and status changes must be sent separately.');
     });
     it('normalizes a requirement revision query.', () => {
         const result = requirementRevisionQuerySchema.parse({ revision: '2' });
@@ -123,7 +165,10 @@ describe('project request schemas', () => {
     });
 
     it('rejects mixing requirement revision query modes.', () => {
-        const result = requirementRevisionQuerySchema.safeParse({ revision: '1', allrevisions: '' });
+        const result = requirementRevisionQuerySchema.safeParse({
+            revision: '1',
+            allrevisions: '',
+        });
 
         expect(result.success).toBe(false);
 

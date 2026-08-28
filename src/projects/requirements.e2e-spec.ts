@@ -13,22 +13,14 @@ import {
 } from '@/projects/projects-api.e2e-helpers';
 
 test.describe('Requirements API - POST /projects/{projectId}/requirements', () => {
-    test('creates draft requirements with generated visible keys.', async ({ request, api }) => {
+    test('creates draft requirements with generated visible keys.', async ({ api }) => {
         const project = await api.createProject(`Playwright API requirement project ${randomUUID()}`);
         const functionalCategory = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
         const nonFunctionalCategory = await api.createCategory(project.id, 'Performance', 'PERF', CategoryType.NFR);
 
         const firstRequirement = await api.createRequirement(project.id, functionalCategory.id, 'Users must sign in.');
-        const secondRequirement = await api.createRequirement(
-            project.id,
-            functionalCategory.id,
-            'Users must sign out.',
-        );
-        const thirdRequirement = await api.createRequirement(
-            project.id,
-            nonFunctionalCategory.id,
-            'Search must be fast.',
-        );
+        const secondRequirement = await api.createRequirement(project.id, functionalCategory.id, 'Users must sign out.');
+        const thirdRequirement = await api.createRequirement(project.id, nonFunctionalCategory.id, 'Search must be fast.');
 
         expectRequirementResponseBody(firstRequirement, {
             projectId: project.id,
@@ -57,12 +49,7 @@ test.describe('Requirements API - POST /projects/{projectId}/requirements', () =
 
         const body = (await response.json()) as ErrorResponseBody;
 
-        expectErrorResponseBody(
-            body,
-            404,
-            `Category with id "${category.id}" in project "${firstProject.id}" was not found.`,
-            'Not Found',
-        );
+        expectErrorResponseBody(body, 404, `Category with id "${category.id}" in project "${firstProject.id}" was not found.`, 'Not Found');
     });
 });
 
@@ -125,10 +112,20 @@ test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requ
         }
 
         const rejectApprovedResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { status: RequirementStatus.Rejected, reviewer: 'Jane Reviewer', rejectionReason: 'Not needed.' },
+            data: {
+                status: RequirementStatus.Rejected,
+                reviewer: 'Jane Reviewer',
+                rejectionReason: 'Not needed.',
+            },
         });
 
         expect(rejectApprovedResponse.status()).toBe(400);
+
+        const ticketResponse = await request.post(`/projects/${project.id}/requirements/${requirement.id}/implementation-tickets`, {
+            data: { ticketId: 'SOLAR-4711', completedBy: 'Alex Developer', completedAt: '2026-08-25' },
+        });
+
+        expect(ticketResponse.status()).toBe(201);
 
         const implementResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             data: { status: RequirementStatus.Implemented },
@@ -139,7 +136,7 @@ test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requ
         const implementedRequirement = (await implementResponse.json()) as RequirementResponseBody;
 
         expect(implementedRequirement.status).toBe(RequirementStatus.Implemented);
-        expect(implementedRequirement.revisionNumber).toBe(3);
+        expect(implementedRequirement.revisionNumber).toBe(4);
         expect(implementedRequirement.implementedAt).not.toBeNull();
 
         if (implementedRequirement.implementedAt !== null) {
@@ -192,6 +189,7 @@ test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requ
         const obsoleteResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             data: {
                 status: RequirementStatus.Obsolete,
+                obsoletedBy: 'Olivia Owner',
                 obsolescenceReason: 'Replaced by a more specific requirement.',
             },
         });
@@ -208,6 +206,8 @@ test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requ
             status: RequirementStatus.Obsolete,
         });
         expect(obsoleteRequirement.obsolescenceReason).toBe('Replaced by a more specific requirement.');
+        expect(obsoleteRequirement.obsoletedBy).toBe('Olivia Owner');
+        expect(obsoleteRequirement.reviewer).toBe('Jane Reviewer');
         expect(obsoleteRequirement.obsoleteAt).not.toBeNull();
     });
 
@@ -220,6 +220,11 @@ test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requ
             data: { status: RequirementStatus.Approved, reviewer: 'Jane Reviewer' },
         });
         expect(approveResponse.status()).toBe(200);
+
+        const ticketResponse = await request.post(`/projects/${project.id}/requirements/${requirement.id}/implementation-tickets`, {
+            data: { ticketId: 'SOLAR-4712', completedBy: 'Alex Developer', completedAt: '2026-08-25' },
+        });
+        expect(ticketResponse.status()).toBe(201);
 
         const implementResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             data: { status: RequirementStatus.Implemented },
@@ -262,15 +267,12 @@ test.describe('Requirements API - DELETE /projects/{projectId}/requirements/{req
         expect(deletedListBody.map((listedRequirement) => listedRequirement.id)).toEqual([firstRequirement.id]);
         expect(deletedListBody[0]?.deletedAt).not.toBeNull();
 
-        const finalDeleteResponse = await request.delete(
-            `/projects/${project.id}/requirements/${firstRequirement.id}?deleted`,
-        );
+        const finalDeleteResponse = await request.delete(`/projects/${project.id}/requirements/${firstRequirement.id}?deleted`);
 
         expect(finalDeleteResponse.status()).toBe(204);
 
         const deletedListAfterFinalDeleteResponse = await request.get(`/projects/${project.id}/requirements?deleted`);
-        const deletedListAfterFinalDeleteBody =
-            (await deletedListAfterFinalDeleteResponse.json()) as readonly RequirementResponseBody[];
+        const deletedListAfterFinalDeleteBody = (await deletedListAfterFinalDeleteResponse.json()) as readonly RequirementResponseBody[];
 
         expect(deletedListAfterFinalDeleteBody).toEqual([]);
     });
@@ -303,9 +305,7 @@ test.describe('Requirements API - DELETE /projects/{projectId}/requirements', ()
         const secondRequirement = await api.createRequirement(project.id, category.id, 'Second draft.');
 
         const firstDeleteResponse = await request.delete(`/projects/${project.id}/requirements/${firstRequirement.id}`);
-        const secondDeleteResponse = await request.delete(
-            `/projects/${project.id}/requirements/${secondRequirement.id}`,
-        );
+        const secondDeleteResponse = await request.delete(`/projects/${project.id}/requirements/${secondRequirement.id}`);
 
         expect(firstDeleteResponse.status()).toBe(204);
         expect(secondDeleteResponse.status()).toBe(204);
@@ -321,9 +321,7 @@ test.describe('Requirements API - DELETE /projects/{projectId}/requirements', ()
     });
 
     test('rejects clearing the recycle bin without the deleted query parameter.', async ({ request, api }) => {
-        const project = await api.createProject(
-            `Playwright API clear recycle bin missing flag project ${randomUUID()}`,
-        );
+        const project = await api.createProject(`Playwright API clear recycle bin missing flag project ${randomUUID()}`);
 
         const clearResponse = await request.delete(`/projects/${project.id}/requirements`);
 
@@ -331,11 +329,6 @@ test.describe('Requirements API - DELETE /projects/{projectId}/requirements', ()
 
         const body = (await clearResponse.json()) as ErrorResponseBody;
 
-        expectErrorResponseBody(
-            body,
-            400,
-            'Clearing requirements requires the deleted query parameter.',
-            'Bad Request',
-        );
+        expectErrorResponseBody(body, 400, 'Clearing requirements requires the deleted query parameter.', 'Bad Request');
     });
 });

@@ -18,6 +18,8 @@ import { MAX_REQUIREMENT_SEQUENCE_NUMBER } from '@/projects/requirement.constant
 import { RequirementRevision } from '@/projects/requirement-revisions.entity';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import { Requirement } from '@/projects/requirements.entity';
+import { RequirementImplementationTicket } from '@/projects/requirement-implementation-ticket.entity';
+import { ImplementationTicketResponseDto, UpsertImplementationTicketDto } from '@/projects/dto/implementation-ticket.dto';
 
 const CONTENT_FIELD_NAMES = ['categoryId', 'description', 'priority', 'owner', 'rationale', 'source'] as const;
 
@@ -35,10 +37,14 @@ export class ProjectsService {
 
         @InjectRepository(RequirementRevision)
         private readonly requirementRevisionsRepository: Repository<RequirementRevision>,
+        @InjectRepository(RequirementImplementationTicket)
+        private readonly implementationTicketsRepository: Repository<RequirementImplementationTicket>,
     ) {}
 
     async findAll(): Promise<ProjectResponseDto[]> {
-        const projects = await this.projectsRepository.find({ order: { name: 'ASC' } });
+        const projects = await this.projectsRepository.find({
+            order: { name: 'ASC' },
+        });
 
         return projects.map((project) => this.toProjectResponseDto(project));
     }
@@ -50,7 +56,10 @@ export class ProjectsService {
     }
 
     async create(createProjectDto: CreateProjectDto): Promise<ProjectResponseDto> {
-        const project = this.projectsRepository.create({ name: createProjectDto.name });
+        const project = this.projectsRepository.create({
+            name: createProjectDto.name,
+            ticketUrlTemplate: null,
+        });
         const savedProject = await this.projectsRepository.save(project);
 
         return this.toProjectResponseDto(savedProject);
@@ -59,7 +68,8 @@ export class ProjectsService {
     async update(id: string, updateProjectDto: UpdateProjectDto): Promise<ProjectResponseDto> {
         const project = await this.getProjectOrThrow(id);
 
-        project.name = updateProjectDto.name;
+        if (updateProjectDto.name !== undefined) project.name = updateProjectDto.name;
+        if (updateProjectDto.ticketUrlTemplate !== undefined) project.ticketUrlTemplate = updateProjectDto.ticketUrlTemplate;
 
         const savedProject = await this.projectsRepository.save(project);
 
@@ -77,7 +87,10 @@ export class ProjectsService {
     async findAllCategories(projectId: string): Promise<CategoryResponseDto[]> {
         await this.getProjectOrThrow(projectId);
 
-        const categories = await this.categoriesRepository.find({ where: { projectId }, order: { name: 'ASC' } });
+        const categories = await this.categoriesRepository.find({
+            where: { projectId },
+            order: { name: 'ASC' },
+        });
 
         return categories.map((category) => this.toCategoryResponseDto(category));
     }
@@ -99,11 +112,7 @@ export class ProjectsService {
         return this.toCategoryResponseDto(savedCategory);
     }
 
-    async updateCategory(
-        projectId: string,
-        categoryId: string,
-        updateCategoryDto: UpdateCategoryDto,
-    ): Promise<CategoryResponseDto> {
+    async updateCategory(projectId: string, categoryId: string, updateCategoryDto: UpdateCategoryDto): Promise<CategoryResponseDto> {
         await this.getProjectOrThrow(projectId);
 
         const category = await this.getCategoryOrThrow(projectId, categoryId);
@@ -130,7 +139,10 @@ export class ProjectsService {
     async deleteCategory(projectId: string, categoryId: string): Promise<void> {
         await this.getProjectOrThrow(projectId);
 
-        const deleteResult = await this.categoriesRepository.delete({ id: categoryId, projectId });
+        const deleteResult = await this.categoriesRepository.delete({
+            id: categoryId,
+            projectId,
+        });
 
         if (deleteResult.affected !== 1) {
             throw new NotFoundException(`Category with id "${categoryId}" in project "${projectId}" was not found.`);
@@ -172,7 +184,11 @@ export class ProjectsService {
             }
 
             const revision = await this.requirementRevisionsRepository.findOne({
-                where: { requirementId, projectId, revisionNumber: revisionQuery.revision },
+                where: {
+                    requirementId,
+                    projectId,
+                    revisionNumber: revisionQuery.revision,
+                },
             });
 
             if (revision === null) {
@@ -187,10 +203,7 @@ export class ProjectsService {
         return this.toRequirementResponseDto(requirement);
     }
 
-    async createRequirement(
-        projectId: string,
-        createRequirementDto: CreateRequirementDto,
-    ): Promise<RequirementResponseDto> {
+    async createRequirement(projectId: string, createRequirementDto: CreateRequirementDto): Promise<RequirementResponseDto> {
         await this.getProjectOrThrow(projectId);
 
         const category = await this.getCategoryOrThrow(projectId, createRequirementDto.categoryId);
@@ -210,37 +223,37 @@ export class ProjectsService {
             source: createRequirementDto.source ?? null,
             rejectionReason: null,
             reviewer: null,
+            obsoletedBy: null,
             rejectedAt: null,
             deletedAt: null,
             approvedAt: null,
             implementedAt: null,
             obsolescenceReason: null,
             obsoleteAt: null,
+            implementationTickets: [],
         });
         const savedRequirement = await this.requirementsRepository.save(requirement);
+        savedRequirement.implementationTickets = [];
 
         return this.toRequirementResponseDto(savedRequirement);
     }
 
-    async updateRequirement(
-        projectId: string,
-        requirementId: string,
-        updateRequirementDto: UpdateRequirementDto,
-    ): Promise<RequirementResponseDto> {
+    async updateRequirement(projectId: string, requirementId: string, updateRequirementDto: UpdateRequirementDto): Promise<RequirementResponseDto> {
         await this.getProjectOrThrow(projectId);
 
         const requirement = await this.getRequirementOrThrow(projectId, requirementId);
 
         if (requirement.deletedAt !== null) {
-            throw new BadRequestException(
-                `Requirement with id "${requirementId}" is in the recycle bin and cannot be changed.`,
-            );
+            throw new BadRequestException(`Requirement with id "${requirementId}" is in the recycle bin and cannot be changed.`);
         }
 
         const categoryChange = await this.prepareRequirementContentChange(projectId, requirement, updateRequirementDto);
 
         if (updateRequirementDto.status !== undefined) {
             this.validateRequirementStatusChange(requirement, updateRequirementDto);
+            if (updateRequirementDto.status === RequirementStatus.Implemented && requirement.implementationTickets.length === 0) {
+                throw new BadRequestException('At least one implementation ticket is required before implementing a requirement.');
+            }
         }
 
         await this.storeCurrentRequirementRevision(requirement);
@@ -267,7 +280,10 @@ export class ProjectsService {
                 throw new BadRequestException(`Requirement with id "${requirementId}" is not in the recycle bin.`);
             }
 
-            await this.requirementsRepository.delete({ id: requirementId, projectId });
+            await this.requirementsRepository.delete({
+                id: requirementId,
+                projectId,
+            });
             return;
         }
 
@@ -291,11 +307,88 @@ export class ProjectsService {
 
         await this.getProjectOrThrow(projectId);
 
-        await this.requirementsRepository.delete({ projectId, deletedAt: Not(IsNull()) });
+        await this.requirementsRepository.delete({
+            projectId,
+            deletedAt: Not(IsNull()),
+        });
+    }
+
+    async listImplementationTickets(projectId: string, requirementId: string): Promise<ImplementationTicketResponseDto[]> {
+        const project = await this.getProjectOrThrow(projectId);
+        await this.getRequirementOrThrow(projectId, requirementId);
+        const tickets = await this.implementationTicketsRepository.find({ where: { requirementId }, order: { ticketId: 'ASC' } });
+        return tickets.map((ticket) => this.toImplementationTicketResponseDto(ticket, project.ticketUrlTemplate));
+    }
+
+    async createImplementationTicket(projectId: string, requirementId: string, dto: UpsertImplementationTicketDto): Promise<ImplementationTicketResponseDto> {
+        const project = await this.getProjectOrThrow(projectId);
+        const requirement = await this.getRequirementOrThrow(projectId, requirementId);
+        this.assertTicketsEditable(requirement);
+        await this.ensureTicketIdAvailable(requirementId, dto.ticketId);
+        await this.storeCurrentRequirementRevision(requirement);
+        const ticket = this.implementationTicketsRepository.create({
+            requirementId,
+            ticketId: dto.ticketId,
+            completedBy: dto.completedBy,
+            completedAt: dto.completedAt,
+        });
+        const savedTicket = await this.implementationTicketsRepository.save(ticket);
+        requirement.implementationTickets = [...requirement.implementationTickets, savedTicket];
+        requirement.revisionNumber += 1;
+        await this.requirementsRepository.save(requirement);
+        return this.toImplementationTicketResponseDto(savedTicket, project.ticketUrlTemplate);
+    }
+
+    async updateImplementationTicket(projectId: string, requirementId: string, ticketRecordId: string, dto: UpsertImplementationTicketDto): Promise<ImplementationTicketResponseDto> {
+        const project = await this.getProjectOrThrow(projectId);
+        const requirement = await this.getRequirementOrThrow(projectId, requirementId);
+        this.assertTicketsEditable(requirement);
+        const ticket = await this.getImplementationTicketOrThrow(requirementId, ticketRecordId);
+        await this.ensureTicketIdAvailable(requirementId, dto.ticketId, ticketRecordId);
+        await this.storeCurrentRequirementRevision(requirement);
+        Object.assign(ticket, dto);
+        const savedTicket = await this.implementationTicketsRepository.save(ticket);
+        requirement.implementationTickets = requirement.implementationTickets.map((item) => item.id === savedTicket.id ? savedTicket : item);
+        requirement.revisionNumber += 1;
+        await this.requirementsRepository.save(requirement);
+        return this.toImplementationTicketResponseDto(savedTicket, project.ticketUrlTemplate);
+    }
+
+    async deleteImplementationTicket(projectId: string, requirementId: string, ticketRecordId: string): Promise<void> {
+        await this.getProjectOrThrow(projectId);
+        const requirement = await this.getRequirementOrThrow(projectId, requirementId);
+        this.assertTicketsEditable(requirement);
+        await this.getImplementationTicketOrThrow(requirementId, ticketRecordId);
+        await this.storeCurrentRequirementRevision(requirement);
+        await this.implementationTicketsRepository.delete({ id: ticketRecordId, requirementId });
+        requirement.implementationTickets = requirement.implementationTickets.filter((item) => item.id !== ticketRecordId);
+        requirement.revisionNumber += 1;
+        await this.requirementsRepository.save(requirement);
+    }
+
+    private assertTicketsEditable(requirement: Requirement): void {
+        if (requirement.status !== RequirementStatus.Approved) {
+            throw new BadRequestException('Implementation tickets can only be changed while the requirement is approved.');
+        }
+    }
+
+    private async ensureTicketIdAvailable(requirementId: string, ticketId: string, excludedId?: string): Promise<void> {
+        const duplicate = await this.implementationTicketsRepository.findOne({
+            where: excludedId === undefined ? { requirementId, ticketId } : { requirementId, ticketId, id: Not(excludedId) },
+        });
+        if (duplicate !== null) throw new BadRequestException(`Implementation ticket "${ticketId}" already exists for this requirement.`);
+    }
+
+    private async getImplementationTicketOrThrow(requirementId: string, id: string): Promise<RequirementImplementationTicket> {
+        const ticket = await this.implementationTicketsRepository.findOne({ where: { id, requirementId } });
+        if (ticket === null) throw new NotFoundException(`Implementation ticket with id "${id}" was not found.`);
+        return ticket;
     }
 
     private async getProjectOrThrow(projectId: string): Promise<Project> {
-        const project = await this.projectsRepository.findOne({ where: { id: projectId } });
+        const project = await this.projectsRepository.findOne({
+            where: { id: projectId },
+        });
 
         if (project === null) {
             throw new NotFoundException(`Project with id "${projectId}" was not found.`);
@@ -305,7 +398,9 @@ export class ProjectsService {
     }
 
     private async getCategoryOrThrow(projectId: string, categoryId: string): Promise<Category> {
-        const category = await this.categoriesRepository.findOne({ where: { id: categoryId, projectId } });
+        const category = await this.categoriesRepository.findOne({
+            where: { id: categoryId, projectId },
+        });
 
         if (category === null) {
             throw new NotFoundException(`Category with id "${categoryId}" in project "${projectId}" was not found.`);
@@ -315,27 +410,20 @@ export class ProjectsService {
     }
 
     private async getRequirementOrThrow(projectId: string, requirementId: string): Promise<Requirement> {
-        const requirement = await this.requirementsRepository.findOne({ where: { id: requirementId, projectId } });
+        const requirement = await this.requirementsRepository.findOne({
+            where: { id: requirementId, projectId },
+        });
 
         if (requirement === null) {
-            throw new NotFoundException(
-                `Requirement with id "${requirementId}" in project "${projectId}" was not found.`,
-            );
+            throw new NotFoundException(`Requirement with id "${requirementId}" in project "${projectId}" was not found.`);
         }
 
         return requirement;
     }
 
-    private async ensureCategoryNameAvailable(
-        projectId: string,
-        name: string,
-        excludedCategoryId?: string,
-    ): Promise<void> {
+    private async ensureCategoryNameAvailable(projectId: string, name: string, excludedCategoryId?: string): Promise<void> {
         const duplicateCategory = await this.categoriesRepository.findOne({
-            where:
-                excludedCategoryId === undefined ?
-                    { projectId, name }
-                :   { projectId, name, id: Not(excludedCategoryId) },
+            where: excludedCategoryId === undefined ? { projectId, name } : { projectId, name, id: Not(excludedCategoryId) },
         });
 
         if (duplicateCategory !== null) {
@@ -343,14 +431,9 @@ export class ProjectsService {
         }
     }
 
-    private async ensureCategoryKeyAvailable(
-        projectId: string,
-        key: string,
-        excludedCategoryId?: string,
-    ): Promise<void> {
+    private async ensureCategoryKeyAvailable(projectId: string, key: string, excludedCategoryId?: string): Promise<void> {
         const duplicateCategory = await this.categoriesRepository.findOne({
-            where:
-                excludedCategoryId === undefined ? { projectId, key } : { projectId, key, id: Not(excludedCategoryId) },
+            where: excludedCategoryId === undefined ? { projectId, key } : { projectId, key, id: Not(excludedCategoryId) },
         });
 
         if (duplicateCategory !== null) {
@@ -392,6 +475,8 @@ export class ProjectsService {
             source: requirement.source,
             rejectionReason: requirement.rejectionReason,
             reviewer: requirement.reviewer,
+            obsoletedBy: requirement.obsoletedBy,
+            implementationTickets: requirement.implementationTickets.map(({ id, ticketId, completedBy, completedAt }) => ({ id, ticketId, completedBy, completedAt })),
             rejectedAt: requirement.rejectedAt,
             deletedAt: requirement.deletedAt,
             approvedAt: requirement.approvedAt,
@@ -415,17 +500,14 @@ export class ProjectsService {
         }
 
         if (
-            requirement.status !== RequirementStatus.Draft
-            && requirement.status !== RequirementStatus.Rejected
-            && requirement.status !== RequirementStatus.Approved
+            requirement.status !== RequirementStatus.Draft &&
+            requirement.status !== RequirementStatus.Rejected &&
+            requirement.status !== RequirementStatus.Approved
         ) {
             throw new BadRequestException(`Requirement in status "${requirement.status}" cannot be changed.`);
         }
 
-        if (
-            updateRequirementDto.categoryId === undefined
-            || updateRequirementDto.categoryId === requirement.categoryId
-        ) {
+        if (updateRequirementDto.categoryId === undefined || updateRequirementDto.categoryId === requirement.categoryId) {
             return undefined;
         }
 
@@ -455,6 +537,7 @@ export class ProjectsService {
         requirement.status = RequirementStatus.Draft;
         requirement.rejectionReason = null;
         requirement.reviewer = null;
+        requirement.obsoletedBy = null;
         requirement.rejectedAt = null;
         requirement.approvedAt = null;
         requirement.implementedAt = null;
@@ -462,10 +545,7 @@ export class ProjectsService {
         requirement.obsoleteAt = null;
     }
 
-    private validateRequirementStatusChange(
-        requirement: Requirement,
-        updateRequirementDto: UpdateRequirementDto,
-    ): void {
+    private validateRequirementStatusChange(requirement: Requirement, updateRequirementDto: UpdateRequirementDto): void {
         switch (updateRequirementDto.status) {
             case RequirementStatus.Approved:
                 if (requirement.status !== RequirementStatus.Draft) {
@@ -487,10 +567,7 @@ export class ProjectsService {
                     throw new BadRequestException('Reviewer must be provided when rejecting a requirement.');
                 }
 
-                if (
-                    updateRequirementDto.rejectionReason === undefined
-                    || updateRequirementDto.rejectionReason === null
-                ) {
+                if (updateRequirementDto.rejectionReason === undefined || updateRequirementDto.rejectionReason === null) {
                     throw new BadRequestException('Rejection reason must be provided when rejecting a requirement.');
                 }
 
@@ -498,32 +575,13 @@ export class ProjectsService {
 
             case RequirementStatus.Implemented:
                 if (requirement.status !== RequirementStatus.Approved) {
-                    throw new BadRequestException(
-                        `Requirement in status "${requirement.status}" cannot be implemented.`,
-                    );
+                    throw new BadRequestException(`Requirement in status "${requirement.status}" cannot be implemented.`);
                 }
 
                 return;
 
             case RequirementStatus.Obsolete:
-                if (
-                    requirement.status !== RequirementStatus.Approved
-                    && requirement.status !== RequirementStatus.Rejected
-                ) {
-                    throw new BadRequestException(
-                        `Requirement in status "${requirement.status}" cannot be set obsolete.`,
-                    );
-                }
-
-                if (
-                    updateRequirementDto.obsolescenceReason === undefined
-                    || updateRequirementDto.obsolescenceReason === null
-                ) {
-                    throw new BadRequestException(
-                        'Obsolescence reason must be provided when setting a requirement obsolete.',
-                    );
-                }
-
+                this.getObsolescenceMetadata(requirement, updateRequirementDto);
                 return;
 
             default:
@@ -570,6 +628,7 @@ export class ProjectsService {
         requirement.approvedAt = new Date();
         requirement.implementedAt = null;
         requirement.obsolescenceReason = null;
+        requirement.obsoletedBy = null;
         requirement.obsoleteAt = null;
     }
 
@@ -593,6 +652,7 @@ export class ProjectsService {
         requirement.approvedAt = null;
         requirement.implementedAt = null;
         requirement.obsolescenceReason = null;
+        requirement.obsoletedBy = null;
         requirement.obsoleteAt = null;
     }
 
@@ -606,21 +666,41 @@ export class ProjectsService {
     }
 
     private applyObsolescence(requirement: Requirement, updateRequirementDto: UpdateRequirementDto): void {
-        if (requirement.status !== RequirementStatus.Approved && requirement.status !== RequirementStatus.Rejected) {
+        const [obsoletedBy, obsolescenceReason] = this.getObsolescenceMetadata(requirement, updateRequirementDto);
+
+        requirement.status = RequirementStatus.Obsolete;
+        requirement.obsoletedBy = obsoletedBy;
+        requirement.obsolescenceReason = obsolescenceReason;
+        requirement.obsoleteAt = new Date();
+    }
+
+    private getObsolescenceMetadata(
+        requirement: Requirement,
+        updateRequirementDto: UpdateRequirementDto,
+    ): readonly [obsoletedBy: string, obsolescenceReason: string] {
+        if (requirement.status !== RequirementStatus.Approved && requirement.status !== RequirementStatus.Implemented) {
             throw new BadRequestException(`Requirement in status "${requirement.status}" cannot be set obsolete.`);
+        }
+
+        if (updateRequirementDto.obsoletedBy === undefined || updateRequirementDto.obsoletedBy === null) {
+            throw new BadRequestException('User name must be provided when setting a requirement obsolete.');
         }
 
         if (updateRequirementDto.obsolescenceReason === undefined || updateRequirementDto.obsolescenceReason === null) {
             throw new BadRequestException('Obsolescence reason must be provided when setting a requirement obsolete.');
         }
 
-        requirement.status = RequirementStatus.Obsolete;
-        requirement.obsolescenceReason = updateRequirementDto.obsolescenceReason;
-        requirement.obsoleteAt = new Date();
+        return [updateRequirementDto.obsoletedBy, updateRequirementDto.obsolescenceReason];
     }
 
     private toProjectResponseDto(project: Project): ProjectResponseDto {
-        return { id: project.id, name: project.name, createdAt: project.createdAt, updatedAt: project.updatedAt };
+        return {
+            id: project.id,
+            name: project.name,
+            ticketUrlTemplate: project.ticketUrlTemplate,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt,
+        };
     }
 
     private toCategoryResponseDto(category: Category): CategoryResponseDto {
@@ -651,6 +731,14 @@ export class ProjectsService {
             source: revision.source,
             rejectionReason: revision.rejectionReason,
             reviewer: revision.reviewer,
+            obsoletedBy: revision.obsoletedBy,
+            implementationTickets: revision.implementationTickets.map((ticket) => ({
+                ...ticket,
+                requirementId: revision.requirementId,
+                url: null,
+                createdAt: revision.updatedAt,
+                updatedAt: revision.updatedAt,
+            })),
             rejectedAt: revision.rejectedAt,
             deletedAt: revision.deletedAt,
             approvedAt: revision.approvedAt,
@@ -678,6 +766,10 @@ export class ProjectsService {
             source: requirement.source,
             rejectionReason: requirement.rejectionReason,
             reviewer: requirement.reviewer,
+            obsoletedBy: requirement.obsoletedBy,
+            implementationTickets: requirement.implementationTickets.map((ticket) =>
+                this.toImplementationTicketResponseDto(ticket, requirement.project.ticketUrlTemplate),
+            ),
             rejectedAt: requirement.rejectedAt,
             deletedAt: requirement.deletedAt,
             approvedAt: requirement.approvedAt,
@@ -686,6 +778,19 @@ export class ProjectsService {
             obsoleteAt: requirement.obsoleteAt,
             createdAt: requirement.createdAt,
             updatedAt: requirement.updatedAt,
+        };
+    }
+
+    private toImplementationTicketResponseDto(ticket: RequirementImplementationTicket, template: string | null): ImplementationTicketResponseDto {
+        return {
+            id: ticket.id,
+            requirementId: ticket.requirementId,
+            ticketId: ticket.ticketId,
+            completedBy: ticket.completedBy,
+            completedAt: ticket.completedAt,
+            url: template === null ? null : template.replace('{ticket-id}', encodeURIComponent(ticket.ticketId)),
+            createdAt: ticket.createdAt,
+            updatedAt: ticket.updatedAt,
         };
     }
 }

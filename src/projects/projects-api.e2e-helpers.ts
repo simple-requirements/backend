@@ -66,10 +66,7 @@ export const INVALID_CATEGORY_KEYS = [
     { testName: 'contains digits', key: 'A11Y' },
 ] as const;
 
-export function expectCategoryResponseBody(
-    body: CategoryResponseBody,
-    expectedCategory: ExpectedCategoryResponseBody,
-): void {
+export function expectCategoryResponseBody(body: CategoryResponseBody, expectedCategory: ExpectedCategoryResponseBody): void {
     if (expectedCategory.id !== undefined) {
         expect(body.id).toBe(expectedCategory.id);
     } else {
@@ -90,12 +87,7 @@ export function expectCategoryResponseBody(
     expectIsoDateString(body.updatedAt);
 }
 
-export function expectErrorResponseBody(
-    body: ErrorResponseBody,
-    expectedStatusCode: number,
-    expectedMessage: string,
-    expectedError: string,
-): void {
+export function expectErrorResponseBody(body: ErrorResponseBody, expectedStatusCode: number, expectedMessage: string, expectedError: string): void {
     expect(body.statusCode).toBe(expectedStatusCode);
     expect(body.message).toBe(expectedMessage);
     expect(body.error).toBe(expectedError);
@@ -108,7 +100,9 @@ export async function createCategory(
     key: string,
     type: CategoryType = CategoryType.FR,
 ): Promise<CategoryResponseBody> {
-    const response = await request.post(`/projects/${projectId}/categories`, { data: { name, key, type } });
+    const response = await request.post(`/projects/${projectId}/categories`, {
+        data: { name, key, type },
+    });
 
     expect(response.status()).toBe(201);
 
@@ -130,6 +124,7 @@ export interface RequirementResponseBody {
     source: string | null;
     rejectionReason: string | null;
     reviewer: string | null;
+    obsoletedBy: string | null;
     rejectedAt: string | null;
     deletedAt: string | null;
     approvedAt: string | null;
@@ -158,10 +153,7 @@ export function expectNullableIsoDateString(value: string | null): void {
     }
 }
 
-export function expectRequirementResponseBody(
-    body: RequirementResponseBody,
-    expectedRequirement: ExpectedRequirementResponseBody,
-): void {
+export function expectRequirementResponseBody(body: RequirementResponseBody, expectedRequirement: ExpectedRequirementResponseBody): void {
     if (expectedRequirement.id !== undefined) {
         expect(body.id).toBe(expectedRequirement.id);
     } else {
@@ -220,10 +212,7 @@ export async function createRequirement(
     return (await response.json()) as RequirementResponseBody;
 }
 
-export async function listCategories(
-    request: APIRequestContext,
-    projectId: string,
-): Promise<readonly CategoryResponseBody[]> {
+export async function listCategories(request: APIRequestContext, projectId: string): Promise<readonly CategoryResponseBody[]> {
     const response = await request.get(`/projects/${projectId}/categories`);
 
     expect(response.status()).toBe(200);

@@ -14,12 +14,16 @@ import { RequirementResponseDto } from '@/projects/dto/requirement-response.dto'
 import { ApproveRequirementDto } from '@/requirement-reviews/dto/approve-requirement.dto';
 import { CloseRequirementReviewCommentDto } from '@/requirement-reviews/dto/close-requirement-review-comment.dto';
 import { CreateRequirementReviewCommentDto } from '@/requirement-reviews/dto/create-requirement-review-comment.dto';
+import { CreateRequirementReviewCommentReplyDto } from '@/requirement-reviews/dto/create-requirement-review-comment-reply.dto';
 import { RejectRequirementDto } from '@/requirement-reviews/dto/reject-requirement.dto';
 import { RequirementReviewCommentResponseDto } from '@/requirement-reviews/dto/requirement-review-comment-response.dto';
+import { RequirementReviewCommentReplyResponseDto } from '@/requirement-reviews/dto/requirement-review-comment-reply-response.dto';
+import { RequirementReviewSummaryResponseDto } from '@/requirement-reviews/dto/requirement-review-summary-response.dto';
 import {
     approveRequirementSchema,
     closeRequirementReviewCommentSchema,
     createRequirementReviewCommentSchema,
+    createRequirementReviewCommentReplySchema,
     rejectRequirementSchema,
 } from '@/requirement-reviews/dto/requirement-review.schemas';
 import { RequirementReviewsService } from '@/requirement-reviews/requirement-reviews.service';
@@ -46,6 +50,20 @@ export class RequirementReviewsController {
         return this.requirementReviewsService.findAllReviewComments(projectId, requirementId);
     }
 
+    @Get('review-summary')
+    @ApiOperation({
+        operationId: 'getRequirementReviewSummary',
+        summary: 'Get the derived review state and comment counts.',
+    })
+    @ApiOkResponse({ type: RequirementReviewSummaryResponseDto })
+    @ApiNotFoundResponse({ description: 'The requirement was not found.' })
+    async getReviewSummary(
+        @Param('projectId') projectId: string,
+        @Param('requirementId') requirementId: string,
+    ): Promise<RequirementReviewSummaryResponseDto> {
+        return this.requirementReviewsService.getReviewSummary(projectId, requirementId);
+    }
+
     @Post('review-comments')
     @ApiOperation({ operationId: 'createRequirementReviewComment', summary: 'Create a review comment.' })
     @ApiParam({ name: 'projectId', description: 'Project identifier.' })
@@ -60,6 +78,26 @@ export class RequirementReviewsController {
         createCommentDto: CreateRequirementReviewCommentDto,
     ): Promise<RequirementReviewCommentResponseDto> {
         return this.requirementReviewsService.createReviewComment(projectId, requirementId, createCommentDto);
+    }
+
+    @Post('review-comments/:commentId/replies')
+    @ApiOperation({ operationId: 'createRequirementReviewCommentReply', summary: 'Reply to an open review comment.' })
+    @ApiCreatedResponse({ type: RequirementReviewCommentReplyResponseDto })
+    @ApiBadRequestResponse({ description: 'The request body is invalid or the comment is already closed.' })
+    @ApiNotFoundResponse({ description: 'The requirement or review comment was not found.' })
+    async createReviewCommentReply(
+        @Param('projectId') projectId: string,
+        @Param('requirementId') requirementId: string,
+        @Param('commentId') commentId: string,
+        @Body(new ZodValidationPipe(createRequirementReviewCommentReplySchema))
+        createReplyDto: CreateRequirementReviewCommentReplyDto,
+    ): Promise<RequirementReviewCommentReplyResponseDto> {
+        return this.requirementReviewsService.createReviewCommentReply(
+            projectId,
+            requirementId,
+            commentId,
+            createReplyDto,
+        );
     }
 
     @Patch('review-comments/:commentId')

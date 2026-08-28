@@ -9,6 +9,8 @@ import { Requirement } from '@/projects/requirements.entity';
 import { RequirementReviewCommentCloseReason } from '@/requirement-reviews/requirement-review-comment-close-reason.enum';
 import { RequirementReviewCommentStatus } from '@/requirement-reviews/requirement-review-comment-status.enum';
 import { RequirementReviewComment } from '@/requirement-reviews/requirement-review-comment.entity';
+import { RequirementReviewCommentReply } from '@/requirement-reviews/requirement-review-comment-reply.entity';
+import { RequirementReviewState } from '@/requirement-reviews/requirement-review-state.enum';
 import { RequirementReviewsService } from '@/requirement-reviews/requirement-reviews.service';
 
 interface RequirementsRepositoryMock {
@@ -26,6 +28,11 @@ interface ReviewCommentsRepositoryMock {
     create: ReturnType<typeof vi.fn>;
     find: ReturnType<typeof vi.fn>;
     findOne: ReturnType<typeof vi.fn>;
+    save: ReturnType<typeof vi.fn>;
+}
+
+interface ReviewCommentRepliesRepositoryMock {
+    create: ReturnType<typeof vi.fn>;
     save: ReturnType<typeof vi.fn>;
 }
 
@@ -51,6 +58,7 @@ function createRequirementEntity(overrides: Partial<Requirement> = {}): Requirem
     requirement.source = 'Workshop';
     requirement.rejectionReason = null;
     requirement.reviewer = null;
+    requirement.obsoletedBy = null;
     requirement.rejectedAt = null;
     requirement.deletedAt = null;
     requirement.approvedAt = null;
@@ -61,6 +69,7 @@ function createRequirementEntity(overrides: Partial<Requirement> = {}): Requirem
     requirement.updatedAt = new Date('2026-06-28T10:00:00.000Z');
     requirement.revisions = [];
     requirement.reviewComments = [];
+    requirement.implementationTickets = [];
 
     return Object.assign(requirement, overrides);
 }
@@ -81,6 +90,7 @@ function createReviewCommentEntity(overrides: Partial<RequirementReviewComment> 
     comment.closedAt = null;
     comment.createdAt = new Date('2026-06-28T10:00:00.000Z');
     comment.updatedAt = new Date('2026-06-28T10:00:00.000Z');
+    comment.replies = [];
 
     return Object.assign(comment, overrides);
 }
@@ -90,6 +100,7 @@ describe('RequirementReviewsService', () => {
     let requirementsRepository: RequirementsRepositoryMock;
     let requirementRevisionsRepository: RequirementRevisionsRepositoryMock;
     let reviewCommentsRepository: ReviewCommentsRepositoryMock;
+    let reviewCommentRepliesRepository: ReviewCommentRepliesRepositoryMock;
 
     beforeEach(async () => {
         requirementsRepository = { findOne: vi.fn(), save: vi.fn() };
@@ -101,23 +112,77 @@ describe('RequirementReviewsService', () => {
             findOne: vi.fn(),
             save: vi.fn(),
         };
+        reviewCommentRepliesRepository = { create: vi.fn(), save: vi.fn() };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 RequirementReviewsService,
-                { provide: getRepositoryToken(Requirement), useValue: requirementsRepository },
-                { provide: getRepositoryToken(RequirementRevision), useValue: requirementRevisionsRepository },
-                { provide: getRepositoryToken(RequirementReviewComment), useValue: reviewCommentsRepository },
+                {
+                    provide: getRepositoryToken(Requirement),
+                    useValue: requirementsRepository,
+                },
+                {
+                    provide: getRepositoryToken(RequirementRevision),
+                    useValue: requirementRevisionsRepository,
+                },
+                {
+                    provide: getRepositoryToken(RequirementReviewComment),
+                    useValue: reviewCommentsRepository,
+                },
+                {
+                    provide: getRepositoryToken(RequirementReviewCommentReply),
+                    useValue: reviewCommentRepliesRepository,
+                },
             ],
         }).compile();
 
         service = module.get<RequirementReviewsService>(RequirementReviewsService);
     });
 
+    it('derives the in-review and decision-pending states from main comment counts.', async () => {
+        requirementsRepository.findOne.mockResolvedValue(createRequirementEntity());
+        reviewCommentsRepository.count.mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+
+        await expect(service.getReviewSummary(PROJECT_ID, REQUIREMENT_ID)).resolves.toEqual({
+            commentCount: 2,
+            openCommentCount: 1,
+            state: RequirementReviewState.InReview,
+        });
+
+        reviewCommentsRepository.count.mockResolvedValueOnce(2).mockResolvedValueOnce(0);
+        await expect(service.getReviewSummary(PROJECT_ID, REQUIREMENT_ID)).resolves.toEqual({
+            commentCount: 2,
+            openCommentCount: 0,
+            state: RequirementReviewState.DecisionPending,
+        });
+    });
+
+    it('rejects replies to closed comments.', async () => {
+        requirementsRepository.findOne.mockResolvedValue(createRequirementEntity());
+        reviewCommentsRepository.findOne.mockResolvedValue(
+            createReviewCommentEntity({
+                status: RequirementReviewCommentStatus.Closed,
+            }),
+        );
+
+        await expect(
+            service.createReviewCommentReply(PROJECT_ID, REQUIREMENT_ID, COMMENT_ID, {
+                text: 'A late reply.',
+                author: 'Alice',
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(reviewCommentRepliesRepository.save).not.toHaveBeenCalled();
+    });
+
     it('creates an open review comment for the current requirement revision.', async () => {
         const requirement = createRequirementEntity({ revisionNumber: 2 });
-        const createdComment = createReviewCommentEntity({ id: undefined, createdForRevisionNumber: 2 });
-        const savedComment = createReviewCommentEntity({ createdForRevisionNumber: 2 });
+        const createdComment = createReviewCommentEntity({
+            id: undefined,
+            createdForRevisionNumber: 2,
+        });
+        const savedComment = createReviewCommentEntity({
+            createdForRevisionNumber: 2,
+        });
 
         requirementsRepository.findOne.mockResolvedValue(requirement);
         reviewCommentsRepository.create.mockReturnValue(createdComment);
@@ -148,7 +213,9 @@ describe('RequirementReviewsService', () => {
         reviewCommentsRepository.count.mockResolvedValue(1);
 
         await expect(
-            service.approveRequirement(PROJECT_ID, REQUIREMENT_ID, { reviewer: 'Jane Reviewer' }),
+            service.approveRequirement(PROJECT_ID, REQUIREMENT_ID, {
+                reviewer: 'Jane Reviewer',
+            }),
         ).rejects.toBeInstanceOf(BadRequestException);
 
         expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
@@ -163,7 +230,7 @@ describe('RequirementReviewsService', () => {
         reviewCommentsRepository.count.mockResolvedValue(0);
         requirementRevisionsRepository.create.mockReturnValue(revision);
         requirementRevisionsRepository.save.mockResolvedValue(revision);
-        requirementsRepository.save.mockImplementation((savedRequirement: Requirement) => Promise.resolve(savedRequirement));
+        requirementsRepository.save.mockResolvedValue(requirement);
 
         const result = await service.approveRequirement(PROJECT_ID, REQUIREMENT_ID, { reviewer: 'Jane Reviewer' });
 
@@ -181,7 +248,7 @@ describe('RequirementReviewsService', () => {
         requirementsRepository.findOne.mockResolvedValue(requirement);
         requirementRevisionsRepository.create.mockReturnValue(revision);
         requirementRevisionsRepository.save.mockResolvedValue(revision);
-        requirementsRepository.save.mockImplementation((savedRequirement: Requirement) => Promise.resolve(savedRequirement));
+        requirementsRepository.save.mockResolvedValue(requirement);
         reviewCommentsRepository.find.mockResolvedValue([comment]);
         reviewCommentsRepository.save.mockResolvedValue([comment]);
 

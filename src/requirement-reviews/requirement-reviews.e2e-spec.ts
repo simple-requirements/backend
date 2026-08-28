@@ -13,6 +13,15 @@ import { test, expect } from '@/projects/projects-api.e2e-fixtures';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import { RequirementReviewCommentCloseReason } from '@/requirement-reviews/requirement-review-comment-close-reason.enum';
 import { RequirementReviewCommentStatus } from '@/requirement-reviews/requirement-review-comment-status.enum';
+import { RequirementReviewState } from '@/requirement-reviews/requirement-review-state.enum';
+
+interface RequirementReviewCommentReplyResponseBody {
+    id: string;
+    commentId: string;
+    text: string;
+    author: string;
+    createdAt: string;
+}
 
 interface RequirementReviewCommentResponseBody {
     id: string;
@@ -28,6 +37,7 @@ interface RequirementReviewCommentResponseBody {
     closedAt: string | null;
     createdAt: string;
     updatedAt: string;
+    replies: RequirementReviewCommentReplyResponseBody[];
 }
 
 function expectReviewCommentResponseBody(
@@ -107,13 +117,54 @@ test.describe('Requirement reviews API - POST /projects/{projectId}/requirements
             closedInRevisionNumber: null,
         });
 
-        const listResponse = await request.get(`/projects/${project.id}/requirements/${requirement.id}/review-comments`);
+        const listResponse = await request.get(
+            `/projects/${project.id}/requirements/${requirement.id}/review-comments`,
+        );
 
         expect(listResponse.status()).toBe(200);
 
         const listedComments = (await listResponse.json()) as readonly RequirementReviewCommentResponseBody[];
 
         expect(listedComments.map((comment) => comment.id)).toContain(createdComment.id);
+    });
+
+    test('creates replies only while the main comment is open and reports the derived review state.', async ({
+        request,
+        api,
+    }) => {
+        const project = await api.createProject(`Playwright API review replies project ${randomUUID()}`);
+        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
+        const requirement = await api.createRequirement(project.id, category.id);
+        const createCommentResponse = await request.post(
+            `/projects/${project.id}/requirements/${requirement.id}/review-comments`,
+            { data: { text: 'Please clarify this.', author: 'Jane Reviewer' } },
+        );
+        const comment = (await createCommentResponse.json()) as RequirementReviewCommentResponseBody;
+        const replyResponse = await request.post(
+            `/projects/${project.id}/requirements/${requirement.id}/review-comments/${comment.id}/replies`,
+            { data: { text: 'The requirement has been clarified.', author: 'Alice Engineer' } },
+        );
+
+        expect(replyResponse.status()).toBe(201);
+        expect(await replyResponse.json()).toMatchObject({ commentId: comment.id, author: 'Alice Engineer' });
+
+        const summaryResponse = await request.get(
+            `/projects/${project.id}/requirements/${requirement.id}/review-summary`,
+        );
+        expect(await summaryResponse.json()).toEqual({
+            commentCount: 1,
+            openCommentCount: 1,
+            state: RequirementReviewState.InReview,
+        });
+
+        await request.patch(`/projects/${project.id}/requirements/${requirement.id}/review-comments/${comment.id}`, {
+            data: { closedBy: 'Jane Reviewer' },
+        });
+        const lateReplyResponse = await request.post(
+            `/projects/${project.id}/requirements/${requirement.id}/review-comments/${comment.id}/replies`,
+            { data: { text: 'A late reply.', author: 'Alice Engineer' } },
+        );
+        expect(lateReplyResponse.status()).toBe(400);
     });
 });
 
@@ -161,9 +212,12 @@ test.describe('Requirement reviews API - POST /projects/{projectId}/requirements
         );
         expect(createCommentResponse.status()).toBe(201);
 
-        const approveResponse = await request.post(`/projects/${project.id}/requirements/${requirement.id}/review/approve`, {
-            data: { reviewer: 'Jane Reviewer' },
-        });
+        const approveResponse = await request.post(
+            `/projects/${project.id}/requirements/${requirement.id}/review/approve`,
+            {
+                data: { reviewer: 'Jane Reviewer' },
+            },
+        );
 
         expect(approveResponse.status()).toBe(400);
 
@@ -192,9 +246,12 @@ test.describe('Requirement reviews API - POST /projects/{projectId}/requirements
         );
         expect(closeResponse.status()).toBe(200);
 
-        const approveResponse = await request.post(`/projects/${project.id}/requirements/${requirement.id}/review/approve`, {
-            data: { reviewer: 'Jane Reviewer' },
-        });
+        const approveResponse = await request.post(
+            `/projects/${project.id}/requirements/${requirement.id}/review/approve`,
+            {
+                data: { reviewer: 'Jane Reviewer' },
+            },
+        );
 
         expect(approveResponse.status()).toBe(200);
 
@@ -223,9 +280,12 @@ test.describe('Requirement reviews API - POST /projects/{projectId}/requirements
         );
         const comment = (await createCommentResponse.json()) as RequirementReviewCommentResponseBody;
 
-        const rejectResponse = await request.post(`/projects/${project.id}/requirements/${requirement.id}/review/reject`, {
-            data: { reviewer: 'Jane Reviewer', rejectionReason: 'The requirement is not testable.' },
-        });
+        const rejectResponse = await request.post(
+            `/projects/${project.id}/requirements/${requirement.id}/review/reject`,
+            {
+                data: { reviewer: 'Jane Reviewer', rejectionReason: 'The requirement is not testable.' },
+            },
+        );
 
         expect(rejectResponse.status()).toBe(200);
 
@@ -242,7 +302,9 @@ test.describe('Requirement reviews API - POST /projects/{projectId}/requirements
         expect(rejectedRequirement.rejectionReason).toBe('The requirement is not testable.');
         expect(rejectedRequirement.rejectedAt).not.toBeNull();
 
-        const listResponse = await request.get(`/projects/${project.id}/requirements/${requirement.id}/review-comments`);
+        const listResponse = await request.get(
+            `/projects/${project.id}/requirements/${requirement.id}/review-comments`,
+        );
         const listedComments = (await listResponse.json()) as readonly RequirementReviewCommentResponseBody[];
         const rejectedClosedComment = listedComments.find((listedComment) => listedComment.id === comment.id);
 

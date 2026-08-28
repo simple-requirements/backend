@@ -9,11 +9,16 @@ import { Requirement } from '@/projects/requirements.entity';
 import type { ApproveRequirementDto } from '@/requirement-reviews/dto/approve-requirement.dto';
 import type { CloseRequirementReviewCommentDto } from '@/requirement-reviews/dto/close-requirement-review-comment.dto';
 import type { CreateRequirementReviewCommentDto } from '@/requirement-reviews/dto/create-requirement-review-comment.dto';
+import type { CreateRequirementReviewCommentReplyDto } from '@/requirement-reviews/dto/create-requirement-review-comment-reply.dto';
+import type { RequirementReviewCommentReplyResponseDto } from '@/requirement-reviews/dto/requirement-review-comment-reply-response.dto';
 import type { RejectRequirementDto } from '@/requirement-reviews/dto/reject-requirement.dto';
 import type { RequirementReviewCommentResponseDto } from '@/requirement-reviews/dto/requirement-review-comment-response.dto';
+import type { RequirementReviewSummaryResponseDto } from '@/requirement-reviews/dto/requirement-review-summary-response.dto';
 import { RequirementReviewCommentCloseReason } from '@/requirement-reviews/requirement-review-comment-close-reason.enum';
 import { RequirementReviewCommentStatus } from '@/requirement-reviews/requirement-review-comment-status.enum';
 import { RequirementReviewComment } from '@/requirement-reviews/requirement-review-comment.entity';
+import { RequirementReviewCommentReply } from '@/requirement-reviews/requirement-review-comment-reply.entity';
+import { RequirementReviewState } from '@/requirement-reviews/requirement-review-state.enum';
 
 @Injectable()
 export class RequirementReviewsService {
@@ -26,20 +31,46 @@ export class RequirementReviewsService {
 
         @InjectRepository(RequirementReviewComment)
         private readonly reviewCommentsRepository: Repository<RequirementReviewComment>,
+
+        @InjectRepository(RequirementReviewCommentReply)
+        private readonly reviewCommentRepliesRepository: Repository<RequirementReviewCommentReply>,
     ) {}
 
-    async findAllReviewComments(
-        projectId: string,
-        requirementId: string,
-    ): Promise<RequirementReviewCommentResponseDto[]> {
+    async findAllReviewComments(projectId: string, requirementId: string): Promise<RequirementReviewCommentResponseDto[]> {
         await this.getRequirementOrThrow(projectId, requirementId);
 
         const comments = await this.reviewCommentsRepository.find({
             where: { projectId, requirementId },
-            order: { createdAt: 'ASC' },
+            relations: { replies: true },
+            order: { createdAt: 'ASC', replies: { createdAt: 'ASC' } },
         });
 
         return comments.map((comment) => this.toReviewCommentResponseDto(comment));
+    }
+
+    async getReviewSummary(projectId: string, requirementId: string): Promise<RequirementReviewSummaryResponseDto> {
+        await this.getRequirementOrThrow(projectId, requirementId);
+        const [commentCount, openCommentCount] = await Promise.all([
+            this.reviewCommentsRepository.count({
+                where: { projectId, requirementId },
+            }),
+            this.reviewCommentsRepository.count({
+                where: {
+                    projectId,
+                    requirementId,
+                    status: RequirementReviewCommentStatus.Open,
+                },
+            }),
+        ]);
+
+        let state = RequirementReviewState.DecisionPending;
+        if (commentCount === 0) {
+            state = RequirementReviewState.NotStarted;
+        } else if (openCommentCount > 0) {
+            state = RequirementReviewState.InReview;
+        }
+
+        return { commentCount, openCommentCount, state };
     }
 
     async createReviewComment(
@@ -66,6 +97,28 @@ export class RequirementReviewsService {
         return this.toReviewCommentResponseDto(savedComment);
     }
 
+    async createReviewCommentReply(
+        projectId: string,
+        requirementId: string,
+        commentId: string,
+        createReplyDto: CreateRequirementReviewCommentReplyDto,
+    ): Promise<RequirementReviewCommentReplyResponseDto> {
+        await this.getReviewableDraftRequirement(projectId, requirementId);
+        const comment = await this.getReviewCommentOrThrow(projectId, requirementId, commentId);
+
+        if (comment.status !== RequirementReviewCommentStatus.Open) {
+            throw new BadRequestException('Replies cannot be added to a closed review comment.');
+        }
+
+        const reply = this.reviewCommentRepliesRepository.create({
+            commentId,
+            text: createReplyDto.text,
+            author: createReplyDto.author,
+        });
+
+        return this.toReviewCommentReplyResponseDto(await this.reviewCommentRepliesRepository.save(reply));
+    }
+
     async closeReviewComment(
         projectId: string,
         requirementId: string,
@@ -90,14 +143,14 @@ export class RequirementReviewsService {
         return this.toReviewCommentResponseDto(savedComment);
     }
 
-    async approveRequirement(
-        projectId: string,
-        requirementId: string,
-        approveRequirementDto: ApproveRequirementDto,
-    ): Promise<RequirementResponseDto> {
+    async approveRequirement(projectId: string, requirementId: string, approveRequirementDto: ApproveRequirementDto): Promise<RequirementResponseDto> {
         const requirement = await this.getReviewableDraftRequirement(projectId, requirementId);
         const openCommentCount = await this.reviewCommentsRepository.count({
-            where: { projectId, requirementId, status: RequirementReviewCommentStatus.Open },
+            where: {
+                projectId,
+                requirementId,
+                status: RequirementReviewCommentStatus.Open,
+            },
         });
 
         if (openCommentCount > 0) {
@@ -113,6 +166,7 @@ export class RequirementReviewsService {
         requirement.rejectedAt = null;
         requirement.approvedAt = new Date();
         requirement.implementedAt = null;
+        requirement.obsoletedBy = null;
         requirement.obsolescenceReason = null;
         requirement.obsoleteAt = null;
 
@@ -121,11 +175,7 @@ export class RequirementReviewsService {
         return this.toRequirementResponseDto(savedRequirement);
     }
 
-    async rejectRequirement(
-        projectId: string,
-        requirementId: string,
-        rejectRequirementDto: RejectRequirementDto,
-    ): Promise<RequirementResponseDto> {
+    async rejectRequirement(projectId: string, requirementId: string, rejectRequirementDto: RejectRequirementDto): Promise<RequirementResponseDto> {
         const requirement = await this.getReviewableDraftRequirement(projectId, requirementId);
 
         await this.storeCurrentRequirementRevision(requirement);
@@ -137,6 +187,7 @@ export class RequirementReviewsService {
         requirement.rejectedAt = new Date();
         requirement.approvedAt = null;
         requirement.implementedAt = null;
+        requirement.obsoletedBy = null;
         requirement.obsolescenceReason = null;
         requirement.obsoleteAt = null;
 
@@ -151,9 +202,7 @@ export class RequirementReviewsService {
         const requirement = await this.getRequirementOrThrow(projectId, requirementId);
 
         if (requirement.deletedAt !== null) {
-            throw new BadRequestException(
-                `Requirement with id "${requirementId}" is in the recycle bin and cannot be reviewed.`,
-            );
+            throw new BadRequestException(`Requirement with id "${requirementId}" is in the recycle bin and cannot be reviewed.`);
         }
 
         if (requirement.status !== RequirementStatus.Draft) {
@@ -164,41 +213,36 @@ export class RequirementReviewsService {
     }
 
     private async getRequirementOrThrow(projectId: string, requirementId: string): Promise<Requirement> {
-        const requirement = await this.requirementsRepository.findOne({ where: { id: requirementId, projectId } });
+        const requirement = await this.requirementsRepository.findOne({
+            where: { id: requirementId, projectId },
+        });
 
         if (requirement === null) {
-            throw new NotFoundException(
-                `Requirement with id "${requirementId}" in project "${projectId}" was not found.`,
-            );
+            throw new NotFoundException(`Requirement with id "${requirementId}" in project "${projectId}" was not found.`);
         }
 
         return requirement;
     }
 
-    private async getReviewCommentOrThrow(
-        projectId: string,
-        requirementId: string,
-        commentId: string,
-    ): Promise<RequirementReviewComment> {
-        const comment = await this.reviewCommentsRepository.findOne({ where: { id: commentId, projectId, requirementId } });
+    private async getReviewCommentOrThrow(projectId: string, requirementId: string, commentId: string): Promise<RequirementReviewComment> {
+        const comment = await this.reviewCommentsRepository.findOne({
+            where: { id: commentId, projectId, requirementId },
+        });
 
         if (comment === null) {
-            throw new NotFoundException(
-                `Review comment with id "${commentId}" for requirement "${requirementId}" in project "${projectId}" was not found.`,
-            );
+            throw new NotFoundException(`Review comment with id "${commentId}" for requirement "${requirementId}" in project "${projectId}" was not found.`);
         }
 
         return comment;
     }
 
-    private async closeOpenCommentsAfterRejection(
-        projectId: string,
-        requirementId: string,
-        revisionNumber: number,
-        reviewer: string,
-    ): Promise<void> {
+    private async closeOpenCommentsAfterRejection(projectId: string, requirementId: string, revisionNumber: number, reviewer: string): Promise<void> {
         const openComments = await this.reviewCommentsRepository.find({
-            where: { projectId, requirementId, status: RequirementReviewCommentStatus.Open },
+            where: {
+                projectId,
+                requirementId,
+                status: RequirementReviewCommentStatus.Open,
+            },
         });
 
         if (openComments.length === 0) {
@@ -234,6 +278,8 @@ export class RequirementReviewsService {
             source: requirement.source,
             rejectionReason: requirement.rejectionReason,
             reviewer: requirement.reviewer,
+            obsoletedBy: requirement.obsoletedBy,
+            implementationTickets: requirement.implementationTickets.map(({ id, ticketId, completedBy, completedAt }) => ({ id, ticketId, completedBy, completedAt })),
             rejectedAt: requirement.rejectedAt,
             deletedAt: requirement.deletedAt,
             approvedAt: requirement.approvedAt,
@@ -262,6 +308,17 @@ export class RequirementReviewsService {
             closedAt: comment.closedAt,
             createdAt: comment.createdAt,
             updatedAt: comment.updatedAt,
+            replies: (comment.replies ?? []).map((reply) => this.toReviewCommentReplyResponseDto(reply)),
+        };
+    }
+
+    private toReviewCommentReplyResponseDto(reply: RequirementReviewCommentReply): RequirementReviewCommentReplyResponseDto {
+        return {
+            id: reply.id,
+            commentId: reply.commentId,
+            text: reply.text,
+            author: reply.author,
+            createdAt: reply.createdAt,
         };
     }
 
@@ -281,6 +338,8 @@ export class RequirementReviewsService {
             source: requirement.source,
             rejectionReason: requirement.rejectionReason,
             reviewer: requirement.reviewer,
+            obsoletedBy: requirement.obsoletedBy,
+            implementationTickets: [],
             rejectedAt: requirement.rejectedAt,
             deletedAt: requirement.deletedAt,
             approvedAt: requirement.approvedAt,

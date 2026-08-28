@@ -13,6 +13,7 @@ import { Project } from '@/projects/projects.entity';
 import { RequirementRevision } from '@/projects/requirement-revisions.entity';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import { Requirement } from '@/projects/requirements.entity';
+import { RequirementImplementationTicket } from '@/projects/requirement-implementation-ticket.entity';
 import { ProjectsService } from '@/projects/projects.service';
 import { CategoryType } from '@/projects/category-type.enum';
 
@@ -47,6 +48,8 @@ interface RequirementRevisionsRepositoryMock {
     save: ReturnType<typeof vi.fn>;
 }
 
+type ImplementationTicketsRepositoryMock = RequirementsRepositoryMock;
+
 const PROJECT_ID = '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b';
 const CATEGORY_ID = '2d7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d10';
 const REQUIREMENT_ID = '3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11';
@@ -79,11 +82,23 @@ function createCategoryEntity(overrides: Partial<Category> = {}): Category {
 }
 
 function createCreateCategoryDto(overrides: Partial<CreateCategoryDto> = {}): CreateCategoryDto {
-    return { name: 'Authentication', key: 'AUTH', type: CategoryType.FR, ...overrides };
+    return {
+        name: 'Authentication',
+        key: 'AUTH',
+        type: CategoryType.FR,
+        ...overrides,
+    };
 }
 
+// Separate factory keeps create/update DTO tests type-safe although their current shapes match.
+// eslint-disable-next-line sonarjs/no-identical-functions
 function createUpdateCategoryDto(overrides: Partial<UpdateCategoryDto> = {}): UpdateCategoryDto {
-    return { name: 'Authentication', key: 'AUTH', type: CategoryType.FR, ...overrides };
+    return {
+        name: 'Authentication',
+        key: 'AUTH',
+        type: CategoryType.FR,
+        ...overrides,
+    };
 }
 
 function createRequirementEntity(overrides: Partial<Requirement> = {}): Requirement {
@@ -103,6 +118,7 @@ function createRequirementEntity(overrides: Partial<Requirement> = {}): Requirem
     requirement.source = 'Workshop';
     requirement.rejectionReason = null;
     requirement.reviewer = null;
+    requirement.obsoletedBy = null;
     requirement.rejectedAt = null;
     requirement.deletedAt = null;
     requirement.approvedAt = null;
@@ -112,6 +128,8 @@ function createRequirementEntity(overrides: Partial<Requirement> = {}): Requirem
     requirement.createdAt = new Date('2026-06-28T10:00:00.000Z');
     requirement.updatedAt = new Date('2026-06-28T10:00:00.000Z');
     requirement.revisions = [];
+    requirement.implementationTickets = [];
+    requirement.project = createProjectEntity();
 
     return Object.assign(requirement, overrides);
 }
@@ -134,6 +152,7 @@ function createRequirementRevisionEntity(overrides: Partial<RequirementRevision>
     revision.source = 'Workshop';
     revision.rejectionReason = null;
     revision.reviewer = null;
+    revision.obsoletedBy = null;
     revision.rejectedAt = null;
     revision.deletedAt = null;
     revision.approvedAt = null;
@@ -142,12 +161,18 @@ function createRequirementRevisionEntity(overrides: Partial<RequirementRevision>
     revision.obsoleteAt = null;
     revision.createdAt = new Date('2026-06-28T10:00:00.000Z');
     revision.updatedAt = new Date('2026-06-28T10:00:00.000Z');
+    revision.implementationTickets = [];
 
     return Object.assign(revision, overrides);
 }
 
 function createCreateRequirementDto(overrides: Partial<CreateRequirementDto> = {}): CreateRequirementDto {
-    return { categoryId: CATEGORY_ID, description: 'Users must sign in.', priority: 'p1', ...overrides };
+    return {
+        categoryId: CATEGORY_ID,
+        description: 'Users must sign in.',
+        priority: 'p1',
+        ...overrides,
+    };
 }
 
 function createUpdateRequirementDto(overrides: Partial<UpdateRequirementDto> = {}): UpdateRequirementDto {
@@ -160,20 +185,63 @@ describe('ProjectsService', () => {
     let categoriesRepository: CategoriesRepositoryMock;
     let requirementsRepository: RequirementsRepositoryMock;
     let requirementRevisionsRepository: RequirementRevisionsRepositoryMock;
+    let implementationTicketsRepository: ImplementationTicketsRepositoryMock;
 
     beforeEach(async () => {
-        projectsRepository = { create: vi.fn(), delete: vi.fn(), find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
-        categoriesRepository = { create: vi.fn(), delete: vi.fn(), find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
-        requirementsRepository = { create: vi.fn(), delete: vi.fn(), find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
-        requirementRevisionsRepository = { create: vi.fn(), find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
+        projectsRepository = {
+            create: vi.fn(),
+            delete: vi.fn(),
+            find: vi.fn(),
+            findOne: vi.fn(),
+            save: vi.fn(),
+        };
+        categoriesRepository = {
+            create: vi.fn(),
+            delete: vi.fn(),
+            find: vi.fn(),
+            findOne: vi.fn(),
+            save: vi.fn(),
+        };
+        requirementsRepository = {
+            create: vi.fn(),
+            delete: vi.fn(),
+            find: vi.fn(),
+            findOne: vi.fn(),
+            save: vi.fn(),
+        };
+        requirementRevisionsRepository = {
+            create: vi.fn(),
+            find: vi.fn(),
+            findOne: vi.fn(),
+            save: vi.fn(),
+        };
+        implementationTicketsRepository = {
+            create: vi.fn(),
+            delete: vi.fn(),
+            findOne: vi.fn(),
+            save: vi.fn(),
+        };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 ProjectsService,
                 { provide: getRepositoryToken(Project), useValue: projectsRepository },
-                { provide: getRepositoryToken(Category), useValue: categoriesRepository },
-                { provide: getRepositoryToken(Requirement), useValue: requirementsRepository },
-                { provide: getRepositoryToken(RequirementRevision), useValue: requirementRevisionsRepository },
+                {
+                    provide: getRepositoryToken(Category),
+                    useValue: categoriesRepository,
+                },
+                {
+                    provide: getRepositoryToken(Requirement),
+                    useValue: requirementsRepository,
+                },
+                {
+                    provide: getRepositoryToken(RequirementRevision),
+                    useValue: requirementRevisionsRepository,
+                },
+                {
+                    provide: getRepositoryToken(RequirementImplementationTicket),
+                    useValue: implementationTicketsRepository,
+                },
             ],
         }).compile();
 
@@ -182,13 +250,18 @@ describe('ProjectsService', () => {
 
     describe('finds', () => {
         it('a project by id.', async () => {
-            const project = createProjectEntity({ id: PROJECT_ID, name: 'Test project' });
+            const project = createProjectEntity({
+                id: PROJECT_ID,
+                name: 'Test project',
+            });
 
             projectsRepository.findOne.mockResolvedValue(project);
 
             const result = await service.findOne(PROJECT_ID);
 
-            expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+            expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                where: { id: PROJECT_ID },
+            });
             expect(result).toEqual({
                 id: PROJECT_ID,
                 name: 'Test project',
@@ -202,7 +275,9 @@ describe('ProjectsService', () => {
 
             await expect(service.findOne(PROJECT_ID)).rejects.toBeInstanceOf(NotFoundException);
 
-            expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+            expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                where: { id: PROJECT_ID },
+            });
         });
 
         it('all projects ordered by name.', async () => {
@@ -220,7 +295,9 @@ describe('ProjectsService', () => {
 
             const result = await service.findAll();
 
-            expect(projectsRepository.find).toHaveBeenCalledWith({ order: { name: 'ASC' } });
+            expect(projectsRepository.find).toHaveBeenCalledWith({
+                order: { name: 'ASC' },
+            });
 
             expect(result).toEqual([
                 {
@@ -255,7 +332,10 @@ describe('ProjectsService', () => {
 
             const result = await service.create({ name: 'Test project' });
 
-            expect(projectsRepository.create).toHaveBeenCalledWith({ name: 'Test project' });
+            expect(projectsRepository.create).toHaveBeenCalledWith({
+                name: 'Test project',
+                ticketUrlTemplate: null,
+            });
             expect(projectsRepository.save).toHaveBeenCalledWith(createdProject);
 
             expect(result).toEqual({
@@ -271,7 +351,10 @@ describe('ProjectsService', () => {
         it('a project.', async () => {
             const projectId = '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b';
 
-            const existingProject = createProjectEntity({ id: projectId, name: 'Old project name' });
+            const existingProject = createProjectEntity({
+                id: projectId,
+                name: 'Old project name',
+            });
 
             const savedProject = createProjectEntity({
                 id: projectId,
@@ -282,9 +365,13 @@ describe('ProjectsService', () => {
             projectsRepository.findOne.mockResolvedValue(existingProject);
             projectsRepository.save.mockResolvedValue(savedProject);
 
-            const result = await service.update(projectId, { name: 'New project name' });
+            const result = await service.update(projectId, {
+                name: 'New project name',
+            });
 
-            expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: projectId } });
+            expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                where: { id: projectId },
+            });
             expect(existingProject.name).toBe('New project name');
             expect(projectsRepository.save).toHaveBeenCalledWith(existingProject);
 
@@ -301,11 +388,11 @@ describe('ProjectsService', () => {
 
             projectsRepository.findOne.mockResolvedValue(null);
 
-            await expect(service.update(projectId, { name: 'New project name' })).rejects.toBeInstanceOf(
-                NotFoundException,
-            );
+            await expect(service.update(projectId, { name: 'New project name' })).rejects.toBeInstanceOf(NotFoundException);
 
-            expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: projectId } });
+            expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                where: { id: projectId },
+            });
             expect(projectsRepository.save).not.toHaveBeenCalled();
         });
     });
@@ -354,7 +441,9 @@ describe('ProjectsService', () => {
 
                 const result = await service.findAllCategories(PROJECT_ID);
 
-                expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+                expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                    where: { id: PROJECT_ID },
+                });
                 expect(categoriesRepository.find).toHaveBeenCalledWith({
                     where: { projectId: PROJECT_ID },
                     order: { name: 'ASC' },
@@ -388,7 +477,9 @@ describe('ProjectsService', () => {
 
                 const result = await service.findAllCategories(PROJECT_ID);
 
-                expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+                expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                    where: { id: PROJECT_ID },
+                });
                 expect(categoriesRepository.find).toHaveBeenCalledWith({
                     where: { projectId: PROJECT_ID },
                     order: { name: 'ASC' },
@@ -403,7 +494,9 @@ describe('ProjectsService', () => {
 
                     await expect(service.findAllCategories(PROJECT_ID)).rejects.toBeInstanceOf(NotFoundException);
 
-                    expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+                    expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                        where: { id: PROJECT_ID },
+                    });
                     expect(categoriesRepository.find).not.toHaveBeenCalled();
                 });
             });
@@ -426,7 +519,9 @@ describe('ProjectsService', () => {
 
                 const result = await service.createCategory(PROJECT_ID, createCreateCategoryDto());
 
-                expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+                expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                    where: { id: PROJECT_ID },
+                });
                 expect(categoriesRepository.create).toHaveBeenCalledWith({
                     projectId: PROJECT_ID,
                     name: 'Authentication',
@@ -450,11 +545,11 @@ describe('ProjectsService', () => {
                 it('NotFoundException when the project does not exist.', async () => {
                     projectsRepository.findOne.mockResolvedValue(null);
 
-                    await expect(service.createCategory(PROJECT_ID, createCreateCategoryDto())).rejects.toBeInstanceOf(
-                        NotFoundException,
-                    );
+                    await expect(service.createCategory(PROJECT_ID, createCreateCategoryDto())).rejects.toBeInstanceOf(NotFoundException);
 
-                    expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+                    expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                        where: { id: PROJECT_ID },
+                    });
                     expect(categoriesRepository.findOne).not.toHaveBeenCalled();
                     expect(categoriesRepository.create).not.toHaveBeenCalled();
                     expect(categoriesRepository.save).not.toHaveBeenCalled();
@@ -469,9 +564,7 @@ describe('ProjectsService', () => {
                     projectsRepository.findOne.mockResolvedValue(createProjectEntity());
                     categoriesRepository.findOne.mockResolvedValueOnce(duplicateCategory);
 
-                    await expect(service.createCategory(PROJECT_ID, createCreateCategoryDto())).rejects.toBeInstanceOf(
-                        BadRequestException,
-                    );
+                    await expect(service.createCategory(PROJECT_ID, createCreateCategoryDto())).rejects.toBeInstanceOf(BadRequestException);
 
                     expect(categoriesRepository.findOne).toHaveBeenCalledWith({
                         where: { projectId: PROJECT_ID, name: 'Authentication' },
@@ -490,9 +583,7 @@ describe('ProjectsService', () => {
                     projectsRepository.findOne.mockResolvedValue(createProjectEntity());
                     categoriesRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(duplicateCategory);
 
-                    await expect(service.createCategory(PROJECT_ID, createCreateCategoryDto())).rejects.toBeInstanceOf(
-                        BadRequestException,
-                    );
+                    await expect(service.createCategory(PROJECT_ID, createCreateCategoryDto())).rejects.toBeInstanceOf(BadRequestException);
 
                     expect(categoriesRepository.findOne).toHaveBeenCalledWith({
                         where: { projectId: PROJECT_ID, name: 'Authentication' },
@@ -518,13 +609,19 @@ describe('ProjectsService', () => {
                 categoriesRepository.findOne.mockResolvedValueOnce(existingCategory).mockResolvedValueOnce(null);
                 categoriesRepository.save.mockResolvedValue(savedCategory);
 
-                const result = await service.updateCategory(PROJECT_ID, CATEGORY_ID, { name: 'New name' });
+                const result = await service.updateCategory(PROJECT_ID, CATEGORY_ID, {
+                    name: 'New name',
+                });
 
                 expect(categoriesRepository.findOne).toHaveBeenCalledWith({
                     where: { id: CATEGORY_ID, projectId: PROJECT_ID },
                 });
                 expect(categoriesRepository.findOne).toHaveBeenCalledWith({
-                    where: { projectId: PROJECT_ID, name: 'New name', id: Not(CATEGORY_ID) },
+                    where: {
+                        projectId: PROJECT_ID,
+                        name: 'New name',
+                        id: Not(CATEGORY_ID),
+                    },
                 });
                 expect(existingCategory.name).toBe('New name');
                 expect(categoriesRepository.save).toHaveBeenCalledWith(existingCategory);
@@ -558,7 +655,9 @@ describe('ProjectsService', () => {
             });
 
             it('updates the category type.', async () => {
-                const existingCategory = createCategoryEntity({ type: CategoryType.FR });
+                const existingCategory = createCategoryEntity({
+                    type: CategoryType.FR,
+                });
                 const savedCategory = createCategoryEntity({
                     type: CategoryType.NFR,
                     updatedAt: new Date('2026-06-28T11:00:00.000Z'),
@@ -568,14 +667,20 @@ describe('ProjectsService', () => {
                 categoriesRepository.findOne.mockResolvedValueOnce(existingCategory);
                 categoriesRepository.save.mockResolvedValue(savedCategory);
 
-                await service.updateCategory(PROJECT_ID, CATEGORY_ID, { type: CategoryType.NFR });
+                await service.updateCategory(PROJECT_ID, CATEGORY_ID, {
+                    type: CategoryType.NFR,
+                });
 
                 expect(existingCategory.type).toBe(CategoryType.NFR);
                 expect(categoriesRepository.save).toHaveBeenCalledWith(existingCategory);
             });
 
             it('updates name, key, and type together.', async () => {
-                const existingCategory = createCategoryEntity({ name: 'Old name', key: 'OLD', type: CategoryType.FR });
+                const existingCategory = createCategoryEntity({
+                    name: 'Old name',
+                    key: 'OLD',
+                    type: CategoryType.FR,
+                });
 
                 const savedCategory = createCategoryEntity({
                     name: 'New name',
@@ -585,16 +690,17 @@ describe('ProjectsService', () => {
                 });
 
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                categoriesRepository.findOne
-                    .mockResolvedValueOnce(existingCategory)
-                    .mockResolvedValueOnce(null)
-                    .mockResolvedValueOnce(null);
+                categoriesRepository.findOne.mockResolvedValueOnce(existingCategory).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
                 categoriesRepository.save.mockResolvedValue(savedCategory);
 
                 const result = await service.updateCategory(
                     PROJECT_ID,
                     CATEGORY_ID,
-                    createUpdateCategoryDto({ name: 'New name', key: 'NEW', type: CategoryType.NFR }),
+                    createUpdateCategoryDto({
+                        name: 'New name',
+                        key: 'NEW',
+                        type: CategoryType.NFR,
+                    }),
                 );
 
                 expect(existingCategory.name).toBe('New name');
@@ -614,20 +720,16 @@ describe('ProjectsService', () => {
             });
 
             it('allows keeping the same name and key on the same category.', async () => {
-                const existingCategory = createCategoryEntity({ name: 'Authentication', key: 'AUTH' });
+                const existingCategory = createCategoryEntity({
+                    name: 'Authentication',
+                    key: 'AUTH',
+                });
 
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                categoriesRepository.findOne
-                    .mockResolvedValueOnce(existingCategory)
-                    .mockResolvedValueOnce(null)
-                    .mockResolvedValueOnce(null);
+                categoriesRepository.findOne.mockResolvedValueOnce(existingCategory).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
                 categoriesRepository.save.mockResolvedValue(existingCategory);
 
-                await service.updateCategory(
-                    PROJECT_ID,
-                    CATEGORY_ID,
-                    createUpdateCategoryDto({ name: 'Authentication', key: 'AUTH' }),
-                );
+                await service.updateCategory(PROJECT_ID, CATEGORY_ID, createUpdateCategoryDto({ name: 'Authentication', key: 'AUTH' }));
 
                 expect(categoriesRepository.save).toHaveBeenCalledWith(existingCategory);
             });
@@ -636,11 +738,11 @@ describe('ProjectsService', () => {
                 it('NotFoundException when the project does not exist.', async () => {
                     projectsRepository.findOne.mockResolvedValue(null);
 
-                    await expect(
-                        service.updateCategory(PROJECT_ID, CATEGORY_ID, createUpdateCategoryDto()),
-                    ).rejects.toBeInstanceOf(NotFoundException);
+                    await expect(service.updateCategory(PROJECT_ID, CATEGORY_ID, createUpdateCategoryDto())).rejects.toBeInstanceOf(NotFoundException);
 
-                    expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+                    expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                        where: { id: PROJECT_ID },
+                    });
                     expect(categoriesRepository.findOne).not.toHaveBeenCalled();
                     expect(categoriesRepository.save).not.toHaveBeenCalled();
                 });
@@ -649,9 +751,7 @@ describe('ProjectsService', () => {
                     projectsRepository.findOne.mockResolvedValue(createProjectEntity());
                     categoriesRepository.findOne.mockResolvedValue(null);
 
-                    await expect(
-                        service.updateCategory(PROJECT_ID, CATEGORY_ID, createUpdateCategoryDto()),
-                    ).rejects.toBeInstanceOf(NotFoundException);
+                    await expect(service.updateCategory(PROJECT_ID, CATEGORY_ID, createUpdateCategoryDto())).rejects.toBeInstanceOf(NotFoundException);
 
                     expect(categoriesRepository.findOne).toHaveBeenCalledWith({
                         where: { id: CATEGORY_ID, projectId: PROJECT_ID },
@@ -660,7 +760,10 @@ describe('ProjectsService', () => {
                 });
 
                 it('BadRequestException when the updated name already exists in the same project.', async () => {
-                    const existingCategory = createCategoryEntity({ id: CATEGORY_ID, name: 'Authentication' });
+                    const existingCategory = createCategoryEntity({
+                        id: CATEGORY_ID,
+                        name: 'Authentication',
+                    });
 
                     const duplicateCategory = createCategoryEntity({
                         id: '2d7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d12',
@@ -668,19 +771,22 @@ describe('ProjectsService', () => {
                     });
 
                     projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                    categoriesRepository.findOne
-                        .mockResolvedValueOnce(existingCategory)
-                        .mockResolvedValueOnce(duplicateCategory);
+                    categoriesRepository.findOne.mockResolvedValueOnce(existingCategory).mockResolvedValueOnce(duplicateCategory);
 
                     await expect(
-                        service.updateCategory(PROJECT_ID, CATEGORY_ID, { name: 'Security' }),
+                        service.updateCategory(PROJECT_ID, CATEGORY_ID, {
+                            name: 'Security',
+                        }),
                     ).rejects.toBeInstanceOf(BadRequestException);
 
                     expect(categoriesRepository.save).not.toHaveBeenCalled();
                 });
 
                 it('BadRequestException when the updated key already exists in the same project.', async () => {
-                    const existingCategory = createCategoryEntity({ id: CATEGORY_ID, key: 'AUTH' });
+                    const existingCategory = createCategoryEntity({
+                        id: CATEGORY_ID,
+                        key: 'AUTH',
+                    });
 
                     const duplicateCategory = createCategoryEntity({
                         id: '2d7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d12',
@@ -688,13 +794,9 @@ describe('ProjectsService', () => {
                     });
 
                     projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                    categoriesRepository.findOne
-                        .mockResolvedValueOnce(existingCategory)
-                        .mockResolvedValueOnce(duplicateCategory);
+                    categoriesRepository.findOne.mockResolvedValueOnce(existingCategory).mockResolvedValueOnce(duplicateCategory);
 
-                    await expect(
-                        service.updateCategory(PROJECT_ID, CATEGORY_ID, { key: 'SEC' }),
-                    ).rejects.toBeInstanceOf(BadRequestException);
+                    await expect(service.updateCategory(PROJECT_ID, CATEGORY_ID, { key: 'SEC' })).rejects.toBeInstanceOf(BadRequestException);
 
                     expect(categoriesRepository.save).not.toHaveBeenCalled();
                 });
@@ -708,19 +810,24 @@ describe('ProjectsService', () => {
 
                 await service.deleteCategory(PROJECT_ID, CATEGORY_ID);
 
-                expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
-                expect(categoriesRepository.delete).toHaveBeenCalledWith({ id: CATEGORY_ID, projectId: PROJECT_ID });
+                expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                    where: { id: PROJECT_ID },
+                });
+                expect(categoriesRepository.delete).toHaveBeenCalledWith({
+                    id: CATEGORY_ID,
+                    projectId: PROJECT_ID,
+                });
             });
 
             describe('throws', () => {
                 it('NotFoundException when the project does not exist.', async () => {
                     projectsRepository.findOne.mockResolvedValue(null);
 
-                    await expect(service.deleteCategory(PROJECT_ID, CATEGORY_ID)).rejects.toBeInstanceOf(
-                        NotFoundException,
-                    );
+                    await expect(service.deleteCategory(PROJECT_ID, CATEGORY_ID)).rejects.toBeInstanceOf(NotFoundException);
 
-                    expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+                    expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                        where: { id: PROJECT_ID },
+                    });
                     expect(categoriesRepository.delete).not.toHaveBeenCalled();
                 });
 
@@ -728,9 +835,7 @@ describe('ProjectsService', () => {
                     projectsRepository.findOne.mockResolvedValue(createProjectEntity());
                     categoriesRepository.delete.mockResolvedValue({ affected: 0 });
 
-                    await expect(service.deleteCategory(PROJECT_ID, CATEGORY_ID)).rejects.toBeInstanceOf(
-                        NotFoundException,
-                    );
+                    await expect(service.deleteCategory(PROJECT_ID, CATEGORY_ID)).rejects.toBeInstanceOf(NotFoundException);
 
                     expect(categoriesRepository.delete).toHaveBeenCalledWith({
                         id: CATEGORY_ID,
@@ -745,7 +850,10 @@ describe('ProjectsService', () => {
         describe('createRequirement', () => {
             it('creates a draft requirement with an allocated visible key.', async () => {
                 const project = createProjectEntity();
-                const category = createCategoryEntity({ type: CategoryType.NFR, key: 'PERF' });
+                const category = createCategoryEntity({
+                    type: CategoryType.NFR,
+                    key: 'PERF',
+                });
                 const createdRequirement = createRequirementEntity({
                     id: undefined,
                     categoryId: category.id,
@@ -762,6 +870,7 @@ describe('ProjectsService', () => {
                     visibleKey: 'NFR-PERF-0001',
                     revisionNumber: 1,
                     status: RequirementStatus.Draft,
+                    implementationTickets: undefined,
                 });
 
                 projectsRepository.findOne.mockResolvedValue(project);
@@ -772,10 +881,16 @@ describe('ProjectsService', () => {
 
                 const result = await service.createRequirement(
                     PROJECT_ID,
-                    createCreateRequirementDto({ categoryId: CATEGORY_ID, description: 'Fast search', priority: 'p2' }),
+                    createCreateRequirementDto({
+                        categoryId: CATEGORY_ID,
+                        description: 'Fast search',
+                        priority: 'p2',
+                    }),
                 );
 
-                expect(projectsRepository.findOne).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+                expect(projectsRepository.findOne).toHaveBeenCalledWith({
+                    where: { id: PROJECT_ID },
+                });
                 expect(categoriesRepository.findOne).toHaveBeenCalledWith({
                     where: { id: CATEGORY_ID, projectId: PROJECT_ID },
                 });
@@ -797,25 +912,26 @@ describe('ProjectsService', () => {
                     source: null,
                     rejectionReason: null,
                     reviewer: null,
+                    obsoletedBy: null,
                     rejectedAt: null,
                     deletedAt: null,
                     approvedAt: null,
                     implementedAt: null,
                     obsolescenceReason: null,
                     obsoleteAt: null,
+                    implementationTickets: [],
                 });
                 expect(requirementsRepository.save).toHaveBeenCalledWith(createdRequirement);
                 expect(result.visibleKey).toBe('NFR-PERF-0001');
                 expect(result.status).toBe(RequirementStatus.Draft);
+                expect(result.implementationTickets).toEqual([]);
             });
 
             it('throws NotFoundException if the category belongs to another project.', async () => {
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
                 categoriesRepository.findOne.mockResolvedValue(null);
 
-                await expect(
-                    service.createRequirement(PROJECT_ID, createCreateRequirementDto()),
-                ).rejects.toBeInstanceOf(NotFoundException);
+                await expect(service.createRequirement(PROJECT_ID, createCreateRequirementDto())).rejects.toBeInstanceOf(NotFoundException);
 
                 expect(requirementsRepository.create).not.toHaveBeenCalled();
                 expect(requirementsRepository.save).not.toHaveBeenCalled();
@@ -824,7 +940,9 @@ describe('ProjectsService', () => {
 
         describe('findAllRequirements', () => {
             it('lists visible requirements sorted by visible key.', async () => {
-                const firstRequirement = createRequirementEntity({ visibleKey: 'FR-AUTH-0001' });
+                const firstRequirement = createRequirementEntity({
+                    visibleKey: 'FR-AUTH-0001',
+                });
                 const secondRequirement = createRequirementEntity({
                     id: '4a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d12',
                     visibleKey: 'FR-AUTH-0002',
@@ -846,7 +964,10 @@ describe('ProjectsService', () => {
 
         describe('findRequirement', () => {
             it('returns the current requirement when no revision query is provided.', async () => {
-                const requirement = createRequirementEntity({ revisionNumber: 3, description: 'Current text.' });
+                const requirement = createRequirementEntity({
+                    revisionNumber: 3,
+                    description: 'Current text.',
+                });
 
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
                 requirementsRepository.findOne.mockResolvedValue(requirement);
@@ -857,11 +978,17 @@ describe('ProjectsService', () => {
                     where: { id: REQUIREMENT_ID, projectId: PROJECT_ID },
                 });
                 expect(requirementRevisionsRepository.findOne).not.toHaveBeenCalled();
-                expect(result).toMatchObject({ id: REQUIREMENT_ID, revisionNumber: 3, description: 'Current text.' });
+                expect(result).toMatchObject({
+                    id: REQUIREMENT_ID,
+                    revisionNumber: 3,
+                    description: 'Current text.',
+                });
             });
 
             it('returns a stored requirement revision by revision number.', async () => {
-                const currentRequirement = createRequirementEntity({ revisionNumber: 3 });
+                const currentRequirement = createRequirementEntity({
+                    revisionNumber: 3,
+                });
                 const revision = createRequirementRevisionEntity({
                     revisionNumber: 2,
                     status: RequirementStatus.Approved,
@@ -877,7 +1004,11 @@ describe('ProjectsService', () => {
                 });
 
                 expect(requirementRevisionsRepository.findOne).toHaveBeenCalledWith({
-                    where: { requirementId: REQUIREMENT_ID, projectId: PROJECT_ID, revisionNumber: 2 },
+                    where: {
+                        requirementId: REQUIREMENT_ID,
+                        projectId: PROJECT_ID,
+                        revisionNumber: 2,
+                    },
                 });
                 expect(result).toMatchObject({
                     id: REQUIREMENT_ID,
@@ -887,7 +1018,10 @@ describe('ProjectsService', () => {
             });
 
             it('returns the current requirement when the requested revision is current.', async () => {
-                const currentRequirement = createRequirementEntity({ revisionNumber: 3, description: 'Current text.' });
+                const currentRequirement = createRequirementEntity({
+                    revisionNumber: 3,
+                    description: 'Current text.',
+                });
 
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
                 requirementsRepository.findOne.mockResolvedValue(currentRequirement);
@@ -898,12 +1032,20 @@ describe('ProjectsService', () => {
                 });
 
                 expect(requirementRevisionsRepository.findOne).not.toHaveBeenCalled();
-                expect(result).toMatchObject({ id: REQUIREMENT_ID, revisionNumber: 3, description: 'Current text.' });
+                expect(result).toMatchObject({
+                    id: REQUIREMENT_ID,
+                    revisionNumber: 3,
+                    description: 'Current text.',
+                });
             });
 
             it('returns all stored historical revisions of a requirement.', async () => {
-                const currentRequirement = createRequirementEntity({ revisionNumber: 3 });
-                const firstRevision = createRequirementRevisionEntity({ revisionNumber: 1 });
+                const currentRequirement = createRequirementEntity({
+                    revisionNumber: 3,
+                });
+                const firstRevision = createRequirementRevisionEntity({
+                    revisionNumber: 1,
+                });
                 const secondRevision = createRequirementRevisionEntity({
                     id: '6a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d14',
                     revisionNumber: 2,
@@ -922,8 +1064,16 @@ describe('ProjectsService', () => {
                 });
                 expect(Array.isArray(result)).toBe(true);
                 expect(result).toMatchObject([
-                    { id: REQUIREMENT_ID, revisionNumber: 1, status: RequirementStatus.Draft },
-                    { id: REQUIREMENT_ID, revisionNumber: 2, status: RequirementStatus.Approved },
+                    {
+                        id: REQUIREMENT_ID,
+                        revisionNumber: 1,
+                        status: RequirementStatus.Draft,
+                    },
+                    {
+                        id: REQUIREMENT_ID,
+                        revisionNumber: 2,
+                        status: RequirementStatus.Approved,
+                    },
                 ]);
             });
 
@@ -933,7 +1083,10 @@ describe('ProjectsService', () => {
                 requirementRevisionsRepository.findOne.mockResolvedValue(null);
 
                 await expect(
-                    service.findRequirement(PROJECT_ID, REQUIREMENT_ID, { revision: 2, allrevisions: false }),
+                    service.findRequirement(PROJECT_ID, REQUIREMENT_ID, {
+                        revision: 2,
+                        allrevisions: false,
+                    }),
                 ).rejects.toBeInstanceOf(NotFoundException);
             });
         });
@@ -961,11 +1114,7 @@ describe('ProjectsService', () => {
                 requirementRevisionsRepository.save.mockResolvedValue(revision);
                 requirementsRepository.save.mockResolvedValue(savedRequirement);
 
-                const result = await service.updateRequirement(
-                    PROJECT_ID,
-                    REQUIREMENT_ID,
-                    createUpdateRequirementDto(),
-                );
+                const result = await service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, createUpdateRequirementDto());
 
                 expect(requirementRevisionsRepository.create).toHaveBeenCalledWith(
                     expect.objectContaining({
@@ -1013,9 +1162,7 @@ describe('ProjectsService', () => {
 
             it('rejects an invalid status transition from rejected to approved.', async () => {
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                requirementsRepository.findOne.mockResolvedValue(
-                    createRequirementEntity({ status: RequirementStatus.Rejected }),
-                );
+                requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ status: RequirementStatus.Rejected }));
                 requirementRevisionsRepository.create.mockReturnValue(new RequirementRevision());
                 requirementRevisionsRepository.save.mockResolvedValue(new RequirementRevision());
 
@@ -1029,17 +1176,25 @@ describe('ProjectsService', () => {
                 expect(requirementsRepository.save).not.toHaveBeenCalled();
             });
 
+            it('requires an implementation ticket before an approved requirement can be implemented.', async () => {
+                projectsRepository.findOne.mockResolvedValue(createProjectEntity());
+                requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ status: RequirementStatus.Approved }));
+
+                await expect(service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
+                    status: RequirementStatus.Implemented,
+                })).rejects.toThrow('At least one implementation ticket is required');
+
+                expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
+                expect(requirementsRepository.save).not.toHaveBeenCalled();
+            });
+
             it('rejects changes to implemented requirements.', async () => {
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                requirementsRepository.findOne.mockResolvedValue(
-                    createRequirementEntity({ status: RequirementStatus.Implemented }),
-                );
+                requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ status: RequirementStatus.Implemented }));
                 requirementRevisionsRepository.create.mockReturnValue(new RequirementRevision());
                 requirementRevisionsRepository.save.mockResolvedValue(new RequirementRevision());
 
-                await expect(
-                    service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, createUpdateRequirementDto()),
-                ).rejects.toBeInstanceOf(BadRequestException);
+                await expect(service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, createUpdateRequirementDto())).rejects.toBeInstanceOf(BadRequestException);
 
                 expect(requirementsRepository.save).not.toHaveBeenCalled();
             });
@@ -1048,9 +1203,7 @@ describe('ProjectsService', () => {
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
                 requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ deletedAt: new Date() }));
 
-                await expect(
-                    service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, createUpdateRequirementDto()),
-                ).rejects.toBeInstanceOf(BadRequestException);
+                await expect(service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, createUpdateRequirementDto())).rejects.toBeInstanceOf(BadRequestException);
 
                 expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
                 expect(requirementsRepository.save).not.toHaveBeenCalled();
@@ -1062,7 +1215,11 @@ describe('ProjectsService', () => {
                     status: RequirementStatus.Rejected,
                     revisionNumber: 2,
                 });
-                const newCategory = createCategoryEntity({ id: newCategoryId, key: 'PERF', type: CategoryType.NFR });
+                const newCategory = createCategoryEntity({
+                    id: newCategoryId,
+                    key: 'PERF',
+                    type: CategoryType.NFR,
+                });
                 const latestRequirementInNewCategory = createRequirementEntity({
                     id: '5a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d13',
                     categoryId: newCategoryId,
@@ -1079,19 +1236,13 @@ describe('ProjectsService', () => {
                 });
 
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                requirementsRepository.findOne
-                    .mockResolvedValueOnce(existingRequirement)
-                    .mockResolvedValueOnce(latestRequirementInNewCategory);
+                requirementsRepository.findOne.mockResolvedValueOnce(existingRequirement).mockResolvedValueOnce(latestRequirementInNewCategory);
                 categoriesRepository.findOne.mockResolvedValue(newCategory);
                 requirementRevisionsRepository.create.mockReturnValue(revision);
                 requirementRevisionsRepository.save.mockResolvedValue(revision);
                 requirementsRepository.save.mockResolvedValue(savedRequirement);
 
-                const result = await service.updateRequirement(
-                    PROJECT_ID,
-                    REQUIREMENT_ID,
-                    createUpdateRequirementDto({ categoryId: newCategoryId }),
-                );
+                const result = await service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, createUpdateRequirementDto({ categoryId: newCategoryId }));
 
                 expect(categoriesRepository.findOne).toHaveBeenCalledWith({
                     where: { id: newCategoryId, projectId: PROJECT_ID },
@@ -1132,12 +1283,17 @@ describe('ProjectsService', () => {
                 expect(result.status).toBe(RequirementStatus.Rejected);
             });
 
-            it('sets an approved requirement obsolete when an obsolescence reason is provided.', async () => {
-                const existingRequirement = createRequirementEntity({ status: RequirementStatus.Approved });
+            it('sets an approved requirement obsolete with actor and reason without replacing the reviewer.', async () => {
+                const existingRequirement = createRequirementEntity({
+                    status: RequirementStatus.Approved,
+                    reviewer: 'Jane Reviewer',
+                });
                 const revision = new RequirementRevision();
                 const savedRequirement = createRequirementEntity({
                     revisionNumber: 2,
                     status: RequirementStatus.Obsolete,
+                    reviewer: 'Jane Reviewer',
+                    obsoletedBy: 'Olivia Owner',
                     obsolescenceReason: 'Replaced by a platform requirement.',
                     obsoleteAt: new Date('2026-06-28T11:00:00.000Z'),
                 });
@@ -1150,10 +1306,13 @@ describe('ProjectsService', () => {
 
                 const result = await service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
                     status: RequirementStatus.Obsolete,
+                    obsoletedBy: 'Olivia Owner',
                     obsolescenceReason: 'Replaced by a platform requirement.',
                 });
 
                 expect(existingRequirement.status).toBe(RequirementStatus.Obsolete);
+                expect(existingRequirement.reviewer).toBe('Jane Reviewer');
+                expect(existingRequirement.obsoletedBy).toBe('Olivia Owner');
                 expect(existingRequirement.obsolescenceReason).toBe('Replaced by a platform requirement.');
                 expect(existingRequirement.obsoleteAt).toBeInstanceOf(Date);
                 expect(result.status).toBe(RequirementStatus.Obsolete);
@@ -1164,7 +1323,9 @@ describe('ProjectsService', () => {
                 requirementsRepository.findOne.mockResolvedValue(createRequirementEntity());
 
                 await expect(
-                    service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, { status: RequirementStatus.Approved }),
+                    service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
+                        status: RequirementStatus.Approved,
+                    }),
                 ).rejects.toBeInstanceOf(BadRequestException);
 
                 expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
@@ -1173,16 +1334,71 @@ describe('ProjectsService', () => {
 
             it('requires an obsolescence reason when setting a requirement obsolete.', async () => {
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                requirementsRepository.findOne.mockResolvedValue(
-                    createRequirementEntity({ status: RequirementStatus.Approved }),
-                );
+                requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ status: RequirementStatus.Approved }));
 
                 await expect(
-                    service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, { status: RequirementStatus.Obsolete }),
+                    service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
+                        status: RequirementStatus.Obsolete,
+                        obsoletedBy: 'Olivia Owner',
+                    }),
                 ).rejects.toBeInstanceOf(BadRequestException);
 
                 expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
                 expect(requirementsRepository.save).not.toHaveBeenCalled();
+            });
+
+            it('requires a user name when setting a requirement obsolete.', async () => {
+                projectsRepository.findOne.mockResolvedValue(createProjectEntity());
+                requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ status: RequirementStatus.Approved }));
+
+                await expect(
+                    service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
+                        status: RequirementStatus.Obsolete,
+                        obsolescenceReason: 'Replaced by a platform requirement.',
+                    }),
+                ).rejects.toBeInstanceOf(BadRequestException);
+
+                expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
+            });
+
+            it('allows implemented requirements to become obsolete.', async () => {
+                const existingRequirement = createRequirementEntity({
+                    status: RequirementStatus.Implemented,
+                    reviewer: 'Jane Reviewer',
+                });
+                const revision = new RequirementRevision();
+
+                projectsRepository.findOne.mockResolvedValue(createProjectEntity());
+                requirementsRepository.findOne.mockResolvedValue(existingRequirement);
+                requirementRevisionsRepository.create.mockReturnValue(revision);
+                requirementRevisionsRepository.save.mockResolvedValue(revision);
+                requirementsRepository.save.mockResolvedValue(existingRequirement);
+
+                const result = await service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
+                    status: RequirementStatus.Obsolete,
+                    obsoletedBy: 'Olivia Owner',
+                    obsolescenceReason: 'The implementation was retired.',
+                });
+
+                expect(result.status).toBe(RequirementStatus.Obsolete);
+                expect(result.reviewer).toBe('Jane Reviewer');
+                expect(result.obsoletedBy).toBe('Olivia Owner');
+                expect(result.obsoleteAt).toBeInstanceOf(Date);
+            });
+
+            it('does not allow rejected requirements to become obsolete.', async () => {
+                projectsRepository.findOne.mockResolvedValue(createProjectEntity());
+                requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ status: RequirementStatus.Rejected }));
+
+                await expect(
+                    service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
+                        status: RequirementStatus.Obsolete,
+                        obsoletedBy: 'Olivia Owner',
+                        obsolescenceReason: 'No longer needed.',
+                    }),
+                ).rejects.toBeInstanceOf(BadRequestException);
+
+                expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
             });
         });
 
@@ -1202,13 +1418,9 @@ describe('ProjectsService', () => {
 
             it('does not soft delete an approved requirement.', async () => {
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-                requirementsRepository.findOne.mockResolvedValue(
-                    createRequirementEntity({ status: RequirementStatus.Approved }),
-                );
+                requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ status: RequirementStatus.Approved }));
 
-                await expect(service.deleteRequirement(PROJECT_ID, REQUIREMENT_ID, false)).rejects.toBeInstanceOf(
-                    BadRequestException,
-                );
+                await expect(service.deleteRequirement(PROJECT_ID, REQUIREMENT_ID, false)).rejects.toBeInstanceOf(BadRequestException);
 
                 expect(requirementsRepository.save).not.toHaveBeenCalled();
             });
@@ -1230,9 +1442,7 @@ describe('ProjectsService', () => {
                 projectsRepository.findOne.mockResolvedValue(createProjectEntity());
                 requirementsRepository.findOne.mockResolvedValue(createRequirementEntity());
 
-                await expect(service.deleteRequirement(PROJECT_ID, REQUIREMENT_ID, true)).rejects.toBeInstanceOf(
-                    BadRequestException,
-                );
+                await expect(service.deleteRequirement(PROJECT_ID, REQUIREMENT_ID, true)).rejects.toBeInstanceOf(BadRequestException);
 
                 expect(requirementsRepository.delete).not.toHaveBeenCalled();
             });
@@ -1261,9 +1471,7 @@ describe('ProjectsService', () => {
             });
 
             it('requires the deleted query flag before clearing the recycle bin.', async () => {
-                await expect(service.clearDeletedRequirements(PROJECT_ID, false)).rejects.toBeInstanceOf(
-                    BadRequestException,
-                );
+                await expect(service.clearDeletedRequirements(PROJECT_ID, false)).rejects.toBeInstanceOf(BadRequestException);
 
                 expect(projectsRepository.findOne).not.toHaveBeenCalled();
                 expect(requirementsRepository.delete).not.toHaveBeenCalled();

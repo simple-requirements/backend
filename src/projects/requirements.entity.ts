@@ -1,6 +1,7 @@
 import { Category } from '@/projects/categories.entity';
 import { Project } from '@/projects/projects.entity';
 import { RequirementRevision } from '@/projects/requirement-revisions.entity';
+import { RequirementImplementationTicket } from '@/projects/requirement-implementation-ticket.entity';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import { RequirementReviewComment } from '@/requirement-reviews/requirement-review-comment.entity';
 import {
@@ -21,8 +22,12 @@ import {
 @Index('IDX_requirements_project_id', ['projectId'])
 @Index('IDX_requirements_category_id', ['categoryId'])
 @Index('IDX_requirements_deleted_at', ['deletedAt'])
-@Index('UQ_requirements_project_key', ['projectId', 'visibleKey'], { unique: true })
-@Index('UQ_requirements_category_sequence', ['categoryId', 'sequenceNumber'], { unique: true })
+@Index('UQ_requirements_project_key', ['projectId', 'visibleKey'], {
+    unique: true,
+})
+@Index('UQ_requirements_category_sequence', ['categoryId', 'sequenceNumber'], {
+    unique: true,
+})
 @Check('CHK_requirements_status', `"status" IN ('draft', 'approved', 'implemented', 'obsolete', 'rejected')`)
 @Check('CHK_requirements_sequence_number_range', '"sequence_number" > 0 AND "sequence_number" <= 9999')
 @Check('CHK_requirements_revision_number_range', '"revision_number" > 0')
@@ -71,6 +76,14 @@ export class Requirement {
     @Column({ type: 'varchar', length: 120, nullable: true })
     reviewer!: string | null;
 
+    @Column({
+        type: 'varchar',
+        length: 120,
+        name: 'obsoleted_by',
+        nullable: true,
+    })
+    obsoletedBy!: string | null;
+
     @Column({ type: 'timestamptz', name: 'rejected_at', nullable: true })
     rejectedAt!: Date | null;
 
@@ -99,7 +112,11 @@ export class Requirement {
     @JoinColumn({ name: 'category_id' })
     category!: Relation<Category>;
 
-    @ManyToOne(() => Project, (project) => project.requirements, { nullable: false, onDelete: 'CASCADE' })
+    @ManyToOne(() => Project, (project) => project.requirements, {
+        nullable: false,
+        onDelete: 'CASCADE',
+        eager: true,
+    })
     @JoinColumn({ name: 'project_id' })
     project!: Relation<Project>;
 
@@ -108,4 +125,6 @@ export class Requirement {
 
     @OneToMany(() => RequirementReviewComment, (comment) => comment.requirement)
     reviewComments!: Relation<RequirementReviewComment>[];
+    @OneToMany(() => RequirementImplementationTicket, (ticket) => ticket.requirement, { eager: true })
+    implementationTickets!: Relation<RequirementImplementationTicket>[];
 }

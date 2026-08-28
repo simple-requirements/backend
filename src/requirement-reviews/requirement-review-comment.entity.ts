@@ -1,6 +1,7 @@
 import { Requirement } from '@/projects/requirements.entity';
 import { RequirementReviewCommentCloseReason } from '@/requirement-reviews/requirement-review-comment-close-reason.enum';
 import { RequirementReviewCommentStatus } from '@/requirement-reviews/requirement-review-comment-status.enum';
+import { RequirementReviewCommentReply } from '@/requirement-reviews/requirement-review-comment-reply.entity';
 import {
     Check,
     Column,
@@ -9,6 +10,7 @@ import {
     Index,
     JoinColumn,
     ManyToOne,
+    OneToMany,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
     type Relation,
@@ -67,6 +69,9 @@ export class RequirementReviewComment {
 
     @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
     updatedAt!: Date;
+
+    @OneToMany(() => RequirementReviewCommentReply, (reply) => reply.comment)
+    replies?: Relation<RequirementReviewCommentReply[]>;
 
     @ManyToOne(() => Requirement, (requirement) => requirement.reviewComments, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'requirement_id' })

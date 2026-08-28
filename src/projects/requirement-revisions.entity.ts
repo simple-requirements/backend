@@ -1,15 +1,6 @@
 import { Requirement } from '@/projects/requirements.entity';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
-import {
-    Check,
-    Column,
-    Entity,
-    Index,
-    JoinColumn,
-    ManyToOne,
-    PrimaryGeneratedColumn,
-    type Relation,
-} from 'typeorm';
+import { Check, Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, type Relation } from 'typeorm';
 
 @Entity({ name: 'requirement_revisions' })
 @Index('IDX_requirement_revisions_requirement_id', ['requirementId'])
@@ -66,6 +57,16 @@ export class RequirementRevision {
     @Column({ type: 'varchar', length: 120, nullable: true })
     reviewer!: string | null;
 
+    @Column({
+        type: 'varchar',
+        length: 120,
+        name: 'obsoleted_by',
+        nullable: true,
+    })
+    obsoletedBy!: string | null;
+    @Column({ type: 'jsonb', name: 'implementation_tickets', default: () => "'[]'::jsonb" })
+    implementationTickets!: { id: string; ticketId: string; completedBy: string; completedAt: string }[];
+
     @Column({ type: 'timestamptz', name: 'rejected_at', nullable: true })
     rejectedAt!: Date | null;
 
@@ -90,7 +91,10 @@ export class RequirementRevision {
     @Column({ type: 'timestamptz', name: 'updated_at' })
     updatedAt!: Date;
 
-    @ManyToOne(() => Requirement, (requirement) => requirement.revisions, { nullable: false, onDelete: 'CASCADE' })
+    @ManyToOne(() => Requirement, (requirement) => requirement.revisions, {
+        nullable: false,
+        onDelete: 'CASCADE',
+    })
     @JoinColumn({ name: 'requirement_id' })
     requirement!: Relation<Requirement>;
 }
