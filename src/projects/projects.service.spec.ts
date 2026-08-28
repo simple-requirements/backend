@@ -2,7 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { Not } from 'typeorm';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Category } from '@/projects/categories.entity';
 import type { CreateCategoryDto } from '@/projects/dto/create-category.dto';
@@ -187,7 +187,7 @@ describe('ProjectsService', () => {
     let requirementRevisionsRepository: RequirementRevisionsRepositoryMock;
     let implementationTicketsRepository: ImplementationTicketsRepositoryMock;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
         projectsRepository = {
             create: vi.fn(),
             delete: vi.fn(),
@@ -246,6 +246,10 @@ describe('ProjectsService', () => {
         }).compile();
 
         service = module.get<ProjectsService>(ProjectsService);
+    });
+
+    beforeEach(() => {
+        vi.resetAllMocks();
     });
 
     describe('finds', () => {

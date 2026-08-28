@@ -1,8 +1,5 @@
-import { randomUUID } from 'node:crypto';
-
 import { expect, test } from '@/projects/projects-api.e2e-fixtures';
 
-import { CategoryType } from '@/projects/category-type.enum';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import {
     expectErrorResponseBody,
@@ -12,15 +9,10 @@ import {
 } from '@/projects/projects-api.e2e-helpers';
 
 test.describe('Requirement revisions API - GET /projects/{projectId}/requirements/{requirementId}', () => {
-    test('returns a requirement by a specific revision number.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API get requirement revision project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id, 'Original draft.');
+    test('returns a requirement by a specific revision number.', async ({ request, api, draftRequirement }) => {
+        const { project, category, requirement } = draftRequirement;
 
-        const approveResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { status: RequirementStatus.Approved, reviewer: 'Jane Reviewer' },
-        });
-        expect(approveResponse.status()).toBe(200);
+        await api.approveRequirement(project.id, requirement.id);
 
         const updateResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             data: { description: 'Current draft.' },
@@ -62,15 +54,10 @@ test.describe('Requirement revisions API - GET /projects/{projectId}/requirement
         });
     });
 
-    test('returns all stored historical revisions of a requirement.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API all requirement revisions project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id, 'Original draft.');
+    test('returns all stored historical revisions of a requirement.', async ({ request, api, draftRequirement }) => {
+        const { project, requirement } = draftRequirement;
 
-        const approveResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { status: RequirementStatus.Approved, reviewer: 'Jane Reviewer' },
-        });
-        expect(approveResponse.status()).toBe(200);
+        await api.approveRequirement(project.id, requirement.id);
 
         const updateResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             data: { description: 'Current draft.' },
@@ -93,10 +80,8 @@ test.describe('Requirement revisions API - GET /projects/{projectId}/requirement
         expect(revisions.every((revision) => revision.id === requirement.id)).toBe(true);
     });
 
-    test('rejects invalid requirement revision query parameters.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API invalid revision query project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('rejects invalid requirement revision query parameters.', async ({ request, draftRequirement }) => {
+        const { project, requirement } = draftRequirement;
 
         const response = await request.get(`/projects/${project.id}/requirements/${requirement.id}?revision=0`);
 
@@ -107,10 +92,8 @@ test.describe('Requirement revisions API - GET /projects/{projectId}/requirement
         expectErrorResponseBody(body, 400, 'Revision query parameter must be a positive integer.', 'Bad Request');
     });
 
-    test('returns 404 when a requested historical revision does not exist.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API unknown revision project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('returns 404 when a requested historical revision does not exist.', async ({ request, draftRequirement }) => {
+        const { project, requirement } = draftRequirement;
 
         const response = await request.get(`/projects/${project.id}/requirements/${requirement.id}?revision=99`);
 

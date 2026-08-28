@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RequirementRevision } from '@/projects/requirement-revisions.entity';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
@@ -102,7 +102,7 @@ describe('RequirementReviewsService', () => {
     let reviewCommentsRepository: ReviewCommentsRepositoryMock;
     let reviewCommentRepliesRepository: ReviewCommentRepliesRepositoryMock;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
         requirementsRepository = { findOne: vi.fn(), save: vi.fn() };
         requirementRevisionsRepository = { create: vi.fn(), save: vi.fn() };
         reviewCommentsRepository = {
@@ -137,6 +137,10 @@ describe('RequirementReviewsService', () => {
         }).compile();
 
         service = module.get<RequirementReviewsService>(RequirementReviewsService);
+    });
+
+    beforeEach(() => {
+        vi.resetAllMocks();
     });
 
     it('derives the in-review and decision-pending states from main comment counts.', async () => {

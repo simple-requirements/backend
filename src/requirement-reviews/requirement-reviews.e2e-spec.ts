@@ -1,6 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
-import { CategoryType } from '@/projects/category-type.enum';
 import {
     expectErrorResponseBody,
     expectIsoDateString,
@@ -91,10 +88,8 @@ function expectReviewCommentResponseBody(
 }
 
 test.describe('Requirement reviews API - POST /projects/{projectId}/requirements/{requirementId}/review-comments', () => {
-    test('creates and lists open review comments for a draft requirement.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API review comments project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('creates and lists open review comments for a draft requirement.', async ({ request, draftRequirement }) => {
+        const { project, requirement } = draftRequirement;
 
         const createResponse = await request.post(
             `/projects/${project.id}/requirements/${requirement.id}/review-comments`,
@@ -130,11 +125,9 @@ test.describe('Requirement reviews API - POST /projects/{projectId}/requirements
 
     test('creates replies only while the main comment is open and reports the derived review state.', async ({
         request,
-        api,
+        draftRequirement,
     }) => {
-        const project = await api.createProject(`Playwright API review replies project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+        const { project, requirement } = draftRequirement;
         const createCommentResponse = await request.post(
             `/projects/${project.id}/requirements/${requirement.id}/review-comments`,
             { data: { text: 'Please clarify this.', author: 'Jane Reviewer' } },
@@ -169,10 +162,8 @@ test.describe('Requirement reviews API - POST /projects/{projectId}/requirements
 });
 
 test.describe('Requirement reviews API - PATCH /projects/{projectId}/requirements/{requirementId}/review-comments/{commentId}', () => {
-    test('closes an open review comment.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API close review comment project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('closes an open review comment.', async ({ request, draftRequirement }) => {
+        const { project, requirement } = draftRequirement;
         const createResponse = await request.post(
             `/projects/${project.id}/requirements/${requirement.id}/review-comments`,
             { data: { text: 'Please define allowed authentication methods.', author: 'Jane Reviewer' } },
@@ -201,10 +192,8 @@ test.describe('Requirement reviews API - PATCH /projects/{projectId}/requirement
 });
 
 test.describe('Requirement reviews API - POST /projects/{projectId}/requirements/{requirementId}/review/approve', () => {
-    test('does not approve requirements while review comments are open.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API approve blocked project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('does not approve requirements while review comments are open.', async ({ request, draftRequirement }) => {
+        const { project, requirement } = draftRequirement;
 
         const createCommentResponse = await request.post(
             `/projects/${project.id}/requirements/${requirement.id}/review-comments`,
@@ -231,10 +220,8 @@ test.describe('Requirement reviews API - POST /projects/{projectId}/requirements
         );
     });
 
-    test('approves requirements when all review comments are closed.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API approve reviewed project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('approves requirements when all review comments are closed.', async ({ request, draftRequirement }) => {
+        const { project, category, requirement } = draftRequirement;
         const createCommentResponse = await request.post(
             `/projects/${project.id}/requirements/${requirement.id}/review-comments`,
             { data: { text: 'Please clarify the acceptance criteria.', author: 'Jane Reviewer' } },
@@ -270,10 +257,8 @@ test.describe('Requirement reviews API - POST /projects/{projectId}/requirements
 });
 
 test.describe('Requirement reviews API - POST /projects/{projectId}/requirements/{requirementId}/review/reject', () => {
-    test('rejects a requirement and auto-closes open review comments.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API reject reviewed project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('rejects a requirement and auto-closes open review comments.', async ({ request, draftRequirement }) => {
+        const { project, category, requirement } = draftRequirement;
         const createCommentResponse = await request.post(
             `/projects/${project.id}/requirements/${requirement.id}/review-comments`,
             { data: { text: 'Please clarify the acceptance criteria.', author: 'Jane Reviewer' } },

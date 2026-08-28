@@ -84,18 +84,10 @@ test.describe('Requirements API - GET /projects/{projectId}/requirements', () =>
 });
 
 test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requirementId}', () => {
-    test('approves, implements, and rejects invalid backward transitions.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API status transitions project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('approves, implements, and rejects invalid backward transitions.', async ({ request, api, draftRequirement }) => {
+        const { project, category, requirement } = draftRequirement;
 
-        const approveResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { status: RequirementStatus.Approved, reviewer: 'Jane Reviewer' },
-        });
-
-        expect(approveResponse.status()).toBe(200);
-
-        const approvedRequirement = (await approveResponse.json()) as RequirementResponseBody;
+        const approvedRequirement = await api.approveRequirement(project.id, requirement.id);
 
         expectRequirementResponseBody(approvedRequirement, {
             id: requirement.id,
@@ -121,11 +113,7 @@ test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requ
 
         expect(rejectApprovedResponse.status()).toBe(400);
 
-        const ticketResponse = await request.post(`/projects/${project.id}/requirements/${requirement.id}/implementation-tickets`, {
-            data: { ticketId: 'SOLAR-4711', completedBy: 'Alex Developer', completedAt: '2026-08-25' },
-        });
-
-        expect(ticketResponse.status()).toBe(201);
+        await api.createImplementationTicket(project.id, requirement.id, 'SOLAR-4711');
 
         const implementResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             data: { status: RequirementStatus.Implemented },
@@ -144,16 +132,10 @@ test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requ
         }
     });
 
-    test('changes an approved requirement by creating a new draft revision.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API requirement revision project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('changes an approved requirement by creating a new draft revision.', async ({ request, api, draftRequirement }) => {
+        const { project, category, requirement } = draftRequirement;
 
-        const approveResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { status: RequirementStatus.Approved, reviewer: 'Jane Reviewer' },
-        });
-
-        expect(approveResponse.status()).toBe(200);
+        await api.approveRequirement(project.id, requirement.id);
 
         const updateResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             data: { description: 'Users must sign in with MFA.', priority: 'p2' },
@@ -176,15 +158,10 @@ test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requ
         expect(updatedRequirement.approvedAt).toBeNull();
     });
 
-    test('sets an approved requirement obsolete.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API obsolete requirement project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('sets an approved requirement obsolete.', async ({ request, api, draftRequirement }) => {
+        const { project, category, requirement } = draftRequirement;
 
-        const approveResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { status: RequirementStatus.Approved, reviewer: 'Jane Reviewer' },
-        });
-        expect(approveResponse.status()).toBe(200);
+        await api.approveRequirement(project.id, requirement.id);
 
         const obsoleteResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             data: {
@@ -211,20 +188,11 @@ test.describe('Requirements API - PATCH /projects/{projectId}/requirements/{requ
         expect(obsoleteRequirement.obsoleteAt).not.toBeNull();
     });
 
-    test('does not change implemented requirements.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API implemented final project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
-        const requirement = await api.createRequirement(project.id, category.id);
+    test('does not change implemented requirements.', async ({ request, api, draftRequirement }) => {
+        const { project, requirement } = draftRequirement;
 
-        const approveResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { status: RequirementStatus.Approved, reviewer: 'Jane Reviewer' },
-        });
-        expect(approveResponse.status()).toBe(200);
-
-        const ticketResponse = await request.post(`/projects/${project.id}/requirements/${requirement.id}/implementation-tickets`, {
-            data: { ticketId: 'SOLAR-4712', completedBy: 'Alex Developer', completedAt: '2026-08-25' },
-        });
-        expect(ticketResponse.status()).toBe(201);
+        await api.approveRequirement(project.id, requirement.id);
+        await api.createImplementationTicket(project.id, requirement.id, 'SOLAR-4712');
 
         const implementResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             data: { status: RequirementStatus.Implemented },

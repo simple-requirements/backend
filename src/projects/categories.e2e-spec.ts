@@ -12,7 +12,7 @@ import {
 } from '@/projects/projects-api.e2e-helpers';
 
 test.describe('Categories API - GET /projects/{projectId}/categories', () => {
-    test('lists all categories of a project.', async ({ request, api }) => {
+    test('lists all categories of a project.', async ({ api }) => {
         const project = await api.createProject(`Playwright API list categories project ${randomUUID()}`);
         const firstCategory = await api.createCategory(project.id, 'Authentication', 'AUTH');
         const secondCategory = await api.createCategory(project.id, 'Reporting', 'RPT', CategoryType.NFR);
@@ -40,7 +40,7 @@ test.describe('Categories API - GET /projects/{projectId}/categories', () => {
         });
     });
 
-    test('returns categories sorted by name.', async ({ request, api }) => {
+    test('returns categories sorted by name.', async ({ api }) => {
         const project = await api.createProject(`Playwright API sorted categories project ${randomUUID()}`);
 
         await api.createCategory(project.id, 'Zeta Category', 'ZET');
@@ -52,7 +52,7 @@ test.describe('Categories API - GET /projects/{projectId}/categories', () => {
         expect(body.map((category) => category.name)).toEqual(['Alpha Category', 'Beta Category', 'Zeta Category']);
     });
 
-    test('returns an empty array for a project without categories.', async ({ request, api }) => {
+    test('returns an empty array for a project without categories.', async ({ api }) => {
         const project = await api.createProject(`Playwright API empty categories project ${randomUUID()}`);
 
         const body = await api.listCategories(project.id);
@@ -243,7 +243,7 @@ test.describe('Categories API - POST /projects/{projectId}/categories', () => {
         expectErrorResponseBody(body, 400, 'Category key "DUP" already exists in this project.', 'Bad Request');
     });
 
-    test('allows the same category name in a different project.', async ({ request, api }) => {
+    test('allows the same category name in a different project.', async ({ api }) => {
         const firstProject = await api.createProject(`Playwright API first duplicate-name project ${randomUUID()}`);
         const secondProject = await api.createProject(`Playwright API second duplicate-name project ${randomUUID()}`);
         const categoryName = `Playwright API reused category name ${randomUUID()}`;
@@ -259,9 +259,8 @@ test.describe('Categories API - POST /projects/{projectId}/categories', () => {
 });
 
 test.describe('Categories API - PATCH /projects/{projectId}/categories/{id}', () => {
-    test('updates a category name.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API update category name project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Old name', 'OLD');
+    test('updates a category name.', async ({ request, categorySetup }) => {
+        const { project, category } = categorySetup;
         const updatedCategoryName = `Playwright API updated category ${randomUUID()}`;
 
         const response = await request.patch(`/projects/${project.id}/categories/${category.id}`, {
@@ -276,15 +275,14 @@ test.describe('Categories API - PATCH /projects/{projectId}/categories/{id}', ()
             id: category.id,
             projectId: project.id,
             name: updatedCategoryName,
-            key: 'OLD',
+            key: 'AUTH',
             type: CategoryType.FR,
             createdAt: category.createdAt,
         });
     });
 
-    test('updates a category key.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API update category key project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH');
+    test('updates a category key.', async ({ request, categorySetup }) => {
+        const { project, category } = categorySetup;
 
         const response = await request.patch(`/projects/${project.id}/categories/${category.id}`, {
             data: { key: 'SEC' },
@@ -304,9 +302,8 @@ test.describe('Categories API - PATCH /projects/{projectId}/categories/{id}', ()
         });
     });
 
-    test('updates a category type.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API update category type project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH', CategoryType.FR);
+    test('updates a category type.', async ({ request, categorySetup }) => {
+        const { project, category } = categorySetup;
 
         const response = await request.patch(`/projects/${project.id}/categories/${category.id}`, {
             data: { type: CategoryType.NFR },
@@ -365,9 +362,8 @@ test.describe('Categories API - PATCH /projects/{projectId}/categories/{id}', ()
         expect(body.name).toBe(updatedCategoryName);
     });
 
-    test('trims and uppercases the updated category key.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API trim updated key project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH');
+    test('trims and uppercases the updated category key.', async ({ request, categorySetup }) => {
+        const { project, category } = categorySetup;
 
         const response = await request.patch(`/projects/${project.id}/categories/${category.id}`, {
             data: { key: '  sec  ' },
@@ -415,9 +411,8 @@ test.describe('Categories API - PATCH /projects/{projectId}/categories/{id}', ()
         );
     });
 
-    test('rejects an empty update body.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API empty update body project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH');
+    test('rejects an empty update body.', async ({ request, categorySetup }) => {
+        const { project, category } = categorySetup;
 
         const response = await request.patch(`/projects/${project.id}/categories/${category.id}`, { data: {} });
 
@@ -428,9 +423,8 @@ test.describe('Categories API - PATCH /projects/{projectId}/categories/{id}', ()
         expectErrorResponseBody(body, 400, 'At least one category field must be provided.', 'Bad Request');
     });
 
-    test('rejects an empty updated name.', async ({ request, api }) => {
-        const project = await api.createProject(`Playwright API empty updated name project ${randomUUID()}`);
-        const category = await api.createCategory(project.id, 'Authentication', 'AUTH');
+    test('rejects an empty updated name.', async ({ request, categorySetup }) => {
+        const { project, category } = categorySetup;
 
         const response = await request.patch(`/projects/${project.id}/categories/${category.id}`, {
             data: { name: '   ' },

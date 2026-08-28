@@ -2,7 +2,7 @@ import { expect, type APIRequestContext } from '@playwright/test';
 import { isValid, parseISO } from 'date-fns';
 
 import { CategoryType } from '@/projects/category-type.enum';
-import type { RequirementStatus } from '@/projects/requirement-status.enum';
+import { RequirementStatus } from '@/projects/requirement-status.enum';
 
 export interface ProjectResponseBody {
     id: string;
@@ -125,12 +125,24 @@ export interface RequirementResponseBody {
     rejectionReason: string | null;
     reviewer: string | null;
     obsoletedBy: string | null;
+    implementationTickets: ImplementationTicketResponseBody[];
     rejectedAt: string | null;
     deletedAt: string | null;
     approvedAt: string | null;
     implementedAt: string | null;
     obsolescenceReason: string | null;
     obsoleteAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ImplementationTicketResponseBody {
+    id: string;
+    requirementId: string;
+    ticketId: string;
+    completedBy: string;
+    completedAt: string;
+    url: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -162,7 +174,7 @@ export function expectRequirementResponseBody(body: RequirementResponseBody, exp
 
     expect(body.projectId).toBe(expectedRequirement.projectId);
     expect(body.categoryId).toBe(expectedRequirement.categoryId);
-    expect(body.visibleKey).toMatch(/^(FR|NFR)-[A-Z]{2,4}-[0-9]{4}$/);
+    expect(body.visibleKey).toMatch(/^(FR|NFR)-[A-Z]{2,4}-\d{4}$/);
 
     if (expectedRequirement.visibleKey !== undefined) {
         expect(body.visibleKey).toBe(expectedRequirement.visibleKey);
@@ -210,6 +222,36 @@ export async function createRequirement(
     expect(response.status()).toBe(201);
 
     return (await response.json()) as RequirementResponseBody;
+}
+
+export async function approveRequirement(
+    request: APIRequestContext,
+    projectId: string,
+    requirementId: string,
+    reviewer = 'Jane Reviewer',
+): Promise<RequirementResponseBody> {
+    const response = await request.patch(`/projects/${projectId}/requirements/${requirementId}`, {
+        data: { status: RequirementStatus.Approved, reviewer },
+    });
+
+    expect(response.status()).toBe(200);
+
+    return (await response.json()) as RequirementResponseBody;
+}
+
+export async function createImplementationTicket(
+    request: APIRequestContext,
+    projectId: string,
+    requirementId: string,
+    ticketId: string,
+): Promise<ImplementationTicketResponseBody> {
+    const response = await request.post(`/projects/${projectId}/requirements/${requirementId}/implementation-tickets`, {
+        data: { ticketId, completedBy: 'Alex Developer', completedAt: '2026-08-25' },
+    });
+
+    expect(response.status()).toBe(201);
+
+    return (await response.json()) as ImplementationTicketResponseBody;
 }
 
 export async function listCategories(request: APIRequestContext, projectId: string): Promise<readonly CategoryResponseBody[]> {
