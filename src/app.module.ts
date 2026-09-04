@@ -1,5 +1,6 @@
 import { AppController } from '@/app.controller';
 import { AppService } from '@/app.service';
+import { AuthModule } from '@/auth/auth.module';
 import databaseConfig from '@/database/database.config';
 import { Module } from '@nestjs/common';
 import { ConfigModule, type ConfigType } from '@nestjs/config';
@@ -38,8 +39,11 @@ import { RequirementReviewsModule } from '@/requirement-reviews/requirement-revi
         }),
         ProjectsModule,
         RequirementReviewsModule,
+        AuthModule,
     ],
     controllers: [AppController],
     providers: [AppService],
 })
+// Nest modules are declarative; the decorator contains the module configuration.
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class AppModule {}
