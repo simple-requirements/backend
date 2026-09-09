@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import type { ProjectMembershipResponseDto } from "@/auth/dto/project-membership-response.dto";
+import type { AuthenticatedProjectMembershipDto } from "@/auth/dto/authenticated-project-membership.dto";
 import { ProjectMembership } from "@/auth/authorization/project-membership.entity";
 import type { ProjectRole } from "@/auth/authorization/project-role.enum";
 import { User } from "@/auth/accounts/users.entity";
@@ -36,6 +37,24 @@ export class ProjectMembershipService {
       byUser.set(membership.userId, current);
     }
     return [...byUser.values()];
+  }
+
+  async listForUser(
+    userId: string,
+  ): Promise<AuthenticatedProjectMembershipDto[]> {
+    const memberships = await this.dataSource
+      .getRepository(ProjectMembership)
+      .find({ where: { userId }, order: { createdAt: "ASC" } });
+    const byProject = new Map<string, AuthenticatedProjectMembershipDto>();
+    for (const membership of memberships) {
+      const current = byProject.get(membership.projectId) ?? {
+        projectId: membership.projectId,
+        roles: [],
+      };
+      current.roles.push(membership.role);
+      byProject.set(membership.projectId, current);
+    }
+    return [...byProject.values()];
   }
 
   async projectIdsForUser(userId: string): Promise<string[]> {

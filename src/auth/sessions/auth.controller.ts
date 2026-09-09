@@ -26,11 +26,15 @@ import { getRequestSource } from "@/auth/sessions/request-source";
 import { SessionAuthGuard } from "@/auth/sessions/session-auth.guard";
 import { SessionService } from "@/auth/sessions/session.service";
 import { ZodValidationPipe } from "@/common/pipes/zod-validation.pipe";
+import { ProjectMembershipService } from "@/auth/authorization/project-membership.service";
 
 @ApiTags("authentication")
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly sessionService: SessionService) {}
+  constructor(
+    private readonly sessionService: SessionService,
+    private readonly memberships: ProjectMembershipService,
+  ) {}
 
   @Post("login")
   @HttpCode(HttpStatus.OK)
@@ -58,7 +62,9 @@ export class AuthController {
   @UseGuards(SessionAuthGuard)
   @ApiBearerAuth()
   @ApiOkResponse({ type: AuthenticatedUserResponseDto })
-  me(@Req() request: AuthenticatedRequest): AuthenticatedUserResponseDto {
+  async me(
+    @Req() request: AuthenticatedRequest,
+  ): Promise<AuthenticatedUserResponseDto> {
     const { user, globalRoles } = request.authentication;
     return {
       id: user.id,
@@ -67,6 +73,7 @@ export class AuthController {
       displayName: user.displayName,
       status: user.status,
       globalRoles: [...globalRoles],
+      projectMemberships: await this.memberships.listForUser(user.id),
     };
   }
 }

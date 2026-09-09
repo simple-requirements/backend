@@ -469,6 +469,7 @@ test.describe("Authentication API - sessions and user administration", () => {
       id: administrator.userId,
       status: "active",
       globalRoles: ["administrator"],
+      projectMemberships: [],
     });
     expect((await request.post("/auth/logout", { headers })).status()).toBe(
       204,
@@ -564,6 +565,19 @@ test.describe("Authentication API - sessions and user administration", () => {
     });
     const memberToken = ((await login.json()) as { accessToken: string })
       .accessToken;
+    const memberMe = await request.get("/auth/me", {
+      headers: { Authorization: `Bearer ${memberToken}` },
+    });
+    expect(memberMe.status()).toBe(200);
+    expect(await memberMe.json()).toMatchObject({
+      id: user.id,
+      projectMemberships: [
+        {
+          projectId: project.id,
+          roles: expect.arrayContaining(["requirements_engineer", "developer"]),
+        },
+      ],
+    });
     expect(
       (
         await request.get(`/projects/${project.id}`, {
