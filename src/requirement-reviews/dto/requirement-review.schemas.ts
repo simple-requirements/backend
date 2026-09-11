@@ -22,6 +22,8 @@ function trimmedStringSchema(typeMessage: string, emptyMessage: string): z.ZodTy
         .refine((value) => value.length > 0, { message: emptyMessage });
 }
 
+const SERVER_DERIVED_ACTOR = '__server_derived_actor__';
+
 const reviewRequestBodySchema = requestBodySchema('Requirement review request body must be an object.');
 const reviewCommentTextSchema = trimmedStringSchema(
     'Review comment text must be a string.',
@@ -31,26 +33,29 @@ const reviewAuthorSchema = trimmedStringSchema(
     'Review comment author must be a string.',
     'Review comment author must not be empty.',
 );
+const serverDerivedReviewAuthorSchema = reviewAuthorSchema.optional().transform((author) => author ?? SERVER_DERIVED_ACTOR);
 const reviewerSchema = trimmedStringSchema('Reviewer must be a string.', 'Reviewer must not be empty.');
+const serverDerivedReviewerSchema = reviewerSchema.optional().transform((reviewer) => reviewer ?? SERVER_DERIVED_ACTOR);
 const rejectionReasonSchema = trimmedStringSchema(
     'Rejection reason must be a string.',
     'Rejection reason must not be empty.',
 );
 const closedBySchema = trimmedStringSchema('Closed by must be a string.', 'Closed by must not be empty.');
+const serverDerivedClosedBySchema = closedBySchema.optional().transform((closedBy) => closedBy ?? SERVER_DERIVED_ACTOR);
 
 export const createRequirementReviewCommentSchema: ZodValidationSchema<CreateRequirementReviewCommentDto> =
-    reviewRequestBodySchema.pipe(z.object({ text: reviewCommentTextSchema, author: reviewAuthorSchema }));
+    reviewRequestBodySchema.pipe(z.object({ text: reviewCommentTextSchema, author: serverDerivedReviewAuthorSchema }));
 
 export const createRequirementReviewCommentReplySchema: ZodValidationSchema<CreateRequirementReviewCommentReplyDto> =
-    reviewRequestBodySchema.pipe(z.object({ text: reviewCommentTextSchema, author: reviewAuthorSchema }));
+    reviewRequestBodySchema.pipe(z.object({ text: reviewCommentTextSchema, author: serverDerivedReviewAuthorSchema }));
 
 export const closeRequirementReviewCommentSchema: ZodValidationSchema<CloseRequirementReviewCommentDto> =
-    reviewRequestBodySchema.pipe(z.object({ closedBy: closedBySchema }));
+    reviewRequestBodySchema.pipe(z.object({ closedBy: serverDerivedClosedBySchema }));
 
 export const approveRequirementSchema: ZodValidationSchema<ApproveRequirementDto> = reviewRequestBodySchema.pipe(
-    z.object({ reviewer: reviewerSchema }),
+    z.object({ reviewer: serverDerivedReviewerSchema }),
 );
 
 export const rejectRequirementSchema: ZodValidationSchema<RejectRequirementDto> = reviewRequestBodySchema.pipe(
-    z.object({ reviewer: reviewerSchema, rejectionReason: rejectionReasonSchema }),
+    z.object({ reviewer: serverDerivedReviewerSchema, rejectionReason: rejectionReasonSchema }),
 );

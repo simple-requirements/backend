@@ -131,6 +131,7 @@ const requirementStatusSchema = z.custom<RequirementStatus>(
 const projectRequestBodySchema = requestBodySchema('Project request body must be an object.');
 const categoryRequestBodySchema = requestBodySchema('Category request body must be an object.');
 const requirementRequestBodySchema = requestBodySchema('Requirement request body must be an object.');
+const SERVER_DERIVED_ACTOR = '__server_derived_actor__';
 
 export const createProjectSchema: ZodValidationSchema<CreateProjectDto> = projectRequestBodySchema.pipe(z.object({ name: projectNameSchema }));
 
@@ -142,7 +143,10 @@ export const updateProjectSchema: ZodValidationSchema<UpdateProjectDto> = projec
 export const implementationTicketSchema: ZodValidationSchema<UpsertImplementationTicketDto> = requirementRequestBodySchema.pipe(
     z.object({
         ticketId: trimmedStringSchema('Ticket ID must be a string.', 'Ticket ID must not be empty.').pipe(z.string().max(120)),
-        completedBy: trimmedStringSchema('Completed by must be a string.', 'Completed by must not be empty.').pipe(z.string().max(120)),
+        completedBy: trimmedStringSchema('Completed by must be a string.', 'Completed by must not be empty.')
+            .pipe(z.string().max(120))
+            .optional()
+            .transform((completedBy) => completedBy ?? SERVER_DERIVED_ACTOR),
         completedAt: z.iso.date('Completion date must use YYYY-MM-DD.'),
     }),
 );

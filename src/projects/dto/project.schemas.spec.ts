@@ -31,10 +31,13 @@ describe('project request schemas', () => {
         expect(updateProjectSchema.safeParse({ ticketUrlTemplate: 'https://github.com/acme/issues' }).success).toBe(false);
     });
 
-    it('normalizes a complete implementation ticket.', () => {
+    it('normalizes an implementation ticket and treats the actor as server-derived.', () => {
         expect(implementationTicketSchema.parse({
             ticketId: ' SOLAR-4711 ', completedBy: ' Ada Lovelace ', completedAt: '2026-08-26',
         })).toEqual({ ticketId: 'SOLAR-4711', completedBy: 'Ada Lovelace', completedAt: '2026-08-26' });
+        expect(implementationTicketSchema.parse({
+            ticketId: ' SOLAR-4712 ', completedAt: '2026-08-27',
+        })).toEqual({ ticketId: 'SOLAR-4712', completedBy: '__server_derived_actor__', completedAt: '2026-08-27' });
     });
 
     it('normalizes a category name and key.', () => {

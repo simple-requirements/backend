@@ -1,13 +1,19 @@
 import dataSource from '@/database/data-source';
 import { seedDemoData } from '@/database/seeding/database-seeder';
+import { seedE2eAuthenticationData } from '@/database/seeding/seed-e2e-authentication-data';
 
 async function main(): Promise<void> {
-    await dataSource.initialize();
-
     try {
+        if (!dataSource.isInitialized) {
+            await dataSource.initialize();
+        }
+
         await seedDemoData(dataSource);
+        await seedE2eAuthenticationData(dataSource);
     } finally {
-        await dataSource.destroy();
+        if (dataSource.isInitialized) {
+            await dataSource.destroy();
+        }
     }
 }
 
