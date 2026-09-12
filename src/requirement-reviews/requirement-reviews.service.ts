@@ -12,6 +12,11 @@ import { Requirement } from "@/projects/requirements.entity";
 import { RequirementLifecycleService } from "@/projects/requirements/requirement-lifecycle.service";
 import { RequirementResponseMapper } from "@/projects/requirements/requirement-response.mapper";
 import { RequirementRevisionService } from "@/projects/requirements/requirement-revision.service";
+import {
+  RequirementRevisionChangeType,
+  type RequirementRevisionActor,
+  systemRevisionActor,
+} from "@/projects/requirements/requirement-revision-metadata";
 import type { ApproveRequirementDto } from "@/requirement-reviews/dto/approve-requirement.dto";
 import type { CloseRequirementReviewCommentDto } from "@/requirement-reviews/dto/close-requirement-review-comment.dto";
 import type { CreateRequirementReviewCommentDto } from "@/requirement-reviews/dto/create-requirement-review-comment.dto";
@@ -177,6 +182,7 @@ export class RequirementReviewsService {
     projectId: string,
     requirementId: string,
     approveRequirementDto: ApproveRequirementDto,
+    actor: RequirementRevisionActor = systemRevisionActor,
   ): Promise<RequirementResponseDto> {
     const requirement = await this.getReviewableDraftRequirement(
       projectId,
@@ -201,10 +207,16 @@ export class RequirementReviewsService {
       reviewer: approveRequirementDto.reviewer,
     };
     this.lifecycle.validateStatusChange(requirement, update);
-    await this.revisions.storeCurrent(requirement);
+    const revisionMetadata = {
+      changeType: RequirementRevisionChangeType.Approved,
+      changeReason: "Requirement approved.",
+      actor,
+    };
+    await this.revisions.storeCurrent(requirement, revisionMetadata);
 
     requirement.revisionNumber += 1;
     this.lifecycle.applyStatusChange(requirement, update);
+    this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
 
     const savedRequirement =
       await this.requirementsRepository.save(requirement);
@@ -216,6 +228,7 @@ export class RequirementReviewsService {
     projectId: string,
     requirementId: string,
     rejectRequirementDto: RejectRequirementDto,
+    actor: RequirementRevisionActor = systemRevisionActor,
   ): Promise<RequirementResponseDto> {
     const requirement = await this.getReviewableDraftRequirement(
       projectId,
@@ -228,10 +241,16 @@ export class RequirementReviewsService {
       rejectionReason: rejectRequirementDto.rejectionReason,
     };
     this.lifecycle.validateStatusChange(requirement, update);
-    await this.revisions.storeCurrent(requirement);
+    const revisionMetadata = {
+      changeType: RequirementRevisionChangeType.Rejected,
+      changeReason: `Requirement rejected: ${rejectRequirementDto.rejectionReason}`,
+      actor,
+    };
+    await this.revisions.storeCurrent(requirement, revisionMetadata);
 
     requirement.revisionNumber += 1;
     this.lifecycle.applyStatusChange(requirement, update);
+    this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
 
     const savedRequirement =
       await this.requirementsRepository.save(requirement);

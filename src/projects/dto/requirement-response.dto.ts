@@ -41,6 +41,21 @@ export class RequirementResponseDto {
     })
     revisionNumber!: number;
 
+    @ApiProperty({ example: 'content_changed', description: 'Reason category for the current revision.' })
+    changeType!: string;
+
+    @ApiProperty({ example: 'Requirement content changed.', description: 'Human-readable reason for the current revision.' })
+    changeReason!: string;
+
+    @ApiProperty({ example: '2026-06-28T10:00:00.000Z', description: 'Date and time when the current revision was created.' })
+    changedAt!: Date;
+
+    @ApiPropertyOptional({ example: '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b', nullable: true })
+    changedByUserId!: string | null;
+
+    @ApiProperty({ example: 'Jane Reviewer' })
+    changedByDisplayName!: string;
+
     @ApiProperty({ enum: RequirementStatus, example: RequirementStatus.Draft })
     status!: RequirementStatus;
 

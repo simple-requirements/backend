@@ -3,58 +3,12 @@ import { expect, test } from '@/projects/projects-api.e2e-fixtures';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import {
     expectErrorResponseBody,
-    expectRequirementResponseBody,
     type ErrorResponseBody,
     type RequirementResponseBody,
 } from '@/projects/projects-api.e2e-helpers';
 
-test.describe('Requirement revisions API - GET /projects/{projectId}/requirements/{requirementId}', () => {
-    test('returns a requirement by a specific revision number.', async ({ request, api, draftRequirement }) => {
-        const { project, category, requirement } = draftRequirement;
-
-        await api.approveRequirement(project.id, requirement.id);
-
-        const updateResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { description: 'Current draft.' },
-        });
-        expect(updateResponse.status()).toBe(200);
-
-        const firstRevisionResponse = await request.get(
-            `/projects/${project.id}/requirements/${requirement.id}?revision=1`,
-        );
-
-        expect(firstRevisionResponse.status()).toBe(200);
-
-        const firstRevision = (await firstRevisionResponse.json()) as RequirementResponseBody;
-
-        expectRequirementResponseBody(firstRevision, {
-            id: requirement.id,
-            projectId: project.id,
-            categoryId: category.id,
-            revisionNumber: 1,
-            status: RequirementStatus.Draft,
-            description: 'Original draft.',
-        });
-
-        const currentRevisionResponse = await request.get(
-            `/projects/${project.id}/requirements/${requirement.id}?revision=3`,
-        );
-
-        expect(currentRevisionResponse.status()).toBe(200);
-
-        const currentRevision = (await currentRevisionResponse.json()) as RequirementResponseBody;
-
-        expectRequirementResponseBody(currentRevision, {
-            id: requirement.id,
-            projectId: project.id,
-            categoryId: category.id,
-            revisionNumber: 3,
-            status: RequirementStatus.Draft,
-            description: 'Current draft.',
-        });
-    });
-
-    test('returns all stored historical revisions of a requirement.', async ({ request, api, draftRequirement }) => {
+test.describe('Requirement revisions API', () => {
+    test('returns immutable revisions including the current requirement revision.', async ({ request, api, draftRequirement }) => {
         const { project, requirement } = draftRequirement;
 
         await api.approveRequirement(project.id, requirement.id);
@@ -65,37 +19,85 @@ test.describe('Requirement revisions API - GET /projects/{projectId}/requirement
         expect(updateResponse.status()).toBe(200);
 
         const revisionsResponse = await request.get(
-            `/projects/${project.id}/requirements/${requirement.id}?allrevisions`,
+            `/projects/${project.id}/requirements/${requirement.id}/revisions`,
         );
 
         expect(revisionsResponse.status()).toBe(200);
 
         const revisions = (await revisionsResponse.json()) as readonly RequirementResponseBody[];
 
-        expect(revisions.map((revision) => revision.revisionNumber)).toEqual([1, 2]);
+        expect(revisions.map((revision) => revision.revisionNumber)).toEqual([1, 2, 3]);
         expect(revisions.map((revision) => revision.status)).toEqual([
             RequirementStatus.Draft,
             RequirementStatus.Approved,
+            RequirementStatus.Draft,
+        ]);
+        expect(revisions.map((revision) => revision.description)).toEqual([
+            'Original draft.',
+            'Original draft.',
+            'Current draft.',
         ]);
         expect(revisions.every((revision) => revision.id === requirement.id)).toBe(true);
     });
 
-    test('rejects invalid requirement revision query parameters.', async ({ request, draftRequirement }) => {
+    test('compares two requirement revisions.', async ({ request, api, draftRequirement }) => {
         const { project, requirement } = draftRequirement;
 
-        const response = await request.get(`/projects/${project.id}/requirements/${requirement.id}?revision=0`);
+        await api.approveRequirement(project.id, requirement.id);
+
+        const updateResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
+            data: { description: 'Current draft.' },
+        });
+        expect(updateResponse.status()).toBe(200);
+
+        const compareResponse = await request.get(
+            `/projects/${project.id}/requirements/${requirement.id}/revisions/compare?from=1&to=3`,
+        );
+
+        expect(compareResponse.status()).toBe(200);
+
+        const body = (await compareResponse.json()) as {
+            readonly projectId: string;
+            readonly requirementId: string;
+            readonly fromRevision: number;
+            readonly toRevision: number;
+            readonly differences: readonly { readonly field: string }[];
+        };
+
+        expect(body).toMatchObject({
+            projectId: project.id,
+            requirementId: requirement.id,
+            fromRevision: 1,
+            toRevision: 3,
+        });
+        expect(body.differences.map((difference) => difference.field)).toContain('description');
+    });
+
+    test('rejects invalid revision comparison parameters.', async ({ request, draftRequirement }) => {
+        const { project, requirement } = draftRequirement;
+
+        const response = await request.get(
+            `/projects/${project.id}/requirements/${requirement.id}/revisions/compare?from=0&to=1`,
+        );
 
         expect(response.status()).toBe(400);
 
         const body = (await response.json()) as ErrorResponseBody;
 
-        expectErrorResponseBody(body, 400, 'Revision query parameter must be a positive integer.', 'Bad Request');
+        expectErrorResponseBody(
+            body,
+            400,
+            'Revision comparison requires positive integer revision numbers.',
+            'Bad Request',
+        );
     });
 
-    test('returns 404 when a requested historical revision does not exist.', async ({ request, draftRequirement }) => {
+    test('returns 404 when a compared revision does not exist.', async ({ request, draftRequirement }) => {
         const { project, requirement } = draftRequirement;
 
-        const response = await request.get(`/projects/${project.id}/requirements/${requirement.id}?revision=99`);
+        const response = await request.get(
+            `/projects/${project.id}/requirements/${requirement.id}/revisions/compare?from=1&to=99`,
+        );
 
         expect(response.status()).toBe(404);
 
@@ -104,7 +106,7 @@ test.describe('Requirement revisions API - GET /projects/{projectId}/requirement
         expectErrorResponseBody(
             body,
             404,
-            `Revision 99 of requirement "${requirement.id}" in project "${project.id}" was not found.`,
+            `One or both requested revisions of requirement "${requirement.id}" were not found.`,
             'Not Found',
         );
     });

@@ -178,6 +178,11 @@ export interface RequirementResponseBody {
   sequenceNumber: number;
   visibleKey: string;
   revisionNumber: number;
+  changeType: string;
+  changeReason: string;
+  changedAt: string;
+  changedByUserId: string | null;
+  changedByDisplayName: string;
   status: RequirementStatus;
   description: string | null;
   priority: string | null;

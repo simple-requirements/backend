@@ -46,6 +46,7 @@ import {
   RequireProjectPermission,
 } from "@/auth/authorization/project-permission";
 import type { AuthenticatedRequest } from "@/auth/sessions/authenticated-request";
+import { revisionActorFromAuthenticatedUser } from "@/projects/requirements/requirement-revision-metadata";
 
 @ApiTags("requirement reviews")
 @ApiBearerAuth()
@@ -225,6 +226,7 @@ export class RequirementReviewsController {
       Object.assign(approveRequirementDto, {
         reviewer: request.authentication.user.displayName,
       }),
+      revisionActorFromAuthenticatedUser(request.authentication.user),
     );
   }
 
@@ -256,6 +258,7 @@ export class RequirementReviewsController {
       Object.assign(rejectRequirementDto, {
         reviewer: request.authentication.user.displayName,
       }),
+      revisionActorFromAuthenticatedUser(request.authentication.user),
     );
   }
 }

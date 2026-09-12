@@ -53,7 +53,7 @@ export class ProjectsController {
   ) {}
 
   @Get()
-  @RequireProjectPermission(ProjectPermission.Read)
+  @RequireProjectPermission(ProjectPermission.ReadProject)
   @ApiOperation({ operationId: "listProjects", summary: "List all projects." })
   @ApiOkResponse({
     description: "All projects.",
@@ -74,7 +74,7 @@ export class ProjectsController {
   }
 
   @Get(":id")
-  @RequireProjectPermission(ProjectPermission.Read)
+  @RequireProjectPermission(ProjectPermission.ReadProject)
   @ApiOperation({ operationId: "getProject", summary: "Get one project." })
   @ApiParam({ name: "id", description: "Project identifier." })
   @ApiOkResponse({ description: "The project.", type: ProjectResponseDto })

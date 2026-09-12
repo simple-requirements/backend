@@ -329,13 +329,13 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
   });
 });
 
-test.describe("Requirements API - DELETE /projects/{projectId}/requirements/{requirementId}", () => {
-  test("moves draft requirements into and out of the recycle bin.", async ({
+test.describe("Requirements API - no requirement deletion", () => {
+  test("does not expose requirement deletion or recycle-bin behavior.", async ({
     request,
     api,
   }) => {
     const project = await api.createProject(
-      `Playwright API recycle bin project ${randomUUID()}`,
+      `Playwright API no requirement delete project ${randomUUID()}`,
     );
     const category = await api.createCategory(
       project.id,
@@ -343,177 +343,27 @@ test.describe("Requirements API - DELETE /projects/{projectId}/requirements/{req
       "AUTH",
       CategoryType.FR,
     );
-    const firstRequirement = await api.createRequirement(
+    const requirement = await api.createRequirement(
       project.id,
       category.id,
-      "First draft.",
+      "Draft that must remain retained.",
     );
-    const secondRequirement = await api.createRequirement(
-      project.id,
-      category.id,
-      "Second draft.",
-    );
-
-    const softDeleteResponse = await request.delete(
-      `/projects/${project.id}/requirements/${firstRequirement.id}`,
-    );
-
-    expect(softDeleteResponse.status()).toBe(204);
-    expect(await softDeleteResponse.text()).toBe("");
-
-    const visibleListResponse = await request.get(
-      `/projects/${project.id}/requirements`,
-    );
-    const visibleListBody =
-      (await visibleListResponse.json()) as readonly RequirementResponseBody[];
-
-    expect(
-      visibleListBody.map((listedRequirement) => listedRequirement.id),
-    ).not.toContain(firstRequirement.id);
-    expect(
-      visibleListBody.map((listedRequirement) => listedRequirement.id),
-    ).toContain(secondRequirement.id);
-
-    const deletedListResponse = await request.get(
-      `/projects/${project.id}/requirements?deleted`,
-    );
-    const deletedListBody =
-      (await deletedListResponse.json()) as readonly RequirementResponseBody[];
-
-    expect(
-      deletedListBody.map((listedRequirement) => listedRequirement.id),
-    ).toEqual([firstRequirement.id]);
-    expect(deletedListBody[0]?.deletedAt).not.toBeNull();
-
-    const finalDeleteResponse = await request.delete(
-      `/projects/${project.id}/requirements/${firstRequirement.id}?deleted`,
-    );
-
-    expect(finalDeleteResponse.status()).toBe(204);
-
-    const deletedListAfterFinalDeleteResponse = await request.get(
-      `/projects/${project.id}/requirements?deleted`,
-    );
-    const deletedListAfterFinalDeleteBody =
-      (await deletedListAfterFinalDeleteResponse.json()) as readonly RequirementResponseBody[];
-
-    expect(deletedListAfterFinalDeleteBody).toEqual([]);
-  });
-
-  test("does not soft delete approved requirements.", async ({
-    request,
-    api,
-  }) => {
-    const project = await api.createProject(
-      `Playwright API approved delete project ${randomUUID()}`,
-    );
-    const category = await api.createCategory(
-      project.id,
-      "Authentication",
-      "AUTH",
-      CategoryType.FR,
-    );
-    const requirement = await api.createRequirement(project.id, category.id);
-
-    const approveResponse = await request.patch(
-      `/projects/${project.id}/requirements/${requirement.id}`,
-      {
-        data: {
-          status: RequirementStatus.Approved,
-          reviewer: "Requirements Engineer",
-        },
-      },
-    );
-    expect(approveResponse.status()).toBe(200);
 
     const deleteResponse = await request.delete(
       `/projects/${project.id}/requirements/${requirement.id}`,
     );
 
-    expect(deleteResponse.status()).toBe(400);
+    expect(deleteResponse.status()).toBe(404);
 
-    const body = (await deleteResponse.json()) as ErrorResponseBody;
+    const listedRequirementsResponse = await request.get(
+      `/projects/${project.id}/requirements?deleted`,
+    );
+    const listedRequirements =
+      (await listedRequirementsResponse.json()) as readonly RequirementResponseBody[];
 
-    expectErrorResponseBody(
-      body,
-      400,
-      "Only draft requirements can be deleted.",
-      "Bad Request",
+    expect(listedRequirements.map((item) => item.id)).toContain(
+      requirement.id,
     );
   });
 });
 
-test.describe("Requirements API - DELETE /projects/{projectId}/requirements", () => {
-  test("clears the complete requirement recycle bin.", async ({
-    request,
-    api,
-  }) => {
-    const project = await api.createProject(
-      `Playwright API clear recycle bin project ${randomUUID()}`,
-    );
-    const category = await api.createCategory(
-      project.id,
-      "Authentication",
-      "AUTH",
-      CategoryType.FR,
-    );
-    const firstRequirement = await api.createRequirement(
-      project.id,
-      category.id,
-      "First draft.",
-    );
-    const secondRequirement = await api.createRequirement(
-      project.id,
-      category.id,
-      "Second draft.",
-    );
-
-    const firstDeleteResponse = await request.delete(
-      `/projects/${project.id}/requirements/${firstRequirement.id}`,
-    );
-    const secondDeleteResponse = await request.delete(
-      `/projects/${project.id}/requirements/${secondRequirement.id}`,
-    );
-
-    expect(firstDeleteResponse.status()).toBe(204);
-    expect(secondDeleteResponse.status()).toBe(204);
-
-    const clearResponse = await request.delete(
-      `/projects/${project.id}/requirements?deleted`,
-    );
-
-    expect(clearResponse.status()).toBe(204);
-
-    const deletedListResponse = await request.get(
-      `/projects/${project.id}/requirements?deleted`,
-    );
-    const deletedListBody =
-      (await deletedListResponse.json()) as readonly RequirementResponseBody[];
-
-    expect(deletedListBody).toEqual([]);
-  });
-
-  test("rejects clearing the recycle bin without the deleted query parameter.", async ({
-    request,
-    api,
-  }) => {
-    const project = await api.createProject(
-      `Playwright API clear recycle bin missing flag project ${randomUUID()}`,
-    );
-
-    const clearResponse = await request.delete(
-      `/projects/${project.id}/requirements`,
-    );
-
-    expect(clearResponse.status()).toBe(400);
-
-    const body = (await clearResponse.json()) as ErrorResponseBody;
-
-    expectErrorResponseBody(
-      body,
-      400,
-      "Clearing requirements requires the deleted query parameter.",
-      "Bad Request",
-    );
-  });
-});

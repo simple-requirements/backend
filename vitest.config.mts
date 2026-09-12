@@ -28,5 +28,7 @@ export default defineConfig({
                 'src/database/**/*.ts',
             ],
         },
+        reporters: ['json', 'default'],
+        outputFile: { json: './vitest-json-report.json' },
     },
 });

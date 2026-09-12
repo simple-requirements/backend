@@ -85,7 +85,7 @@ test.describe("Categories API - GET /projects/{projectId}/categories", () => {
     expect(body).toEqual([]);
   });
 
-  test("returns 404 when the project does not exist.", async ({ request }) => {
+  test("returns 403 when the user has no project-content access.", async ({ request }) => {
     const unknownProjectId = randomUUID();
 
     const response = await request.get(
@@ -93,15 +93,15 @@ test.describe("Categories API - GET /projects/{projectId}/categories", () => {
       { headers: E2E_ADMIN_HEADERS },
     );
 
-    expect(response.status()).toBe(404);
+    expect(response.status()).toBe(403);
 
     const body = (await response.json()) as ErrorResponseBody;
 
     expectErrorResponseBody(
       body,
-      404,
-      `Project with id "${unknownProjectId}" was not found.`,
-      "Not Found",
+      403,
+      "Project access is not permitted.",
+      "Forbidden",
     );
   });
 });

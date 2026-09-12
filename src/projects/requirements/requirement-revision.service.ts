@@ -4,6 +4,17 @@ import { Repository } from "typeorm";
 
 import { RequirementRevision } from "@/projects/requirement-revisions.entity";
 import { Requirement } from "@/projects/requirements.entity";
+import {
+  RequirementRevisionChangeType,
+  type RequirementRevisionMetadata,
+  systemRevisionActor,
+} from "@/projects/requirements/requirement-revision-metadata";
+
+const legacyRevisionMetadata: RequirementRevisionMetadata = {
+  changeType: RequirementRevisionChangeType.ContentChanged,
+  changeReason: "Legacy revision snapshot.",
+  actor: systemRevisionActor,
+};
 
 @Injectable()
 export class RequirementRevisionService {
@@ -12,7 +23,21 @@ export class RequirementRevisionService {
     private readonly revisions: Repository<RequirementRevision>,
   ) {}
 
-  async storeCurrent(requirement: Requirement): Promise<void> {
+  applyCurrentMetadata(
+    requirement: Requirement,
+    metadata: RequirementRevisionMetadata,
+  ): void {
+    requirement.changeType = metadata.changeType;
+    requirement.changeReason = metadata.changeReason;
+    requirement.changedAt = new Date();
+    requirement.changedByUserId = metadata.actor.userId;
+    requirement.changedByDisplayName = metadata.actor.displayName;
+  }
+
+  async storeCurrent(
+    requirement: Requirement,
+    metadata: RequirementRevisionMetadata = legacyRevisionMetadata,
+  ): Promise<void> {
     const revision = this.revisions.create({
       requirementId: requirement.id,
       projectId: requirement.projectId,
@@ -20,6 +45,11 @@ export class RequirementRevisionService {
       sequenceNumber: requirement.sequenceNumber,
       visibleKey: requirement.visibleKey,
       revisionNumber: requirement.revisionNumber,
+      changeType: metadata.changeType,
+      changeReason: metadata.changeReason,
+      changedAt: new Date(),
+      changedByUserId: metadata.actor.userId,
+      changedByDisplayName: metadata.actor.displayName,
       status: requirement.status,
       description: requirement.description,
       priority: requirement.priority,
@@ -48,6 +78,16 @@ export class RequirementRevisionService {
     });
 
     await this.revisions.save(revision);
+  }
+
+  async findHistory(
+    projectId: string,
+    requirement: Requirement,
+  ): Promise<(RequirementRevision | Requirement)[]> {
+    const archived = await this.findAll(projectId, requirement.id);
+    return [...archived, requirement].sort(
+      (left, right) => left.revisionNumber - right.revisionNumber,
+    );
   }
 
   findAll(

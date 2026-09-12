@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, IsNull, Not, Repository } from "typeorm";
+import { In, Not, Repository } from "typeorm";
 
 import { Category } from "@/projects/categories.entity";
 import { CreateCategoryDto } from "@/projects/dto/create-category.dto";
@@ -13,7 +13,6 @@ import { CreateRequirementDto } from "@/projects/dto/create-requirement.dto";
 import { CategoryResponseDto } from "@/projects/dto/category-response.dto";
 import { ProjectResponseDto } from "@/projects/dto/project-response.dto";
 import { RequirementResponseDto } from "@/projects/dto/requirement-response.dto";
-import type { RequirementRevisionQueryDto } from "@/projects/dto/requirement-revision-query.dto";
 import { UpdateCategoryDto } from "@/projects/dto/update-category.dto";
 import { UpdateProjectDto } from "@/projects/dto/update-project.dto";
 import { UpdateRequirementDto } from "@/projects/dto/update-requirement.dto";
@@ -25,6 +24,12 @@ import { RequirementImplementationTicket } from "@/projects/requirement-implemen
 import { RequirementLifecycleService } from "@/projects/requirements/requirement-lifecycle.service";
 import { RequirementResponseMapper } from "@/projects/requirements/requirement-response.mapper";
 import { RequirementRevisionService } from "@/projects/requirements/requirement-revision.service";
+import {
+  RequirementRevisionChangeType,
+  type RequirementRevisionActor,
+  type RequirementRevisionMetadata,
+  systemRevisionActor,
+} from "@/projects/requirements/requirement-revision-metadata";
 import {
   ImplementationTicketResponseDto,
   UpsertImplementationTicketDto,
@@ -38,6 +43,44 @@ const CONTENT_FIELD_NAMES = [
   "rationale",
   "source",
 ] as const;
+
+function createRevisionMetadata(
+  changeType: RequirementRevisionChangeType,
+  changeReason: string,
+  actor: RequirementRevisionActor = systemRevisionActor,
+): RequirementRevisionMetadata {
+  return { changeType, changeReason, actor };
+}
+
+function statusChangeReason(update: UpdateRequirementDto): string {
+  switch (update.status) {
+    case RequirementStatus.Approved:
+      return "Requirement approved.";
+    case RequirementStatus.Rejected:
+      return `Requirement rejected: ${update.rejectionReason ?? "No reason provided."}`;
+    case RequirementStatus.Implemented:
+      return "Requirement implemented.";
+    case RequirementStatus.Obsolete:
+      return `Requirement marked obsolete: ${update.obsolescenceReason ?? "No reason provided."}`;
+    default:
+      return "Requirement changed.";
+  }
+}
+
+function statusChangeType(update: UpdateRequirementDto): RequirementRevisionChangeType {
+  switch (update.status) {
+    case RequirementStatus.Approved:
+      return RequirementRevisionChangeType.Approved;
+    case RequirementStatus.Rejected:
+      return RequirementRevisionChangeType.Rejected;
+    case RequirementStatus.Implemented:
+      return RequirementRevisionChangeType.Implemented;
+    case RequirementStatus.Obsolete:
+      return RequirementRevisionChangeType.Obsoleted;
+    default:
+      return RequirementRevisionChangeType.ContentChanged;
+  }
+}
 
 @Injectable()
 export class ProjectsService {
@@ -195,12 +238,11 @@ export class ProjectsService {
 
   async findAllRequirements(
     projectId: string,
-    deletedOnly: boolean,
   ): Promise<RequirementResponseDto[]> {
     await this.getProjectOrThrow(projectId);
 
     const requirements = await this.requirementsRepository.find({
-      where: { projectId, deletedAt: deletedOnly ? Not(IsNull()) : IsNull() },
+      where: { projectId },
       order: { visibleKey: "ASC" },
     });
 
@@ -212,8 +254,7 @@ export class ProjectsService {
   async findRequirement(
     projectId: string,
     requirementId: string,
-    revisionQuery: RequirementRevisionQueryDto = { allrevisions: false },
-  ): Promise<RequirementResponseDto | RequirementResponseDto[]> {
+  ): Promise<RequirementResponseDto> {
     await this.getProjectOrThrow(projectId);
 
     const requirement = await this.getRequirementOrThrow(
@@ -221,34 +262,13 @@ export class ProjectsService {
       requirementId,
     );
 
-    if (revisionQuery.allrevisions) {
-      const revisions = await this.revisions.findAll(projectId, requirementId);
-
-      return revisions.map((revision) =>
-        this.requirementMapper.fromRevision(revision),
-      );
-    }
-
-    if (revisionQuery.revision !== undefined) {
-      if (revisionQuery.revision === requirement.revisionNumber) {
-        return this.requirementMapper.fromRequirement(requirement);
-      }
-
-      const revision = await this.revisions.findOne(
-        projectId,
-        requirementId,
-        revisionQuery.revision,
-      );
-
-      return this.requirementMapper.fromRevision(revision);
-    }
-
     return this.requirementMapper.fromRequirement(requirement);
   }
 
   async createRequirement(
     projectId: string,
     createRequirementDto: CreateRequirementDto,
+    actor: RequirementRevisionActor = systemRevisionActor,
   ): Promise<RequirementResponseDto> {
     await this.getProjectOrThrow(projectId);
 
@@ -267,6 +287,11 @@ export class ProjectsService {
       sequenceNumber,
       visibleKey: this.buildVisibleKey(category, sequenceNumber),
       revisionNumber: 1,
+      changeType: RequirementRevisionChangeType.Created,
+      changeReason: "Requirement created.",
+      changedAt: new Date(),
+      changedByUserId: actor.userId,
+      changedByDisplayName: actor.displayName,
       status: RequirementStatus.Draft,
       description: createRequirementDto.description ?? null,
       priority: createRequirementDto.priority ?? null,
@@ -295,6 +320,7 @@ export class ProjectsService {
     projectId: string,
     requirementId: string,
     updateRequirementDto: UpdateRequirementDto,
+    actor: RequirementRevisionActor = systemRevisionActor,
   ): Promise<RequirementResponseDto> {
     await this.getProjectOrThrow(projectId);
 
@@ -303,11 +329,6 @@ export class ProjectsService {
       requirementId,
     );
 
-    if (requirement.deletedAt !== null) {
-      throw new BadRequestException(
-        `Requirement with id "${requirementId}" is in the recycle bin and cannot be changed.`,
-      );
-    }
 
     const categoryChange = await this.prepareRequirementContentChange(
       projectId,
@@ -319,7 +340,13 @@ export class ProjectsService {
       this.lifecycle.validateStatusChange(requirement, updateRequirementDto);
     }
 
-    await this.revisions.storeCurrent(requirement);
+    const revisionMetadata = this.createRequirementRevisionMetadata(
+      requirement,
+      updateRequirementDto,
+      actor,
+    );
+
+    await this.revisions.storeCurrent(requirement, revisionMetadata);
     requirement.revisionNumber += 1;
 
     if (updateRequirementDto.status !== undefined) {
@@ -331,68 +358,12 @@ export class ProjectsService {
         categoryChange,
       );
     }
+    this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
 
     const savedRequirement =
       await this.requirementsRepository.save(requirement);
 
     return this.requirementMapper.fromRequirement(savedRequirement);
-  }
-
-  async deleteRequirement(
-    projectId: string,
-    requirementId: string,
-    deletedOnly: boolean,
-  ): Promise<void> {
-    await this.getProjectOrThrow(projectId);
-
-    const requirement = await this.getRequirementOrThrow(
-      projectId,
-      requirementId,
-    );
-
-    if (deletedOnly) {
-      if (requirement.deletedAt === null) {
-        throw new BadRequestException(
-          `Requirement with id "${requirementId}" is not in the recycle bin.`,
-        );
-      }
-
-      await this.requirementsRepository.delete({
-        id: requirementId,
-        projectId,
-      });
-      return;
-    }
-
-    if (requirement.status !== RequirementStatus.Draft) {
-      throw new BadRequestException("Only draft requirements can be deleted.");
-    }
-
-    if (requirement.deletedAt !== null) {
-      return;
-    }
-
-    requirement.deletedAt = new Date();
-
-    await this.requirementsRepository.save(requirement);
-  }
-
-  async clearDeletedRequirements(
-    projectId: string,
-    deletedOnly: boolean,
-  ): Promise<void> {
-    if (!deletedOnly) {
-      throw new BadRequestException(
-        "Clearing requirements requires the deleted query parameter.",
-      );
-    }
-
-    await this.getProjectOrThrow(projectId);
-
-    await this.requirementsRepository.delete({
-      projectId,
-      deletedAt: Not(IsNull()),
-    });
   }
 
   async listImplementationTickets(
@@ -417,6 +388,7 @@ export class ProjectsService {
     projectId: string,
     requirementId: string,
     dto: UpsertImplementationTicketDto,
+    actor: RequirementRevisionActor = systemRevisionActor,
   ): Promise<ImplementationTicketResponseDto> {
     const project = await this.getProjectOrThrow(projectId);
     const requirement = await this.getRequirementOrThrow(
@@ -425,7 +397,12 @@ export class ProjectsService {
     );
     this.assertTicketsEditable(requirement);
     await this.ensureTicketIdAvailable(requirementId, dto.ticketId);
-    await this.revisions.storeCurrent(requirement);
+    const revisionMetadata = createRevisionMetadata(
+      RequirementRevisionChangeType.ImplementationTicketCreated,
+      `Implementation ticket ${dto.ticketId} created.`,
+      actor,
+    );
+    await this.revisions.storeCurrent(requirement, revisionMetadata);
     const ticket = this.implementationTicketsRepository.create({
       requirementId,
       ticketId: dto.ticketId,
@@ -438,6 +415,7 @@ export class ProjectsService {
       savedTicket,
     ];
     requirement.revisionNumber += 1;
+    this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
     await this.requirementsRepository.save(requirement);
     return this.requirementMapper.fromImplementationTicket(
       savedTicket,
@@ -450,6 +428,7 @@ export class ProjectsService {
     requirementId: string,
     ticketRecordId: string,
     dto: UpsertImplementationTicketDto,
+    actor: RequirementRevisionActor = systemRevisionActor,
   ): Promise<ImplementationTicketResponseDto> {
     const project = await this.getProjectOrThrow(projectId);
     const requirement = await this.getRequirementOrThrow(
@@ -466,13 +445,19 @@ export class ProjectsService {
       dto.ticketId,
       ticketRecordId,
     );
-    await this.revisions.storeCurrent(requirement);
+    const revisionMetadata = createRevisionMetadata(
+      RequirementRevisionChangeType.ImplementationTicketUpdated,
+      `Implementation ticket ${dto.ticketId} updated.`,
+      actor,
+    );
+    await this.revisions.storeCurrent(requirement, revisionMetadata);
     Object.assign(ticket, dto);
     const savedTicket = await this.implementationTicketsRepository.save(ticket);
     requirement.implementationTickets = requirement.implementationTickets.map(
       (item) => (item.id === savedTicket.id ? savedTicket : item),
     );
     requirement.revisionNumber += 1;
+    this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
     await this.requirementsRepository.save(requirement);
     return this.requirementMapper.fromImplementationTicket(
       savedTicket,
@@ -484,6 +469,7 @@ export class ProjectsService {
     projectId: string,
     requirementId: string,
     ticketRecordId: string,
+    actor: RequirementRevisionActor = systemRevisionActor,
   ): Promise<void> {
     await this.getProjectOrThrow(projectId);
     const requirement = await this.getRequirementOrThrow(
@@ -491,8 +477,13 @@ export class ProjectsService {
       requirementId,
     );
     this.assertTicketsEditable(requirement);
-    await this.getImplementationTicketOrThrow(requirementId, ticketRecordId);
-    await this.revisions.storeCurrent(requirement);
+    const ticket = await this.getImplementationTicketOrThrow(requirementId, ticketRecordId);
+    const revisionMetadata = createRevisionMetadata(
+      RequirementRevisionChangeType.ImplementationTicketRemoved,
+      `Implementation ticket ${ticket.ticketId} removed.`,
+      actor,
+    );
+    await this.revisions.storeCurrent(requirement, revisionMetadata);
     await this.implementationTicketsRepository.delete({
       id: ticketRecordId,
       requirementId,
@@ -502,7 +493,101 @@ export class ProjectsService {
         (item) => item.id !== ticketRecordId,
       );
     requirement.revisionNumber += 1;
+    this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
     await this.requirementsRepository.save(requirement);
+  }
+
+
+  async findRequirementRevisions(
+    projectId: string,
+    requirementId: string,
+  ): Promise<RequirementResponseDto[]> {
+    await this.getProjectOrThrow(projectId);
+    const requirement = await this.getRequirementOrThrow(
+      projectId,
+      requirementId,
+    );
+    const history = await this.revisions.findHistory(projectId, requirement);
+
+    return history.map((revision) =>
+      revision instanceof Requirement
+        ? this.requirementMapper.fromRequirement(revision)
+        : this.requirementMapper.fromRevision(revision),
+    );
+  }
+
+  async compareRequirementRevisions(
+    projectId: string,
+    requirementId: string,
+    fromRevision: number,
+    toRevision: number,
+  ): Promise<{
+    readonly projectId: string;
+    readonly requirementId: string;
+    readonly fromRevision: number;
+    readonly toRevision: number;
+    readonly differences: readonly {
+      readonly field: string;
+      readonly from: unknown;
+      readonly to: unknown;
+    }[];
+  }> {
+    if (
+      !Number.isInteger(fromRevision) ||
+      !Number.isInteger(toRevision) ||
+      fromRevision < 1 ||
+      toRevision < 1
+    ) {
+      throw new BadRequestException(
+        "Revision comparison requires positive integer revision numbers.",
+      );
+    }
+
+    const snapshots = await this.findRequirementRevisions(
+      projectId,
+      requirementId,
+    );
+    const from = snapshots.find(
+      (snapshot) => snapshot.revisionNumber === fromRevision,
+    );
+    const to = snapshots.find((snapshot) => snapshot.revisionNumber === toRevision);
+
+    if (from === undefined || to === undefined) {
+      throw new NotFoundException(
+        `One or both requested revisions of requirement "${requirementId}" were not found.`,
+      );
+    }
+
+    const comparedFields = [
+      "categoryId",
+      "sequenceNumber",
+      "visibleKey",
+      "status",
+      "description",
+      "priority",
+      "owner",
+      "rationale",
+      "source",
+      "rejectionReason",
+      "reviewer",
+      "obsoletedBy",
+      "implementationTickets",
+      "approvedAt",
+      "implementedAt",
+      "obsolescenceReason",
+      "obsoleteAt",
+      "rejectedAt",
+    ] as const;
+
+    return {
+      projectId,
+      requirementId,
+      fromRevision,
+      toRevision,
+      differences: comparedFields
+        .filter((field) => JSON.stringify(from[field]) !== JSON.stringify(to[field]))
+        .map((field) => ({ field, from: from[field], to: to[field] })),
+    };
   }
 
   private assertTicketsEditable(requirement: Requirement): void {
@@ -653,6 +738,31 @@ export class ProjectsService {
     return `${category.type}-${category.key}-${sequenceNumber.toString().padStart(4, "0")}`;
   }
 
+
+  private createRequirementRevisionMetadata(
+    requirement: Requirement,
+    update: UpdateRequirementDto,
+    actor: RequirementRevisionActor,
+  ): RequirementRevisionMetadata {
+    if (update.status !== undefined) {
+      return createRevisionMetadata(
+        statusChangeType(update),
+        statusChangeReason(update),
+        actor,
+      );
+    }
+
+    return createRevisionMetadata(
+      update.categoryId !== undefined && update.categoryId !== requirement.categoryId
+        ? RequirementRevisionChangeType.CategoryChanged
+        : RequirementRevisionChangeType.ContentChanged,
+      update.categoryId !== undefined && update.categoryId !== requirement.categoryId
+        ? "Requirement category changed."
+        : "Requirement content changed.",
+      actor,
+    );
+  }
+
   private async prepareRequirementContentChange(
     projectId: string,
     requirement: Requirement,
@@ -666,7 +776,6 @@ export class ProjectsService {
 
     if (
       requirement.status !== RequirementStatus.Draft &&
-      requirement.status !== RequirementStatus.Rejected &&
       requirement.status !== RequirementStatus.Approved
     ) {
       throw new BadRequestException(

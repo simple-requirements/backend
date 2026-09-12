@@ -33,6 +33,21 @@ export class RequirementRevision {
     @Column({ type: 'integer', name: 'revision_number' })
     revisionNumber!: number;
 
+    @Column({ type: 'varchar', length: 40, name: 'change_type', default: 'requirement_created' })
+    changeType!: string;
+
+    @Column({ type: 'text', name: 'change_reason', default: 'Requirement created' })
+    changeReason!: string;
+
+    @Column({ type: 'timestamptz', name: 'changed_at', default: () => 'now()' })
+    changedAt!: Date;
+
+    @Column({ type: 'uuid', name: 'changed_by_user_id', nullable: true })
+    changedByUserId!: string | null;
+
+    @Column({ type: 'varchar', length: 120, name: 'changed_by_display_name', default: 'System' })
+    changedByDisplayName!: string;
+
     @Column({ type: 'varchar', length: 12 })
     status!: RequirementStatus;
 

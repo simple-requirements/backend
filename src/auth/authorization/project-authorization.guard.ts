@@ -32,20 +32,23 @@ export class ProjectAuthorizationGuard implements CanActivate {
     );
     if (permission === ProjectPermission.Administer)
       return this.require(administrator);
-    if (permission === ProjectPermission.Read && administrator) return true;
     const projectId =
       "projectId" in request.params
         ? request.params.projectId
         : request.params.id;
-    if (typeof projectId !== "string" && permission === ProjectPermission.Read)
+    if (typeof projectId !== "string") {
       return true;
-    if (typeof projectId !== "string")
-      throw new ForbiddenException("Project access is required.");
+    }
+    if (permission === ProjectPermission.ReadProject && administrator)
+      return true;
     const memberships = await this.dataSource
       .getRepository(ProjectMembership)
       .findBy({ projectId, userId: request.authentication.user.id });
     const roles = new Set(memberships.map(({ role }) => role));
-    if (permission === ProjectPermission.Read)
+    if (
+      permission === ProjectPermission.Read ||
+      permission === ProjectPermission.ReadProject
+    )
       return this.require(roles.size > 0);
     if (permission === ProjectPermission.ManageRequirements)
       return this.require(roles.has(ProjectRole.RequirementsEngineer));

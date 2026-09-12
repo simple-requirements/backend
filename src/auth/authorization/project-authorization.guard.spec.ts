@@ -36,9 +36,9 @@ function setup(
 }
 
 describe("ProjectAuthorizationGuard", () => {
-  it("allows global Administrators to read and administer projects.", async () => {
+  it("allows global Administrators to read project records and administer projects.", async () => {
     for (const permission of [
-      ProjectPermission.Read,
+      ProjectPermission.ReadProject,
       ProjectPermission.Administer,
     ]) {
       const { guard, context } = setup(
@@ -48,6 +48,16 @@ describe("ProjectAuthorizationGuard", () => {
       );
       await expect(guard.canActivate(context)).resolves.toBe(true);
     }
+  });
+  it("does not allow global Administrators to read project contents without membership.", async () => {
+    const { guard, context } = setup(
+      ProjectPermission.Read,
+      [],
+      [GlobalRole.Administrator],
+    );
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
   it.each([
     [ProjectPermission.Read, ProjectRole.Viewer],

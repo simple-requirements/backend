@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { demoProjects } from '@/database/seeding/demo-projects';
 import { expect, test } from '@/projects/projects-api.e2e-fixtures';
 
 import {
@@ -7,11 +8,24 @@ import {
     expectProjectResponseBody,
     UUID_REGEX,
     E2E_ADMIN_HEADERS,
+    E2E_REQUIREMENTS_ENGINEER_HEADERS,
     type ErrorResponseBody,
     type ProjectResponseBody,
 } from '@/projects/projects-api.e2e-helpers';
 
 test.describe('Projects API - GET /projects', () => {
+    test('lists seeded demo projects for the Requirements Engineer.', async ({ request }) => {
+        const response = await request.get('/projects', { headers: E2E_REQUIREMENTS_ENGINEER_HEADERS });
+
+        expect(response.status()).toBe(200);
+
+        const body = (await response.json()) as readonly ProjectResponseBody[];
+        const projectNames = body.map((project) => project.name);
+        const expectedNames = demoProjects.map((project) => project.name).sort((left, right) => left.localeCompare(right));
+
+        expect(projectNames).toEqual(expectedNames);
+    });
+
     test('lists all projects.', async ({ request }) => {
         const firstProjectName = `Playwright API list project A ${randomUUID()}`;
         const secondProjectName = `Playwright API list project B ${randomUUID()}`;

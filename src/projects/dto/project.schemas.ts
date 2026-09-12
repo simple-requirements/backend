@@ -6,7 +6,6 @@ import { CATEGORY_KEY_PATTERN } from '@/projects/requirement.constants';
 import type { CreateCategoryDto } from '@/projects/dto/create-category.dto';
 import type { CreateProjectDto } from '@/projects/dto/create-project.dto';
 import type { CreateRequirementDto } from '@/projects/dto/create-requirement.dto';
-import type { RequirementRevisionQueryDto } from '@/projects/dto/requirement-revision-query.dto';
 import type { UpdateCategoryDto } from '@/projects/dto/update-category.dto';
 import type { UpdateProjectDto } from '@/projects/dto/update-project.dto';
 import type { UpdateRequirementDto } from '@/projects/dto/update-requirement.dto';
@@ -181,25 +180,6 @@ export const createRequirementSchema: ZodValidationSchema<CreateRequirementDto> 
         source: requirementTextSchema.optional(),
     }),
 );
-
-export const requirementRevisionQuerySchema: ZodValidationSchema<RequirementRevisionQueryDto> = z
-    .object({
-        revision: revisionNumberQuerySchema().optional(),
-        allrevisions: z
-            .unknown()
-            .optional()
-            .transform((value) => value !== undefined),
-    })
-    .refine((query) => query.revision === undefined || !query.allrevisions, {
-        message: 'Use either revision or allrevisions, not both.',
-    })
-    .transform((query) => {
-        if (query.revision === undefined) {
-            return { allrevisions: query.allrevisions };
-        }
-
-        return { revision: query.revision, allrevisions: query.allrevisions };
-    });
 
 export const updateRequirementSchema: ZodValidationSchema<UpdateRequirementDto> = requirementRequestBodySchema.pipe(
     z

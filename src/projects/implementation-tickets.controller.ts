@@ -33,6 +33,7 @@ import {
   RequireProjectPermission,
 } from "@/auth/authorization/project-permission";
 import type { AuthenticatedRequest } from "@/auth/sessions/authenticated-request";
+import { revisionActorFromAuthenticatedUser } from "@/projects/requirements/requirement-revision-metadata";
 
 @ApiTags("implementation-tickets")
 @ApiBearerAuth()
@@ -77,6 +78,7 @@ export class ImplementationTicketsController {
       projectId,
       requirementId,
       dto,
+      revisionActorFromAuthenticatedUser(request.authentication.user),
     );
   }
   @Patch(":ticketRecordId")
@@ -100,6 +102,7 @@ export class ImplementationTicketsController {
       requirementId,
       ticketRecordId,
       dto,
+      revisionActorFromAuthenticatedUser(request.authentication.user),
     );
   }
   @Delete(":ticketRecordId")
@@ -114,11 +117,13 @@ export class ImplementationTicketsController {
     @Param("projectId") projectId: string,
     @Param("requirementId") requirementId: string,
     @Param("ticketRecordId") ticketRecordId: string,
+    @Req() request: AuthenticatedRequest,
   ): Promise<void> {
     await this.projectsService.deleteImplementationTicket(
       projectId,
       requirementId,
       ticketRecordId,
+      revisionActorFromAuthenticatedUser(request.authentication.user),
     );
   }
 }

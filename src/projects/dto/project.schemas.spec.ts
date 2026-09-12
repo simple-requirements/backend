@@ -5,7 +5,6 @@ import {
     createCategorySchema,
     createProjectSchema,
     createRequirementSchema,
-    requirementRevisionQuerySchema,
     implementationTicketSchema,
     updateCategorySchema,
     updateProjectSchema,
@@ -155,42 +154,5 @@ describe('project request schemas', () => {
 
         expect(result.error.issues[0]?.message).toBe('Requirement content changes and status changes must be sent separately.');
     });
-    it('normalizes a requirement revision query.', () => {
-        const result = requirementRevisionQuerySchema.parse({ revision: '2' });
 
-        expect(result).toEqual({ revision: 2, allrevisions: false });
-    });
-
-    it('normalizes a requirement all revisions query.', () => {
-        const result = requirementRevisionQuerySchema.parse({ allrevisions: '' });
-
-        expect(result).toEqual({ allrevisions: true });
-    });
-
-    it('rejects mixing requirement revision query modes.', () => {
-        const result = requirementRevisionQuerySchema.safeParse({
-            revision: '1',
-            allrevisions: '',
-        });
-
-        expect(result.success).toBe(false);
-
-        if (result.success) {
-            throw new Error('Expected Zod parsing to fail.');
-        }
-
-        expect(result.error.issues[0]?.message).toBe('Use either revision or allrevisions, not both.');
-    });
-
-    it('rejects an invalid requirement revision query.', () => {
-        const result = requirementRevisionQuerySchema.safeParse({ revision: '0' });
-
-        expect(result.success).toBe(false);
-
-        if (result.success) {
-            throw new Error('Expected Zod parsing to fail.');
-        }
-
-        expect(result.error.issues[0]?.message).toBe('Revision query parameter must be a positive integer.');
-    });
 });

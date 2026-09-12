@@ -19,6 +19,7 @@ import { CategoryType } from "@/projects/category-type.enum";
 import { RequirementLifecycleService } from "@/projects/requirements/requirement-lifecycle.service";
 import { RequirementResponseMapper } from "@/projects/requirements/requirement-response.mapper";
 import { RequirementRevisionService } from "@/projects/requirements/requirement-revision.service";
+import { RequirementRevisionChangeType } from "@/projects/requirements/requirement-revision-metadata";
 
 interface ProjectsRepositoryMock {
   create: ReturnType<typeof vi.fn>;
@@ -119,6 +120,11 @@ function createRequirementEntity(
   requirement.sequenceNumber = 1;
   requirement.visibleKey = "FR-AUTH-0001";
   requirement.revisionNumber = 1;
+  requirement.changeType = "requirement_created";
+  requirement.changeReason = "Requirement created.";
+  requirement.changedAt = new Date("2026-06-28T10:00:00.000Z");
+  requirement.changedByUserId = null;
+  requirement.changedByDisplayName = "System";
   requirement.status = RequirementStatus.Draft;
   requirement.description = "Users must sign in.";
   requirement.priority = "p1";
@@ -155,6 +161,11 @@ function createRequirementRevisionEntity(
   revision.sequenceNumber = 1;
   revision.visibleKey = "FR-AUTH-0001";
   revision.revisionNumber = 1;
+  revision.changeType = "requirement_created";
+  revision.changeReason = "Requirement created.";
+  revision.changedAt = new Date("2026-06-28T10:00:00.000Z");
+  revision.changedByUserId = null;
+  revision.changedByDisplayName = "System";
   revision.status = RequirementStatus.Draft;
   revision.description = "Users must sign in.";
   revision.priority = "p1";
@@ -233,6 +244,7 @@ describe("ProjectsService", () => {
     implementationTicketsRepository = {
       create: vi.fn(),
       delete: vi.fn(),
+      find: vi.fn(),
       findOne: vi.fn(),
       save: vi.fn(),
     };
@@ -994,6 +1006,11 @@ describe("ProjectsService", () => {
           sequenceNumber: 1,
           visibleKey: "NFR-PERF-0001",
           revisionNumber: 1,
+          changeType: RequirementRevisionChangeType.Created,
+          changeReason: "Requirement created.",
+          changedAt: expect.any(Date),
+          changedByUserId: null,
+          changedByDisplayName: "System",
           status: RequirementStatus.Draft,
           description: "Fast search",
           priority: "p2",
@@ -1049,10 +1066,10 @@ describe("ProjectsService", () => {
           secondRequirement,
         ]);
 
-        const result = await service.findAllRequirements(PROJECT_ID, false);
+        const result = await service.findAllRequirements(PROJECT_ID);
 
         expect(requirementsRepository.find).toHaveBeenCalledWith({
-          where: { projectId: PROJECT_ID, deletedAt: expect.any(Object) },
+          where: { projectId: PROJECT_ID },
           order: { visibleKey: "ASC" },
         });
         expect(result.map((requirement) => requirement.visibleKey)).toEqual([
@@ -1063,7 +1080,7 @@ describe("ProjectsService", () => {
     });
 
     describe("findRequirement", () => {
-      it("returns the current requirement when no revision query is provided.", async () => {
+      it("returns the current requirement.", async () => {
         const requirement = createRequirementEntity({
           revisionNumber: 3,
           description: "Current text.",
@@ -1087,70 +1104,10 @@ describe("ProjectsService", () => {
           description: "Current text.",
         });
       });
+    });
 
-      it("returns a stored requirement revision by revision number.", async () => {
-        const currentRequirement = createRequirementEntity({
-          revisionNumber: 3,
-        });
-        const revision = createRequirementRevisionEntity({
-          revisionNumber: 2,
-          status: RequirementStatus.Approved,
-        });
-
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(currentRequirement);
-        requirementRevisionsRepository.findOne.mockResolvedValue(revision);
-
-        const result = await service.findRequirement(
-          PROJECT_ID,
-          REQUIREMENT_ID,
-          {
-            revision: 2,
-            allrevisions: false,
-          },
-        );
-
-        expect(requirementRevisionsRepository.findOne).toHaveBeenCalledWith({
-          where: {
-            requirementId: REQUIREMENT_ID,
-            projectId: PROJECT_ID,
-            revisionNumber: 2,
-          },
-        });
-        expect(result).toMatchObject({
-          id: REQUIREMENT_ID,
-          revisionNumber: 2,
-          status: RequirementStatus.Approved,
-        });
-      });
-
-      it("returns the current requirement when the requested revision is current.", async () => {
-        const currentRequirement = createRequirementEntity({
-          revisionNumber: 3,
-          description: "Current text.",
-        });
-
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(currentRequirement);
-
-        const result = await service.findRequirement(
-          PROJECT_ID,
-          REQUIREMENT_ID,
-          {
-            revision: 3,
-            allrevisions: false,
-          },
-        );
-
-        expect(requirementRevisionsRepository.findOne).not.toHaveBeenCalled();
-        expect(result).toMatchObject({
-          id: REQUIREMENT_ID,
-          revisionNumber: 3,
-          description: "Current text.",
-        });
-      });
-
-      it("returns all stored historical revisions of a requirement.", async () => {
+    describe("findRequirementRevisions", () => {
+      it("returns archived revisions and the current requirement.", async () => {
         const currentRequirement = createRequirementEntity({
           revisionNumber: 3,
         });
@@ -1170,17 +1127,15 @@ describe("ProjectsService", () => {
           secondRevision,
         ]);
 
-        const result = await service.findRequirement(
+        const result = await service.findRequirementRevisions(
           PROJECT_ID,
           REQUIREMENT_ID,
-          { allrevisions: true },
         );
 
         expect(requirementRevisionsRepository.find).toHaveBeenCalledWith({
           where: { requirementId: REQUIREMENT_ID, projectId: PROJECT_ID },
           order: { revisionNumber: "ASC" },
         });
-        expect(Array.isArray(result)).toBe(true);
         expect(result).toMatchObject([
           {
             id: REQUIREMENT_ID,
@@ -1192,22 +1147,12 @@ describe("ProjectsService", () => {
             revisionNumber: 2,
             status: RequirementStatus.Approved,
           },
+          {
+            id: REQUIREMENT_ID,
+            revisionNumber: 3,
+            status: RequirementStatus.Draft,
+          },
         ]);
-      });
-
-      it("throws NotFoundException when the requested revision does not exist.", async () => {
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(
-          createRequirementEntity({ revisionNumber: 3 }),
-        );
-        requirementRevisionsRepository.findOne.mockResolvedValue(null);
-
-        await expect(
-          service.findRequirement(PROJECT_ID, REQUIREMENT_ID, {
-            revision: 2,
-            allrevisions: false,
-          }),
-        ).rejects.toBeInstanceOf(NotFoundException);
       });
     });
 
@@ -1353,28 +1298,10 @@ describe("ProjectsService", () => {
         expect(requirementsRepository.save).not.toHaveBeenCalled();
       });
 
-      it("rejects changes to requirements in the recycle bin.", async () => {
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(
-          createRequirementEntity({ deletedAt: new Date() }),
-        );
-
-        await expect(
-          service.updateRequirement(
-            PROJECT_ID,
-            REQUIREMENT_ID,
-            createUpdateRequirementDto(),
-          ),
-        ).rejects.toBeInstanceOf(BadRequestException);
-
-        expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
-        expect(requirementsRepository.save).not.toHaveBeenCalled();
-      });
-
       it("moves a changed requirement to another project category and allocates a new visible key.", async () => {
         const newCategoryId = "4a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d12";
         const existingRequirement = createRequirementEntity({
-          status: RequirementStatus.Rejected,
+          status: RequirementStatus.Approved,
           revisionNumber: 2,
         });
         const newCategory = createCategoryEntity({
@@ -1594,97 +1521,10 @@ describe("ProjectsService", () => {
       });
     });
 
-    describe("deleteRequirement", () => {
-      it("soft deletes a draft requirement.", async () => {
-        const existingRequirement = createRequirementEntity();
-
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(existingRequirement);
-        requirementsRepository.save.mockResolvedValue(
-          createRequirementEntity({ deletedAt: new Date() }),
-        );
-
-        await service.deleteRequirement(PROJECT_ID, REQUIREMENT_ID, false);
-
-        expect(existingRequirement.deletedAt).toBeInstanceOf(Date);
-        expect(requirementsRepository.save).toHaveBeenCalledWith(
-          existingRequirement,
-        );
-      });
-
-      it("does not soft delete an approved requirement.", async () => {
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(
-          createRequirementEntity({ status: RequirementStatus.Approved }),
-        );
-
-        await expect(
-          service.deleteRequirement(PROJECT_ID, REQUIREMENT_ID, false),
-        ).rejects.toBeInstanceOf(BadRequestException);
-
-        expect(requirementsRepository.save).not.toHaveBeenCalled();
-      });
-
-      it("permanently deletes a requirement from the recycle bin.", async () => {
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(
-          createRequirementEntity({ deletedAt: new Date() }),
-        );
-        requirementsRepository.delete.mockResolvedValue({ affected: 1 });
-
-        await service.deleteRequirement(PROJECT_ID, REQUIREMENT_ID, true);
-
-        expect(requirementsRepository.delete).toHaveBeenCalledWith({
-          id: REQUIREMENT_ID,
-          projectId: PROJECT_ID,
-        });
-      });
-
-      it("rejects permanent deletion when the requirement is not in the recycle bin.", async () => {
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(
-          createRequirementEntity(),
-        );
-
-        await expect(
-          service.deleteRequirement(PROJECT_ID, REQUIREMENT_ID, true),
-        ).rejects.toBeInstanceOf(BadRequestException);
-
-        expect(requirementsRepository.delete).not.toHaveBeenCalled();
-      });
-
-      it("does not save a draft requirement that is already in the recycle bin.", async () => {
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(
-          createRequirementEntity({ deletedAt: new Date() }),
-        );
-
-        await service.deleteRequirement(PROJECT_ID, REQUIREMENT_ID, false);
-
-        expect(requirementsRepository.save).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("clearDeletedRequirements", () => {
-      it("clears the recycle bin.", async () => {
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.delete.mockResolvedValue({ affected: 2 });
-
-        await service.clearDeletedRequirements(PROJECT_ID, true);
-
-        expect(requirementsRepository.delete).toHaveBeenCalledWith({
-          projectId: PROJECT_ID,
-          deletedAt: expect.any(Object),
-        });
-      });
-
-      it("requires the deleted query flag before clearing the recycle bin.", async () => {
-        await expect(
-          service.clearDeletedRequirements(PROJECT_ID, false),
-        ).rejects.toBeInstanceOf(BadRequestException);
-
-        expect(projectsRepository.findOne).not.toHaveBeenCalled();
-        expect(requirementsRepository.delete).not.toHaveBeenCalled();
+    describe("requirement deletion", () => {
+      it("does not expose requirement deletion service behavior.", () => {
+        expect("deleteRequirement" in service).toBe(false);
+        expect("clearDeletedRequirements" in service).toBe(false);
       });
     });
   });
