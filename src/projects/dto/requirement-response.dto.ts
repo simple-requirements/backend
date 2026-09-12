@@ -100,9 +100,6 @@ export class RequirementResponseDto {
     rejectedAt!: Date | null;
 
     @ApiPropertyOptional({ example: '2026-06-28T10:00:00.000Z', nullable: true })
-    deletedAt!: Date | null;
-
-    @ApiPropertyOptional({ example: '2026-06-28T10:00:00.000Z', nullable: true })
     approvedAt!: Date | null;
 
     @ApiPropertyOptional({ example: '2026-06-28T10:00:00.000Z', nullable: true })

@@ -135,7 +135,6 @@ function createRequirementEntity(
   requirement.reviewer = null;
   requirement.obsoletedBy = null;
   requirement.rejectedAt = null;
-  requirement.deletedAt = null;
   requirement.approvedAt = null;
   requirement.implementedAt = null;
   requirement.obsolescenceReason = null;
@@ -176,7 +175,6 @@ function createRequirementRevisionEntity(
   revision.reviewer = null;
   revision.obsoletedBy = null;
   revision.rejectedAt = null;
-  revision.deletedAt = null;
   revision.approvedAt = null;
   revision.implementedAt = null;
   revision.obsolescenceReason = null;
@@ -202,7 +200,7 @@ function createCreateRequirementDto(
 function createUpdateRequirementDto(
   overrides: Partial<UpdateRequirementDto> = {},
 ): UpdateRequirementDto {
-  return { description: "Users must sign in with MFA.", ...overrides };
+  return { description: "Users must sign in with MFA.", changeReason: "Clarified authentication behavior.", ...overrides };
 }
 
 describe("ProjectsService", () => {
@@ -1021,7 +1019,6 @@ describe("ProjectsService", () => {
           reviewer: null,
           obsoletedBy: null,
           rejectedAt: null,
-          deletedAt: null,
           approvedAt: null,
           implementedAt: null,
           obsolescenceReason: null,
@@ -1200,10 +1197,27 @@ describe("ProjectsService", () => {
         expect(existingRequirement.description).toBe(
           "Users must sign in with MFA.",
         );
+        expect(existingRequirement.changeReason).toBe(
+          "Clarified authentication behavior.",
+        );
         expect(existingRequirement.reviewer).toBeNull();
         expect(existingRequirement.approvedAt).toBeNull();
         expect(result.revisionNumber).toBe(3);
         expect(result.status).toBe(RequirementStatus.Draft);
+      });
+
+      it("requires an explicit change reason for substantive edits.", async () => {
+        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
+        requirementsRepository.findOne.mockResolvedValue(createRequirementEntity());
+
+        await expect(
+          service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
+            description: "Users must sign in with MFA.",
+          }),
+        ).rejects.toThrow("Change reason is required");
+
+        expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
+        expect(requirementsRepository.save).not.toHaveBeenCalled();
       });
 
       it("approves a draft requirement when a reviewer is provided.", async () => {
@@ -1501,6 +1515,21 @@ describe("ProjectsService", () => {
         expect(result.reviewer).toBe("Jane Reviewer");
         expect(result.obsoletedBy).toBe("Olivia Owner");
         expect(result.obsoleteAt).toBeInstanceOf(Date);
+      });
+
+      it("does not allow draft requirements to become obsolete.", async () => {
+        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
+        requirementsRepository.findOne.mockResolvedValue(createRequirementEntity());
+
+        await expect(
+          service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
+            status: RequirementStatus.Obsolete,
+            obsoletedBy: "Olivia Owner",
+            obsolescenceReason: "No longer needed.",
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
       });
 
       it("does not allow rejected requirements to become obsolete.", async () => {

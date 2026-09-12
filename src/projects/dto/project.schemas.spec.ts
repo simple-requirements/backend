@@ -30,13 +30,13 @@ describe('project request schemas', () => {
         expect(updateProjectSchema.safeParse({ ticketUrlTemplate: 'https://github.com/acme/issues' }).success).toBe(false);
     });
 
-    it('normalizes an implementation ticket and treats the actor as server-derived.', () => {
+    it('normalizes all user-entered implementation-ticket fields.', () => {
         expect(implementationTicketSchema.parse({
             ticketId: ' SOLAR-4711 ', completedBy: ' Ada Lovelace ', completedAt: '2026-08-26',
         })).toEqual({ ticketId: 'SOLAR-4711', completedBy: 'Ada Lovelace', completedAt: '2026-08-26' });
-        expect(implementationTicketSchema.parse({
-            ticketId: ' SOLAR-4712 ', completedAt: '2026-08-27',
-        })).toEqual({ ticketId: 'SOLAR-4712', completedBy: '__server_derived_actor__', completedAt: '2026-08-27' });
+        expect(implementationTicketSchema.safeParse({
+            ticketId: ' SOLAR-4712 ', completedBy: '   ', completedAt: '2026-08-27',
+        }).success).toBe(false);
     });
 
     it('normalizes a category name and key.', () => {
@@ -111,6 +111,33 @@ describe('project request schemas', () => {
         }
 
         expect(result.error.issues[0]?.message).toBe('Category id must be a valid UUID.');
+    });
+
+    it('requires and normalizes a change reason for requirement content updates.', () => {
+        expect(updateRequirementSchema.parse({
+            description: '  Clarified requirement text.  ',
+            changeReason: '  Clarified the authentication behavior.  ',
+        })).toEqual({
+            description: 'Clarified requirement text.',
+            changeReason: 'Clarified the authentication behavior.',
+        });
+
+        const missingReason = updateRequirementSchema.safeParse({ description: 'Changed text.' });
+        expect(missingReason.success).toBe(false);
+        if (missingReason.success) throw new Error('Expected Zod parsing to fail.');
+        expect(missingReason.error.issues.some((issue) => issue.message === 'Change reason is required when changing requirement content or metadata.')).toBe(true);
+    });
+
+    it('rejects client-supplied change reasons for lifecycle transitions.', () => {
+        const result = updateRequirementSchema.safeParse({
+            status: RequirementStatus.Approved,
+            reviewer: 'Jane Reviewer',
+            changeReason: 'Approve this requirement.',
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) throw new Error('Expected Zod parsing to fail.');
+        expect(result.error.issues.some((issue) => issue.message === 'Change reason is derived by the server for lifecycle transitions.')).toBe(true);
     });
 
     it('allows a requirement status patch.', () => {

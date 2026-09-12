@@ -20,7 +20,6 @@ type DemoRequirementRevision = Pick<
     | 'reviewer'
     | 'obsoletedBy'
     | 'rejectedAt'
-    | 'deletedAt'
     | 'approvedAt'
     | 'implementedAt'
     | 'obsolescenceReason'
@@ -48,7 +47,6 @@ export const demoRequirementRevisions: readonly DemoRequirementRevision[] = [
         reviewer: null,
         obsoletedBy: null,
         rejectedAt: null,
-        deletedAt: null,
         approvedAt: null,
         implementedAt: null,
         obsolescenceReason: null,
@@ -74,7 +72,6 @@ export const demoRequirementRevisions: readonly DemoRequirementRevision[] = [
         reviewer: 'Jane Reviewer',
         obsoletedBy: null,
         rejectedAt: null,
-        deletedAt: null,
         approvedAt: new Date('2026-06-21T09:00:00.000Z'),
         implementedAt: null,
         obsolescenceReason: null,
@@ -100,7 +97,6 @@ export const demoRequirementRevisions: readonly DemoRequirementRevision[] = [
         reviewer: 'Jane Reviewer',
         obsoletedBy: null,
         rejectedAt: null,
-        deletedAt: null,
         approvedAt: new Date('2026-06-21T14:00:00.000Z'),
         implementedAt: null,
         obsolescenceReason: null,

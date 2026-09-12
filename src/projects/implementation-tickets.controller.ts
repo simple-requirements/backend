@@ -73,7 +73,6 @@ export class ImplementationTicketsController {
     dto: UpsertImplementationTicketDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    dto.completedBy = request.authentication.user.displayName;
     return this.projectsService.createImplementationTicket(
       projectId,
       requirementId,
@@ -96,7 +95,6 @@ export class ImplementationTicketsController {
     dto: UpsertImplementationTicketDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    dto.completedBy = request.authentication.user.displayName;
     return this.projectsService.updateImplementationTicket(
       projectId,
       requirementId,

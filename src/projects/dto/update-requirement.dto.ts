@@ -35,6 +35,12 @@ export class UpdateRequirementDto {
     source?: string | null;
 
     @ApiPropertyOptional({
+        example: 'Clarified the authentication timeout requirement.',
+        description: 'Required non-empty reason for content, metadata, owner, or category changes.',
+    })
+    changeReason?: string;
+
+    @ApiPropertyOptional({
         enum: RequirementStatus,
         example: RequirementStatus.Approved,
     })

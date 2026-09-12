@@ -65,7 +65,6 @@ function createRequirementEntity(
   requirement.reviewer = null;
   requirement.obsoletedBy = null;
   requirement.rejectedAt = null;
-  requirement.deletedAt = null;
   requirement.approvedAt = null;
   requirement.implementedAt = null;
   requirement.obsolescenceReason = null;

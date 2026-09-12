@@ -21,7 +21,6 @@ import {
 @Entity({ name: 'requirements' })
 @Index('IDX_requirements_project_id', ['projectId'])
 @Index('IDX_requirements_category_id', ['categoryId'])
-@Index('IDX_requirements_deleted_at', ['deletedAt'])
 @Index('UQ_requirements_project_key', ['projectId', 'visibleKey'], {
     unique: true,
 })
@@ -102,8 +101,6 @@ export class Requirement {
     @Column({ type: 'timestamptz', name: 'rejected_at', nullable: true })
     rejectedAt!: Date | null;
 
-    @Column({ type: 'timestamptz', name: 'deleted_at', nullable: true })
-    deletedAt!: Date | null;
 
     @Column({ type: 'timestamptz', name: 'approved_at', nullable: true })
     approvedAt!: Date | null;

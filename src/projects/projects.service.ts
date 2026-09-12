@@ -13,6 +13,7 @@ import { CreateRequirementDto } from "@/projects/dto/create-requirement.dto";
 import { CategoryResponseDto } from "@/projects/dto/category-response.dto";
 import { ProjectResponseDto } from "@/projects/dto/project-response.dto";
 import { RequirementResponseDto } from "@/projects/dto/requirement-response.dto";
+import type { RequirementRevisionComparisonDto } from "@/projects/dto/requirement-revision-comparison.dto";
 import { UpdateCategoryDto } from "@/projects/dto/update-category.dto";
 import { UpdateProjectDto } from "@/projects/dto/update-project.dto";
 import { UpdateRequirementDto } from "@/projects/dto/update-requirement.dto";
@@ -34,6 +35,7 @@ import {
   ImplementationTicketResponseDto,
   UpsertImplementationTicketDto,
 } from "@/projects/dto/implementation-ticket.dto";
+
 
 const CONTENT_FIELD_NAMES = [
   "categoryId",
@@ -302,7 +304,6 @@ export class ProjectsService {
       reviewer: null,
       obsoletedBy: null,
       rejectedAt: null,
-      deletedAt: null,
       approvedAt: null,
       implementedAt: null,
       obsolescenceReason: null,
@@ -346,7 +347,7 @@ export class ProjectsService {
       actor,
     );
 
-    await this.revisions.storeCurrent(requirement, revisionMetadata);
+    await this.revisions.storeCurrent(requirement);
     requirement.revisionNumber += 1;
 
     if (updateRequirementDto.status !== undefined) {
@@ -402,7 +403,7 @@ export class ProjectsService {
       `Implementation ticket ${dto.ticketId} created.`,
       actor,
     );
-    await this.revisions.storeCurrent(requirement, revisionMetadata);
+    await this.revisions.storeCurrent(requirement);
     const ticket = this.implementationTicketsRepository.create({
       requirementId,
       ticketId: dto.ticketId,
@@ -450,7 +451,7 @@ export class ProjectsService {
       `Implementation ticket ${dto.ticketId} updated.`,
       actor,
     );
-    await this.revisions.storeCurrent(requirement, revisionMetadata);
+    await this.revisions.storeCurrent(requirement);
     Object.assign(ticket, dto);
     const savedTicket = await this.implementationTicketsRepository.save(ticket);
     requirement.implementationTickets = requirement.implementationTickets.map(
@@ -483,7 +484,7 @@ export class ProjectsService {
       `Implementation ticket ${ticket.ticketId} removed.`,
       actor,
     );
-    await this.revisions.storeCurrent(requirement, revisionMetadata);
+    await this.revisions.storeCurrent(requirement);
     await this.implementationTicketsRepository.delete({
       id: ticketRecordId,
       requirementId,
@@ -521,17 +522,7 @@ export class ProjectsService {
     requirementId: string,
     fromRevision: number,
     toRevision: number,
-  ): Promise<{
-    readonly projectId: string;
-    readonly requirementId: string;
-    readonly fromRevision: number;
-    readonly toRevision: number;
-    readonly differences: readonly {
-      readonly field: string;
-      readonly from: unknown;
-      readonly to: unknown;
-    }[];
-  }> {
+  ): Promise<RequirementRevisionComparisonDto> {
     if (
       !Number.isInteger(fromRevision) ||
       !Number.isInteger(toRevision) ||
@@ -550,7 +541,9 @@ export class ProjectsService {
     const from = snapshots.find(
       (snapshot) => snapshot.revisionNumber === fromRevision,
     );
-    const to = snapshots.find((snapshot) => snapshot.revisionNumber === toRevision);
+    const to = snapshots.find(
+      (snapshot) => snapshot.revisionNumber === toRevision,
+    );
 
     if (from === undefined || to === undefined) {
       throw new NotFoundException(
@@ -745,6 +738,12 @@ export class ProjectsService {
     actor: RequirementRevisionActor,
   ): RequirementRevisionMetadata {
     if (update.status !== undefined) {
+      if (update.changeReason !== undefined) {
+        throw new BadRequestException(
+          "Change reason is derived by the server for lifecycle transitions.",
+        );
+      }
+
       return createRevisionMetadata(
         statusChangeType(update),
         statusChangeReason(update),
@@ -752,13 +751,17 @@ export class ProjectsService {
       );
     }
 
+    if (update.changeReason === undefined || update.changeReason.trim().length === 0) {
+      throw new BadRequestException(
+        "Change reason is required when changing requirement content or metadata.",
+      );
+    }
+
     return createRevisionMetadata(
       update.categoryId !== undefined && update.categoryId !== requirement.categoryId
         ? RequirementRevisionChangeType.CategoryChanged
         : RequirementRevisionChangeType.ContentChanged,
-      update.categoryId !== undefined && update.categoryId !== requirement.categoryId
-        ? "Requirement category changed."
-        : "Requirement content changed.",
+      update.changeReason.trim(),
       actor,
     );
   }

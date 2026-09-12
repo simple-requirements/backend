@@ -15,6 +15,7 @@ import { RequirementStatus } from '@/projects/requirement-status.enum';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRIORITIES = ['p1', 'p2', 'p3'] as const;
 const CONTENT_UPDATE_FIELDS = ['categoryId', 'description', 'priority', 'owner', 'rationale', 'source'] as const;
+const CHANGE_REASON_FIELD = 'changeReason' as const;
 const STATUS_UPDATE_FIELDS = ['status', 'reviewer', 'rejectionReason', 'obsoletedBy', 'obsolescenceReason'] as const;
 
 function requestBodySchema(message: string): z.ZodType<Record<string, unknown>> {
@@ -107,6 +108,7 @@ const reviewerSchema = nullableTrimmedStringSchema('Reviewer must be a string or
 const obsoletedBySchema = nullableTrimmedStringSchema('Obsoleted by must be a string or null.');
 const rejectionReasonSchema = nullableTrimmedStringSchema('Rejection reason must be a string or null.');
 const obsolescenceReasonSchema = nullableTrimmedStringSchema('Obsolescence reason must be a string or null.');
+const changeReasonSchema = trimmedStringSchema('Change reason must be a string.', 'Change reason must not be empty.').pipe(z.string().max(500));
 
 const prioritySchema = z
     .custom<string | null>((value): value is string | null => value === null || typeof value === 'string', {
@@ -130,7 +132,6 @@ const requirementStatusSchema = z.custom<RequirementStatus>(
 const projectRequestBodySchema = requestBodySchema('Project request body must be an object.');
 const categoryRequestBodySchema = requestBodySchema('Category request body must be an object.');
 const requirementRequestBodySchema = requestBodySchema('Requirement request body must be an object.');
-const SERVER_DERIVED_ACTOR = '__server_derived_actor__';
 
 export const createProjectSchema: ZodValidationSchema<CreateProjectDto> = projectRequestBodySchema.pipe(z.object({ name: projectNameSchema }));
 
@@ -142,10 +143,7 @@ export const updateProjectSchema: ZodValidationSchema<UpdateProjectDto> = projec
 export const implementationTicketSchema: ZodValidationSchema<UpsertImplementationTicketDto> = requirementRequestBodySchema.pipe(
     z.object({
         ticketId: trimmedStringSchema('Ticket ID must be a string.', 'Ticket ID must not be empty.').pipe(z.string().max(120)),
-        completedBy: trimmedStringSchema('Completed by must be a string.', 'Completed by must not be empty.')
-            .pipe(z.string().max(120))
-            .optional()
-            .transform((completedBy) => completedBy ?? SERVER_DERIVED_ACTOR),
+        completedBy: trimmedStringSchema('Completed by must be a string.', 'Completed by must not be empty.').pipe(z.string().max(120)),
         completedAt: z.iso.date('Completion date must use YYYY-MM-DD.'),
     }),
 );
@@ -190,6 +188,7 @@ export const updateRequirementSchema: ZodValidationSchema<UpdateRequirementDto> 
             owner: requirementTextSchema.optional(),
             rationale: requirementTextSchema.optional(),
             source: requirementTextSchema.optional(),
+            changeReason: changeReasonSchema.optional(),
             status: requirementStatusSchema.optional(),
             reviewer: reviewerSchema.optional(),
             rejectionReason: rejectionReasonSchema.optional(),
@@ -204,5 +203,13 @@ export const updateRequirementSchema: ZodValidationSchema<UpdateRequirementDto> 
         })
         .refine((requirementPatch) => requirementPatch.status === undefined || !hasAnyField(requirementPatch, CONTENT_UPDATE_FIELDS), {
             message: 'Requirement content changes and status changes must be sent separately.',
+        })
+        .refine((requirementPatch) => requirementPatch.status !== undefined || requirementPatch[CHANGE_REASON_FIELD] !== undefined, {
+            message: 'Change reason is required when changing requirement content or metadata.',
+            path: [CHANGE_REASON_FIELD],
+        })
+        .refine((requirementPatch) => requirementPatch.status === undefined || requirementPatch[CHANGE_REASON_FIELD] === undefined, {
+            message: 'Change reason is derived by the server for lifecycle transitions.',
+            path: [CHANGE_REASON_FIELD],
         }),
 );

@@ -85,8 +85,6 @@ export class RequirementRevision {
     @Column({ type: 'timestamptz', name: 'rejected_at', nullable: true })
     rejectedAt!: Date | null;
 
-    @Column({ type: 'timestamptz', name: 'deleted_at', nullable: true })
-    deletedAt!: Date | null;
 
     @Column({ type: 'timestamptz', name: 'approved_at', nullable: true })
     approvedAt!: Date | null;

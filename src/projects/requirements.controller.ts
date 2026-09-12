@@ -17,12 +17,14 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
 
 import { ZodValidationPipe } from "@/common/pipes/zod-validation.pipe";
 import { CreateRequirementDto } from "@/projects/dto/create-requirement.dto";
 import { RequirementResponseDto } from "@/projects/dto/requirement-response.dto";
+import { RequirementRevisionComparisonDto } from "@/projects/dto/requirement-revision-comparison.dto";
 import {
   createRequirementSchema,
   updateRequirementSchema,
@@ -65,7 +67,6 @@ export class RequirementsController {
     return this.projectsService.findAllRequirements(projectId);
   }
 
-
   @Get(":requirementId/revisions")
   @RequireProjectPermission(ProjectPermission.Read)
   @ApiOperation({
@@ -93,12 +94,34 @@ export class RequirementsController {
     operationId: "compareRequirementRevisions",
     summary: "Compare two requirement revisions.",
   })
+  @ApiOkResponse({
+    description: "Differences between the requested requirement revisions.",
+    type: RequirementRevisionComparisonDto,
+  })
+  @ApiQuery({
+    name: "from",
+    type: Number,
+    required: true,
+    description: "Source revision number.",
+  })
+  @ApiQuery({
+    name: "to",
+    type: Number,
+    required: true,
+    description: "Target revision number.",
+  })
+  @ApiBadRequestResponse({
+    description: "Revision numbers must be positive integers.",
+  })
+  @ApiNotFoundResponse({
+    description: "The requirement or a requested revision was not found.",
+  })
   async compareRequirementRevisions(
     @Param("projectId") projectId: string,
     @Param("requirementId") requirementId: string,
     @Query("from") fromRevision: string,
     @Query("to") toRevision: string,
-  ) {
+  ): Promise<RequirementRevisionComparisonDto> {
     return this.projectsService.compareRequirementRevisions(
       projectId,
       requirementId,

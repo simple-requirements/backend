@@ -194,7 +194,6 @@ export interface RequirementResponseBody {
   obsoletedBy: string | null;
   implementationTickets: ImplementationTicketResponseBody[];
   rejectedAt: string | null;
-  deletedAt: string | null;
   approvedAt: string | null;
   implementedAt: string | null;
   obsolescenceReason: string | null;
@@ -223,7 +222,6 @@ export type ExpectedRequirementResponseBody = Readonly<{
   status?: RequirementStatus;
   description?: string | null;
   priority?: string | null;
-  deletedAt?: string | null;
 }>;
 
 export function expectNullableIsoDateString(value: string | null): void {
@@ -266,14 +264,11 @@ export function expectRequirementResponseBody(
     expect(body.priority).toBe(expectedRequirement.priority);
   }
 
-  if (expectedRequirement.deletedAt !== undefined) {
-    expect(body.deletedAt).toBe(expectedRequirement.deletedAt);
-  }
+  expect(body).not.toHaveProperty("deletedAt");
 
   expectIsoDateString(body.createdAt);
   expectIsoDateString(body.updatedAt);
   expectNullableIsoDateString(body.rejectedAt);
-  expectNullableIsoDateString(body.deletedAt);
   expectNullableIsoDateString(body.approvedAt);
   expectNullableIsoDateString(body.implementedAt);
   expectNullableIsoDateString(body.obsoleteAt);
@@ -319,13 +314,14 @@ export async function createImplementationTicket(
   projectId: string,
   requirementId: string,
   ticketId: string,
+  completedBy = "Ada Developer",
 ): Promise<ImplementationTicketResponseBody> {
   const response = await request.post(
     `/projects/${projectId}/requirements/${requirementId}/implementation-tickets`,
     {
       data: {
         ticketId,
-        completedBy: "Requirements Engineer",
+        completedBy,
         completedAt: "2026-08-25",
       },
       headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,

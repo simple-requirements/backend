@@ -56,7 +56,6 @@ test.describe("Requirements API - POST /projects/{projectId}/requirements", () =
       status: RequirementStatus.Draft,
       description: "Users must sign in.",
       priority: "p1",
-      deletedAt: null,
     });
     expect(secondRequirement.visibleKey).toBe("FR-AUTH-0002");
     expect(thirdRequirement.visibleKey).toBe("NFR-PERF-0001");
@@ -186,11 +185,13 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
 
     expect(rejectApprovedResponse.status()).toBe(400);
 
-    await api.createImplementationTicket(
+    const implementationTicket = await api.createImplementationTicket(
       project.id,
       requirement.id,
       "SOLAR-4711",
+      "Ada Developer",
     );
+    expect(implementationTicket.completedBy).toBe("Ada Developer");
 
     const implementResponse = await request.patch(
       `/projects/${project.id}/requirements/${requirement.id}`,
@@ -225,7 +226,7 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
     const updateResponse = await request.patch(
       `/projects/${project.id}/requirements/${requirement.id}`,
       {
-        data: { description: "Users must sign in with MFA.", priority: "p2" },
+        data: { description: "Users must sign in with MFA.", priority: "p2", changeReason: "Clarified authentication behavior." },
       },
     );
 
@@ -245,6 +246,51 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
     });
     expect(updatedRequirement.reviewer).toBeNull();
     expect(updatedRequirement.approvedAt).toBeNull();
+  });
+
+  test("requires an explicit change reason for substantive requirement edits.", async ({
+    request,
+    draftRequirement,
+  }) => {
+    const { project, requirement } = draftRequirement;
+
+    const response = await request.patch(
+      `/projects/${project.id}/requirements/${requirement.id}`,
+      { data: { description: "Clarified draft text." } },
+    );
+
+    expect(response.status()).toBe(400);
+    const body = (await response.json()) as ErrorResponseBody;
+    expect(body.message).toContain(
+      "Change reason is required when changing requirement content or metadata.",
+    );
+  });
+
+  test("does not allow a draft requirement to become obsolete.", async ({
+    request,
+    draftRequirement,
+  }) => {
+    const { project, requirement } = draftRequirement;
+
+    const response = await request.patch(
+      `/projects/${project.id}/requirements/${requirement.id}`,
+      {
+        data: {
+          status: RequirementStatus.Obsolete,
+          obsoletedBy: "Requirements Engineer",
+          obsolescenceReason: "No longer needed.",
+        },
+      },
+    );
+
+    expect(response.status()).toBe(400);
+    const body = (await response.json()) as ErrorResponseBody;
+    expectErrorResponseBody(
+      body,
+      400,
+      'Requirement in status "draft" cannot be set obsolete.',
+      "Bad Request",
+    );
   });
 
   test("sets an approved requirement obsolete.", async ({
@@ -312,7 +358,7 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
     const updateResponse = await request.patch(
       `/projects/${project.id}/requirements/${requirement.id}`,
       {
-        data: { description: "Changed after implementation." },
+        data: { description: "Changed after implementation.", changeReason: "Attempted post-implementation edit." },
       },
     );
 

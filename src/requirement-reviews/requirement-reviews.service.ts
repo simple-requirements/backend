@@ -212,7 +212,7 @@ export class RequirementReviewsService {
       changeReason: "Requirement approved.",
       actor,
     };
-    await this.revisions.storeCurrent(requirement, revisionMetadata);
+    await this.revisions.storeCurrent(requirement);
 
     requirement.revisionNumber += 1;
     this.lifecycle.applyStatusChange(requirement, update);
@@ -246,7 +246,7 @@ export class RequirementReviewsService {
       changeReason: `Requirement rejected: ${rejectRequirementDto.rejectionReason}`,
       actor,
     };
-    await this.revisions.storeCurrent(requirement, revisionMetadata);
+    await this.revisions.storeCurrent(requirement);
 
     requirement.revisionNumber += 1;
     this.lifecycle.applyStatusChange(requirement, update);
@@ -273,12 +273,6 @@ export class RequirementReviewsService {
       projectId,
       requirementId,
     );
-
-    if (requirement.deletedAt !== null) {
-      throw new BadRequestException(
-        `Requirement with id "${requirementId}" is in the recycle bin and cannot be reviewed.`,
-      );
-    }
 
     if (requirement.status !== RequirementStatus.Draft) {
       throw new BadRequestException(

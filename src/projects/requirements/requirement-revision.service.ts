@@ -4,17 +4,7 @@ import { Repository } from "typeorm";
 
 import { RequirementRevision } from "@/projects/requirement-revisions.entity";
 import { Requirement } from "@/projects/requirements.entity";
-import {
-  RequirementRevisionChangeType,
-  type RequirementRevisionMetadata,
-  systemRevisionActor,
-} from "@/projects/requirements/requirement-revision-metadata";
-
-const legacyRevisionMetadata: RequirementRevisionMetadata = {
-  changeType: RequirementRevisionChangeType.ContentChanged,
-  changeReason: "Legacy revision snapshot.",
-  actor: systemRevisionActor,
-};
+import type { RequirementRevisionMetadata } from "@/projects/requirements/requirement-revision-metadata";
 
 @Injectable()
 export class RequirementRevisionService {
@@ -34,10 +24,7 @@ export class RequirementRevisionService {
     requirement.changedByDisplayName = metadata.actor.displayName;
   }
 
-  async storeCurrent(
-    requirement: Requirement,
-    metadata: RequirementRevisionMetadata = legacyRevisionMetadata,
-  ): Promise<void> {
+  async storeCurrent(requirement: Requirement): Promise<void> {
     const revision = this.revisions.create({
       requirementId: requirement.id,
       projectId: requirement.projectId,
@@ -45,11 +32,11 @@ export class RequirementRevisionService {
       sequenceNumber: requirement.sequenceNumber,
       visibleKey: requirement.visibleKey,
       revisionNumber: requirement.revisionNumber,
-      changeType: metadata.changeType,
-      changeReason: metadata.changeReason,
-      changedAt: new Date(),
-      changedByUserId: metadata.actor.userId,
-      changedByDisplayName: metadata.actor.displayName,
+      changeType: requirement.changeType,
+      changeReason: requirement.changeReason,
+      changedAt: requirement.changedAt,
+      changedByUserId: requirement.changedByUserId,
+      changedByDisplayName: requirement.changedByDisplayName,
       status: requirement.status,
       description: requirement.description,
       priority: requirement.priority,
@@ -68,7 +55,6 @@ export class RequirementRevisionService {
         }),
       ),
       rejectedAt: requirement.rejectedAt,
-      deletedAt: requirement.deletedAt,
       approvedAt: requirement.approvedAt,
       implementedAt: requirement.implementedAt,
       obsolescenceReason: requirement.obsolescenceReason,
