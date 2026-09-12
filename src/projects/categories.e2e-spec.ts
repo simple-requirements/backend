@@ -4,6 +4,7 @@ import { expect, test } from "@/projects/projects-api.e2e-fixtures";
 
 import { CategoryType } from "@/projects/category-type.enum";
 import {
+  E2E_ADMIN_HEADERS,
   expectCategoryResponseBody,
   expectErrorResponseBody,
   INVALID_CATEGORY_KEYS,
@@ -89,6 +90,7 @@ test.describe("Categories API - GET /projects/{projectId}/categories", () => {
 
     const response = await request.get(
       `/projects/${unknownProjectId}/categories`,
+      { headers: E2E_ADMIN_HEADERS },
     );
 
     expect(response.status()).toBe(404);

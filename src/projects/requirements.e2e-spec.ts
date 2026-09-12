@@ -166,7 +166,7 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
       revisionNumber: 2,
       status: RequirementStatus.Approved,
     });
-    expect(approvedRequirement.reviewer).toBe("E2E Requirements Engineer");
+    expect(approvedRequirement.reviewer).toBe("Requirements Engineer");
     expect(approvedRequirement.approvedAt).not.toBeNull();
 
     if (approvedRequirement.approvedAt !== null) {
@@ -178,7 +178,7 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
       {
         data: {
           status: RequirementStatus.Rejected,
-          reviewer: "E2E Requirements Engineer",
+          reviewer: "Requirements Engineer",
           rejectionReason: "Not needed.",
         },
       },
@@ -261,7 +261,7 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
       {
         data: {
           status: RequirementStatus.Obsolete,
-          obsoletedBy: "E2E Requirements Engineer",
+          obsoletedBy: "Requirements Engineer",
           obsolescenceReason: "Replaced by a more specific requirement.",
         },
       },
@@ -282,8 +282,8 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
     expect(obsoleteRequirement.obsolescenceReason).toBe(
       "Replaced by a more specific requirement.",
     );
-    expect(obsoleteRequirement.obsoletedBy).toBe("E2E Requirements Engineer");
-    expect(obsoleteRequirement.reviewer).toBe("E2E Requirements Engineer");
+    expect(obsoleteRequirement.obsoletedBy).toBe("Requirements Engineer");
+    expect(obsoleteRequirement.reviewer).toBe("Requirements Engineer");
     expect(obsoleteRequirement.obsoleteAt).not.toBeNull();
   });
 
@@ -420,7 +420,7 @@ test.describe("Requirements API - DELETE /projects/{projectId}/requirements/{req
       {
         data: {
           status: RequirementStatus.Approved,
-          reviewer: "E2E Requirements Engineer",
+          reviewer: "Requirements Engineer",
         },
       },
     );

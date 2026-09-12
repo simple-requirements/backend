@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { test as base, expect } from "@playwright/test";
 
 import { resetE2eDatabase } from "@/database/seeding/reset-e2e-database";
-import { seedE2eAuthentication } from "@/database/seeding/seed-e2e-authentication";
 import { CategoryType } from "@/projects/category-type.enum";
 import {
   approveRequirement,
@@ -67,9 +66,12 @@ export const test = base.extend<ProjectsApiFixtures>({
   resetDatabase: [
     // eslint-disable-next-line no-empty-pattern -- Playwright pattern
     async ({}, use, testInfo) => {
-      await resetE2eDatabase();
-      if (!testInfo.file.endsWith("/auth/auth.e2e-spec.ts"))
-        await seedE2eAuthentication();
+      const normalizedTestFile = testInfo.file.replaceAll("\\", "/");
+      const isAuthenticationSpec = normalizedTestFile.endsWith(
+        "/auth/auth.e2e-spec.ts",
+      );
+
+      await resetE2eDatabase({ includeAuthentication: !isAuthenticationSpec });
 
       await use(undefined);
     },

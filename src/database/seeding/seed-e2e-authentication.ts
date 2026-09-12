@@ -14,8 +14,8 @@ export const E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN = 'e2e-requirements-engineer
 export const E2E_DEVELOPER_ACCESS_TOKEN = 'e2e-developer-token';
 export const E2E_VIEWER_ACCESS_TOKEN = 'e2e-viewer-token';
 
-export const E2E_LOGIN_USERNAME = 'e2e-admin';
-export const E2E_LOGIN_PASSWORD = 'correct horse battery staple';
+export const E2E_LOGIN_USERNAME = 'administrator';
+export const E2E_LOGIN_PASSWORD = 'password';
 
 const execFileAsync = promisify(execFile);
 

@@ -101,7 +101,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       {
         data: {
           text: "Please define allowed authentication methods.",
-          author: "E2E Requirements Engineer",
+          author: "Requirements Engineer",
         },
       },
     );
@@ -117,7 +117,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       createdForRevisionNumber: 1,
       text: "Please define allowed authentication methods.",
       status: RequirementReviewCommentStatus.Open,
-      author: "E2E Requirements Engineer",
+      author: "Requirements Engineer",
       closedBy: null,
       closeReason: null,
       closedInRevisionNumber: null,
@@ -147,7 +147,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       {
         data: {
           text: "Please clarify this.",
-          author: "E2E Requirements Engineer",
+          author: "Requirements Engineer",
         },
       },
     );
@@ -158,7 +158,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       {
         data: {
           text: "The requirement has been clarified.",
-          author: "E2E Requirements Engineer",
+          author: "Requirements Engineer",
         },
       },
     );
@@ -166,7 +166,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
     expect(replyResponse.status()).toBe(201);
     expect(await replyResponse.json()).toMatchObject({
       commentId: comment.id,
-      author: "E2E Requirements Engineer",
+      author: "Requirements Engineer",
     });
 
     const summaryResponse = await request.get(
@@ -181,12 +181,12 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
     await request.patch(
       `/projects/${project.id}/requirements/${requirement.id}/review-comments/${comment.id}`,
       {
-        data: { closedBy: "E2E Requirements Engineer" },
+        data: { closedBy: "Requirements Engineer" },
       },
     );
     const lateReplyResponse = await request.post(
       `/projects/${project.id}/requirements/${requirement.id}/review-comments/${comment.id}/replies`,
-      { data: { text: "A late reply.", author: "E2E Requirements Engineer" } },
+      { data: { text: "A late reply.", author: "Requirements Engineer" } },
     );
     expect(lateReplyResponse.status()).toBe(400);
   });
@@ -203,7 +203,7 @@ test.describe("Requirement reviews API - PATCH /projects/{projectId}/requirement
       {
         data: {
           text: "Please define allowed authentication methods.",
-          author: "E2E Requirements Engineer",
+          author: "Requirements Engineer",
         },
       },
     );
@@ -212,7 +212,7 @@ test.describe("Requirement reviews API - PATCH /projects/{projectId}/requirement
 
     const closeResponse = await request.patch(
       `/projects/${project.id}/requirements/${requirement.id}/review-comments/${comment.id}`,
-      { data: { closedBy: "E2E Requirements Engineer" } },
+      { data: { closedBy: "Requirements Engineer" } },
     );
 
     expect(closeResponse.status()).toBe(200);
@@ -224,7 +224,7 @@ test.describe("Requirement reviews API - PATCH /projects/{projectId}/requirement
       projectId: project.id,
       requirementId: requirement.id,
       status: RequirementReviewCommentStatus.Closed,
-      closedBy: "E2E Requirements Engineer",
+      closedBy: "Requirements Engineer",
       closeReason: RequirementReviewCommentCloseReason.Resolved,
       closedInRevisionNumber: 1,
     });
@@ -244,7 +244,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       {
         data: {
           text: "Please clarify the acceptance criteria.",
-          author: "E2E Requirements Engineer",
+          author: "Requirements Engineer",
         },
       },
     );
@@ -253,7 +253,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
     const approveResponse = await request.post(
       `/projects/${project.id}/requirements/${requirement.id}/review/approve`,
       {
-        data: { reviewer: "E2E Requirements Engineer" },
+        data: { reviewer: "Requirements Engineer" },
       },
     );
 
@@ -279,7 +279,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       {
         data: {
           text: "Please clarify the acceptance criteria.",
-          author: "E2E Requirements Engineer",
+          author: "Requirements Engineer",
         },
       },
     );
@@ -287,14 +287,14 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       (await createCommentResponse.json()) as RequirementReviewCommentResponseBody;
     const closeResponse = await request.patch(
       `/projects/${project.id}/requirements/${requirement.id}/review-comments/${comment.id}`,
-      { data: { closedBy: "E2E Requirements Engineer" } },
+      { data: { closedBy: "Requirements Engineer" } },
     );
     expect(closeResponse.status()).toBe(200);
 
     const approveResponse = await request.post(
       `/projects/${project.id}/requirements/${requirement.id}/review/approve`,
       {
-        data: { reviewer: "E2E Requirements Engineer" },
+        data: { reviewer: "Requirements Engineer" },
       },
     );
 
@@ -310,7 +310,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       revisionNumber: 2,
       status: RequirementStatus.Approved,
     });
-    expect(approvedRequirement.reviewer).toBe("E2E Requirements Engineer");
+    expect(approvedRequirement.reviewer).toBe("Requirements Engineer");
     expect(approvedRequirement.approvedAt).not.toBeNull();
   });
 });
@@ -326,7 +326,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       {
         data: {
           text: "Please clarify the acceptance criteria.",
-          author: "E2E Requirements Engineer",
+          author: "Requirements Engineer",
         },
       },
     );
@@ -337,7 +337,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       `/projects/${project.id}/requirements/${requirement.id}/review/reject`,
       {
         data: {
-          reviewer: "E2E Requirements Engineer",
+          reviewer: "Requirements Engineer",
           rejectionReason: "The requirement is not testable.",
         },
       },
@@ -355,7 +355,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
       revisionNumber: 2,
       status: RequirementStatus.Rejected,
     });
-    expect(rejectedRequirement.reviewer).toBe("E2E Requirements Engineer");
+    expect(rejectedRequirement.reviewer).toBe("Requirements Engineer");
     expect(rejectedRequirement.rejectionReason).toBe(
       "The requirement is not testable.",
     );
@@ -374,7 +374,7 @@ test.describe("Requirement reviews API - POST /projects/{projectId}/requirements
     expect(rejectedClosedComment?.status).toBe(
       RequirementReviewCommentStatus.Closed,
     );
-    expect(rejectedClosedComment?.closedBy).toBe("E2E Requirements Engineer");
+    expect(rejectedClosedComment?.closedBy).toBe("Requirements Engineer");
     expect(rejectedClosedComment?.closeReason).toBe(
       RequirementReviewCommentCloseReason.RequirementRejected,
     );

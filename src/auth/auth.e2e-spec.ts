@@ -12,7 +12,9 @@ const GENERIC_RESEND_RESPONSE = {
   message: "If the account is eligible, a verification email will be sent.",
 };
 const BOOTSTRAP_RESPONSE = { message: "Bootstrap registration received." };
-const TEST_BOOTSTRAP_SECRET = "test-only-bootstrap-secret-with-32-characters";
+const TEST_BOOTSTRAP_SECRET =
+  process.env.INITIAL_ADMIN_BOOTSTRAP_SECRET ??
+  "test-only-bootstrap-secret-with-32-characters";
 
 interface PersistedUserRow {
   emailVerifiedAt: Date | null;

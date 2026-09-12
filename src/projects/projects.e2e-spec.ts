@@ -6,6 +6,7 @@ import {
     expectIsoDateString,
     expectProjectResponseBody,
     UUID_REGEX,
+    E2E_ADMIN_HEADERS,
     type ErrorResponseBody,
     type ProjectResponseBody,
 } from '@/projects/projects-api.e2e-helpers';
@@ -15,13 +16,13 @@ test.describe('Projects API - GET /projects', () => {
         const firstProjectName = `Playwright API list project A ${randomUUID()}`;
         const secondProjectName = `Playwright API list project B ${randomUUID()}`;
 
-        const firstCreateResponse = await request.post('/projects', { data: { name: firstProjectName } });
-        const secondCreateResponse = await request.post('/projects', { data: { name: secondProjectName } });
+        const firstCreateResponse = await request.post('/projects', { data: { name: firstProjectName }, headers: E2E_ADMIN_HEADERS });
+        const secondCreateResponse = await request.post('/projects', { data: { name: secondProjectName }, headers: E2E_ADMIN_HEADERS });
 
         expect(firstCreateResponse.status()).toBe(201);
         expect(secondCreateResponse.status()).toBe(201);
 
-        const response = await request.get('/projects');
+        const response = await request.get('/projects', { headers: E2E_ADMIN_HEADERS });
 
         expect(response.status()).toBe(200);
 
@@ -50,7 +51,7 @@ test.describe('Projects API - GET /projects/{id}', () => {
         const projectName = `Playwright API get project ${randomUUID()}`;
         const createdProject = await api.createProject(projectName);
 
-        const response = await request.get(`/projects/${createdProject.id}`);
+        const response = await request.get(`/projects/${createdProject.id}`, { headers: E2E_ADMIN_HEADERS });
 
         expect(response.status()).toBe(200);
 
@@ -64,7 +65,7 @@ test.describe('Projects API - GET /projects/{id}', () => {
     test('returns 404 when the project does not exist.', async ({ request }) => {
         const unknownProjectId = randomUUID();
 
-        const response = await request.get(`/projects/${unknownProjectId}`);
+        const response = await request.get(`/projects/${unknownProjectId}`, { headers: E2E_ADMIN_HEADERS });
 
         expect(response.status()).toBe(404);
 
@@ -80,7 +81,7 @@ test.describe('Projects API - POST /projects', () => {
     test('creates a project.', async ({ request }) => {
         const projectName = `Playwright API project ${randomUUID()}`;
 
-        const response = await request.post('/projects', { data: { name: `  ${projectName}  ` } });
+        const response = await request.post('/projects', { data: { name: `  ${projectName}  ` }, headers: E2E_ADMIN_HEADERS });
 
         expect(response.status()).toBe(201);
 
@@ -90,7 +91,7 @@ test.describe('Projects API - POST /projects', () => {
     });
 
     test('rejects an empty project name.', async ({ request }) => {
-        const response = await request.post('/projects', { data: { name: '   ' } });
+        const response = await request.post('/projects', { data: { name: '   ' }, headers: E2E_ADMIN_HEADERS });
 
         expect(response.status()).toBe(400);
 
@@ -111,6 +112,7 @@ test.describe('Projects API - PATCH /projects/{id}', () => {
 
         const response = await request.patch(`/projects/${createdProject.id}`, {
             data: { name: `  ${updatedProjectName}  ` },
+            headers: E2E_ADMIN_HEADERS,
         });
 
         expect(response.status()).toBe(200);
@@ -123,7 +125,7 @@ test.describe('Projects API - PATCH /projects/{id}', () => {
     });
 
     test('rejects an empty project name while updating.', async ({ request }) => {
-        const response = await request.patch(`/projects/${randomUUID()}`, { data: { name: '   ' } });
+        const response = await request.patch(`/projects/${randomUUID()}`, { data: { name: '   ' }, headers: E2E_ADMIN_HEADERS });
 
         expect(response.status()).toBe(400);
 
@@ -139,6 +141,7 @@ test.describe('Projects API - PATCH /projects/{id}', () => {
 
         const response = await request.patch(`/projects/${unknownProjectId}`, {
             data: { name: `Playwright API unknown update ${randomUUID()}` },
+            headers: E2E_ADMIN_HEADERS,
         });
 
         expect(response.status()).toBe(404);
@@ -157,12 +160,12 @@ test.describe('Projects API - DELETE /projects/{id}', () => {
 
         const createdProject = await api.createProject(projectName);
 
-        const deleteResponse = await request.delete(`/projects/${createdProject.id}`);
+        const deleteResponse = await request.delete(`/projects/${createdProject.id}`, { headers: E2E_ADMIN_HEADERS });
 
         expect(deleteResponse.status()).toBe(204);
         expect(await deleteResponse.text()).toBe('');
 
-        const listResponse = await request.get('/projects');
+        const listResponse = await request.get('/projects', { headers: E2E_ADMIN_HEADERS });
 
         expect(listResponse.status()).toBe(200);
 
@@ -174,7 +177,7 @@ test.describe('Projects API - DELETE /projects/{id}', () => {
     test('returns 404 when deleting an unknown project.', async ({ request }) => {
         const unknownProjectId = randomUUID();
 
-        const response = await request.delete(`/projects/${unknownProjectId}`);
+        const response = await request.delete(`/projects/${unknownProjectId}`, { headers: E2E_ADMIN_HEADERS });
 
         expect(response.status()).toBe(404);
 

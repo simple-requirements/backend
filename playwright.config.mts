@@ -26,7 +26,7 @@ export default defineConfig({
 
     extraHTTPHeaders: {
       Accept: "application/json",
-      Authorization: "Bearer e2e-authentication-token",
+      Authorization: "Bearer e2e-requirements-engineer-token",
     },
   },
 
@@ -37,7 +37,8 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: "NODE_ENV=test PORT=3001 pnpm start",
+        command:
+          "INITIAL_ADMIN_BOOTSTRAP_SECRET=test-only-bootstrap-secret-with-32-characters NODE_ENV=test PORT=3001 pnpm start",
         url: `${baseURL}/`,
         reuseExistingServer: !process.env.CI,
         timeout: 60_000,

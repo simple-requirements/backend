@@ -9,7 +9,10 @@ async function main(): Promise<void> {
         }
 
         await seedDemoData(dataSource);
-        await seedE2eAuthenticationData(dataSource);
+
+        if (process.env.E2E_SEED_AUTHENTICATION !== 'false') {
+            await seedE2eAuthenticationData(dataSource);
+        }
     } finally {
         if (dataSource.isInitialized) {
             await dataSource.destroy();

@@ -3,7 +3,14 @@ import { isValid, parseISO } from "date-fns";
 
 import { CategoryType } from "@/projects/category-type.enum";
 import { RequirementStatus } from "@/projects/requirement-status.enum";
-import { E2E_USER_ID } from "@/database/seeding/seed-e2e-authentication";
+import {
+  E2E_ADMIN_ACCESS_TOKEN,
+  E2E_ADMIN_USER_ID,
+  E2E_DEVELOPER_USER_ID,
+  E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN,
+  E2E_REQUIREMENTS_ENGINEER_USER_ID,
+  E2E_VIEWER_USER_ID,
+} from "@/database/seeding/seed-e2e-authentication";
 
 export interface ProjectResponseBody {
   id: string;
@@ -20,6 +27,15 @@ export interface ErrorResponseBody {
 
 export const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const E2E_ADMIN_HEADERS = {
+  Authorization: `Bearer ${E2E_ADMIN_ACCESS_TOKEN}`,
+} as const;
+
+export const E2E_REQUIREMENTS_ENGINEER_HEADERS = {
+  Authorization: `Bearer ${E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN}`,
+} as const;
+
 
 export function expectIsoDateString(value: string): void {
   const parsedDate = parseISO(value);
@@ -42,16 +58,39 @@ export async function createProject(
   request: APIRequestContext,
   name: string,
 ): Promise<ProjectResponseBody> {
-  const response = await request.post("/projects", { data: { name } });
+  const response = await request.post("/projects", {
+    data: { name },
+    headers: E2E_ADMIN_HEADERS,
+  });
 
   expect(response.status()).toBe(201);
 
   const project = (await response.json()) as ProjectResponseBody;
-  const membership = await request.put(
-    `/admin/projects/${project.id}/memberships/${E2E_USER_ID}`,
-    { data: { roles: ["requirements_engineer", "developer", "viewer"] } },
-  );
-  expect(membership.status()).toBe(200);
+  const memberships = await Promise.all([
+    request.put(`/admin/projects/${project.id}/memberships/${E2E_ADMIN_USER_ID}`, {
+      data: { roles: ["viewer"] },
+      headers: E2E_ADMIN_HEADERS,
+    }),
+    request.put(
+      `/admin/projects/${project.id}/memberships/${E2E_REQUIREMENTS_ENGINEER_USER_ID}`,
+      {
+        data: { roles: ["requirements_engineer"] },
+        headers: E2E_ADMIN_HEADERS,
+      },
+    ),
+    request.put(
+      `/admin/projects/${project.id}/memberships/${E2E_DEVELOPER_USER_ID}`,
+      { data: { roles: ["developer"] }, headers: E2E_ADMIN_HEADERS },
+    ),
+    request.put(`/admin/projects/${project.id}/memberships/${E2E_VIEWER_USER_ID}`, {
+      data: { roles: ["viewer"] },
+      headers: E2E_ADMIN_HEADERS,
+    }),
+  ]);
+
+  expect(memberships.map((membership) => membership.status())).toEqual([
+    200, 200, 200, 200,
+  ]);
   return project;
 }
 
@@ -124,6 +163,7 @@ export async function createCategory(
 ): Promise<CategoryResponseBody> {
   const response = await request.post(`/projects/${projectId}/categories`, {
     data: { name, key, type },
+    headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
   });
 
   expect(response.status()).toBe(201);
@@ -242,6 +282,7 @@ export async function createRequirement(
 ): Promise<RequirementResponseBody> {
   const response = await request.post(`/projects/${projectId}/requirements`, {
     data: { categoryId, description, priority: "p1" },
+    headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
   });
 
   expect(response.status()).toBe(201);
@@ -253,12 +294,13 @@ export async function approveRequirement(
   request: APIRequestContext,
   projectId: string,
   requirementId: string,
-  reviewer = "E2E Requirements Engineer",
+  reviewer = "Requirements Engineer",
 ): Promise<RequirementResponseBody> {
   const response = await request.patch(
     `/projects/${projectId}/requirements/${requirementId}`,
     {
       data: { status: RequirementStatus.Approved, reviewer },
+      headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
     },
   );
 
@@ -278,9 +320,10 @@ export async function createImplementationTicket(
     {
       data: {
         ticketId,
-        completedBy: "E2E Requirements Engineer",
+        completedBy: "Requirements Engineer",
         completedAt: "2026-08-25",
       },
+      headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
     },
   );
 
@@ -293,7 +336,9 @@ export async function listCategories(
   request: APIRequestContext,
   projectId: string,
 ): Promise<readonly CategoryResponseBody[]> {
-  const response = await request.get(`/projects/${projectId}/categories`);
+  const response = await request.get(`/projects/${projectId}/categories`, {
+    headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+  });
 
   expect(response.status()).toBe(200);
 
