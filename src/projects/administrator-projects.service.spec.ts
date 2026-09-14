@@ -78,8 +78,6 @@ describe("AdministratorProjectsService", () => {
           },
         ],
         ticketUrlTemplate: "https://tracker.example/{ticket-id}",
-        createdAt: new Date("2026-09-14T06:00:00.000Z"),
-        updatedAt: new Date("2026-09-14T06:10:00.000Z"),
       },
     ]);
 

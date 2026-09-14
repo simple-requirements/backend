@@ -39,10 +39,4 @@ export class AdministratorProjectSummaryResponseDto {
     description: "Administrative implementation-ticket URL template.",
   })
   ticketUrlTemplate!: string | null;
-
-  @ApiProperty({ example: "2026-06-28T10:00:00.000Z" })
-  createdAt!: Date;
-
-  @ApiProperty({ example: "2026-06-28T10:00:00.000Z" })
-  updatedAt!: Date;
 }

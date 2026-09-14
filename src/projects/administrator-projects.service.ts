@@ -73,8 +73,6 @@ export class AdministratorProjectsService {
       requirementCount,
       memberships,
       ticketUrlTemplate: project.ticketUrlTemplate,
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
     };
   }
 }
