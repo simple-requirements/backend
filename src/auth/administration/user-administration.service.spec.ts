@@ -6,6 +6,7 @@ import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
 import { User } from "@/auth/accounts/users.entity";
 import { UserAdministrationService } from "@/auth/administration/user-administration.service";
+import { ProjectMembership } from "@/auth/authorization/project-membership.entity";
 import type { SessionService } from "@/auth/sessions/session.service";
 
 function user(overrides: Partial<User> = {}): User {
@@ -29,8 +30,13 @@ describe("UserAdministrationService role model", () => {
     findOneBy: vi.fn(),
     save: vi.fn((value: User) => Promise.resolve(value)),
   };
+  const membershipRepository = {
+    countBy: vi.fn(),
+  };
   const dataSource = {
-    getRepository: vi.fn(() => repository),
+    getRepository: vi.fn((entity: unknown) =>
+      entity === ProjectMembership ? membershipRepository : repository,
+    ),
   };
   const sessions = {
     revokeAllForUser: vi.fn(),
@@ -122,7 +128,7 @@ describe("UserAdministrationService role model", () => {
     );
   });
 
-  it("does not allow a deactivated account with an assigned role to change roles.", async () => {
+  it("allows a deactivated account to change its project-scoped role.", async () => {
     repository.findOneBy.mockResolvedValue(
       user({
         status: UserStatus.Deactivated,
@@ -134,6 +140,40 @@ describe("UserAdministrationService role model", () => {
       service.assignRole(
         "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
         AccountRole.Viewer,
+      ),
+    ).resolves.toMatchObject({ role: AccountRole.Viewer });
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ role: AccountRole.Viewer }),
+    );
+  });
+
+  it("allows a deactivated account without memberships to become Administrator.", async () => {
+    repository.findOneBy.mockResolvedValue(
+      user({ status: UserStatus.Deactivated, role: AccountRole.Viewer }),
+    );
+    membershipRepository.countBy.mockResolvedValue(0);
+
+    await expect(
+      service.assignRole(
+        "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
+        AccountRole.Administrator,
+      ),
+    ).resolves.toMatchObject({ role: AccountRole.Administrator });
+    expect(membershipRepository.countBy).toHaveBeenCalledWith({
+      userId: "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
+    });
+  });
+
+  it("blocks Administrator assignment while project memberships still exist.", async () => {
+    repository.findOneBy.mockResolvedValue(
+      user({ status: UserStatus.Deactivated, role: AccountRole.Viewer }),
+    );
+    membershipRepository.countBy.mockResolvedValue(1);
+
+    await expect(
+      service.assignRole(
+        "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
+        AccountRole.Administrator,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(repository.save).not.toHaveBeenCalled();

@@ -12,8 +12,10 @@ import {
 } from "@nestjs/common";
 import {
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiNoContentResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from "@nestjs/swagger";
 
@@ -52,7 +54,16 @@ export class UserAdministrationController {
   }
 
   @Patch(":userId/role")
+  @ApiOperation({
+    summary: "Assign or change an account role",
+    description:
+      "Roles can be assigned while an account is pending or changed while it is deactivated. Active accounts must be deactivated first. Administrator accounts cannot retain project memberships.",
+  })
   @ApiOkResponse({ type: UserAdministrationResponseDto })
+  @ApiConflictResponse({
+    description:
+      "The account is active or Administrator assignment conflicts with existing project memberships.",
+  })
   updateRole(
     @Param("userId", ParseUUIDPipe) userId: string,
     @Body(new ZodValidationPipe(updateUserRoleSchema))

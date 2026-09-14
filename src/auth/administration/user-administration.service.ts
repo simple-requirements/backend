@@ -11,6 +11,7 @@ import { UserStatus } from "@/auth/accounts/user-status.enum";
 import { User } from "@/auth/accounts/users.entity";
 import type { SessionResponseDto } from "@/auth/dto/session-response.dto";
 import type { UserAdministrationResponseDto } from "@/auth/dto/user-administration-response.dto";
+import { ProjectMembership } from "@/auth/authorization/project-membership.entity";
 import { SessionService } from "@/auth/sessions/session.service";
 
 @Injectable()
@@ -43,12 +44,17 @@ export class UserAdministrationService {
     }
     if (
       user.status === UserStatus.Deactivated &&
-      user.role !== null &&
-      user.role !== role
+      role === AccountRole.Administrator &&
+      user.role !== AccountRole.Administrator
     ) {
-      throw new ConflictException(
-        "The role of a previously assigned deactivated account cannot be changed.",
-      );
+      const membershipCount = await this.dataSource
+        .getRepository(ProjectMembership)
+        .countBy({ userId });
+      if (membershipCount > 0) {
+        throw new ConflictException(
+          "Project memberships must be removed before assigning the Administrator role.",
+        );
+      }
     }
     user.role = role;
     await this.dataSource.getRepository(User).save(user);
