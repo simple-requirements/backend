@@ -36,7 +36,6 @@ import {
   UpsertImplementationTicketDto,
 } from "@/projects/dto/implementation-ticket.dto";
 
-
 const CONTENT_FIELD_NAMES = [
   "categoryId",
   "description",
@@ -69,7 +68,9 @@ function statusChangeReason(update: UpdateRequirementDto): string {
   }
 }
 
-function statusChangeType(update: UpdateRequirementDto): RequirementRevisionChangeType {
+function statusChangeType(
+  update: UpdateRequirementDto,
+): RequirementRevisionChangeType {
   switch (update.status) {
     case RequirementStatus.Approved:
       return RequirementRevisionChangeType.Approved;
@@ -149,11 +150,15 @@ export class ProjectsService {
   }
 
   async delete(id: string): Promise<void> {
-    const deleteResult = await this.projectsRepository.delete({ id });
+    await this.getProjectOrThrow(id);
 
-    if (deleteResult.affected !== 1) {
-      throw new NotFoundException(`Project with id "${id}" was not found.`);
+    if (await this.requirementsRepository.existsBy({ projectId: id })) {
+      throw new BadRequestException(
+        `Project with id "${id}" cannot be deleted because it contains requirements.`,
+      );
     }
+
+    await this.projectsRepository.delete({ id });
   }
 
   async findAllCategories(projectId: string): Promise<CategoryResponseDto[]> {
@@ -330,6 +335,7 @@ export class ProjectsService {
       requirementId,
     );
 
+    this.ensureGenericStatusChangeAllowed(updateRequirementDto);
 
     const categoryChange = await this.prepareRequirementContentChange(
       projectId,
@@ -478,7 +484,10 @@ export class ProjectsService {
       requirementId,
     );
     this.assertTicketsEditable(requirement);
-    const ticket = await this.getImplementationTicketOrThrow(requirementId, ticketRecordId);
+    const ticket = await this.getImplementationTicketOrThrow(
+      requirementId,
+      ticketRecordId,
+    );
     const revisionMetadata = createRevisionMetadata(
       RequirementRevisionChangeType.ImplementationTicketRemoved,
       `Implementation ticket ${ticket.ticketId} removed.`,
@@ -497,7 +506,6 @@ export class ProjectsService {
     this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
     await this.requirementsRepository.save(requirement);
   }
-
 
   async findRequirementRevisions(
     projectId: string,
@@ -578,7 +586,9 @@ export class ProjectsService {
       fromRevision,
       toRevision,
       differences: comparedFields
-        .filter((field) => JSON.stringify(from[field]) !== JSON.stringify(to[field]))
+        .filter(
+          (field) => JSON.stringify(from[field]) !== JSON.stringify(to[field]),
+        )
         .map((field) => ({ field, from: from[field], to: to[field] })),
     };
   }
@@ -731,7 +741,6 @@ export class ProjectsService {
     return `${category.type}-${category.key}-${sequenceNumber.toString().padStart(4, "0")}`;
   }
 
-
   private createRequirementRevisionMetadata(
     requirement: Requirement,
     update: UpdateRequirementDto,
@@ -751,14 +760,18 @@ export class ProjectsService {
       );
     }
 
-    if (update.changeReason === undefined || update.changeReason.trim().length === 0) {
+    if (
+      update.changeReason === undefined ||
+      update.changeReason.trim().length === 0
+    ) {
       throw new BadRequestException(
         "Change reason is required when changing requirement content or metadata.",
       );
     }
 
     return createRevisionMetadata(
-      update.categoryId !== undefined && update.categoryId !== requirement.categoryId
+      update.categoryId !== undefined &&
+        update.categoryId !== requirement.categoryId
         ? RequirementRevisionChangeType.CategoryChanged
         : RequirementRevisionChangeType.ContentChanged,
       update.changeReason.trim(),
@@ -829,16 +842,19 @@ export class ProjectsService {
         requirement[fieldName] = updateRequirementDto[fieldName];
       }
     }
+  }
 
-    requirement.status = RequirementStatus.Draft;
-    requirement.rejectionReason = null;
-    requirement.reviewer = null;
-    requirement.obsoletedBy = null;
-    requirement.rejectedAt = null;
-    requirement.approvedAt = null;
-    requirement.implementedAt = null;
-    requirement.obsolescenceReason = null;
-    requirement.obsoleteAt = null;
+  private ensureGenericStatusChangeAllowed(
+    updateRequirementDto: UpdateRequirementDto,
+  ): void {
+    if (
+      updateRequirementDto.status === RequirementStatus.Approved ||
+      updateRequirementDto.status === RequirementStatus.Rejected
+    ) {
+      throw new BadRequestException(
+        "Requirement approval and rejection must use the review decision endpoints.",
+      );
+    }
   }
 
   private toProjectResponseDto(project: Project): ProjectResponseDto {

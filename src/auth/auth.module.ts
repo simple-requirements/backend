@@ -13,7 +13,6 @@ import bootstrapConfig from "@/auth/bootstrap/bootstrap.config";
 import { EmailDeliveryService } from "@/auth/registration/email-delivery.service";
 import { EmailVerificationToken } from "@/auth/registration/email-verification-token.entity";
 import { EmailVerificationService } from "@/auth/registration/email-verification.service";
-import { GlobalUserRole } from "@/auth/authorization/global-user-role.entity";
 import { LoginAttempt } from "@/auth/sessions/login-attempt.entity";
 import mailConfig from "@/auth/registration/mail.config";
 import { PasswordService } from "@/auth/accounts/password.service";
@@ -44,7 +43,6 @@ import { RegistrationController } from "@/auth/registration/registration.control
       EmailVerificationToken,
       AuthenticationBootstrap,
       BootstrapRegistrationAttempt,
-      GlobalUserRole,
       AuthenticationSession,
       LoginAttempt,
       ProjectMembership,

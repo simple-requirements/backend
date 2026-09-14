@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
+import { AdministratorProjectsController } from "@/projects/administrator-projects.controller";
+import { AdministratorProjectsService } from "@/projects/administrator-projects.service";
 import { CategoriesController } from "@/projects/categories.controller";
 import { Category } from "@/projects/categories.entity";
 import { Project } from "@/projects/projects.entity";
@@ -28,12 +30,14 @@ import { RequirementRevisionService } from "@/projects/requirements/requirement-
     ]),
   ],
   controllers: [
+    AdministratorProjectsController,
     ProjectsController,
     CategoriesController,
     RequirementsController,
     ImplementationTicketsController,
   ],
   providers: [
+    AdministratorProjectsService,
     ProjectsService,
     RequirementLifecycleService,
     RequirementResponseMapper,

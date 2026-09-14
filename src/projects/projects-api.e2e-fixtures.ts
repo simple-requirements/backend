@@ -39,6 +39,7 @@ export type ProjectsApiFixture = Readonly<{
     projectId: string,
     requirementId: string,
     ticketId: string,
+    completedBy?: string,
   ): Promise<ImplementationTicketResponseBody>;
   listCategories(projectId: string): Promise<readonly CategoryResponseBody[]>;
 }>;
@@ -100,8 +101,15 @@ export const test = base.extend<ProjectsApiFixtures>({
         projectId: string,
         requirementId: string,
         ticketId: string,
+        completedBy?: string,
       ) =>
-        createImplementationTicket(request, projectId, requirementId, ticketId),
+        createImplementationTicket(
+          request,
+          projectId,
+          requirementId,
+          ticketId,
+          completedBy,
+        ),
       listCategories: (projectId: string) => listCategories(request, projectId),
     });
   },

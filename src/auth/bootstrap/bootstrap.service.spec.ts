@@ -15,8 +15,7 @@ import {
 import type { BootstrapConfiguration } from "@/auth/bootstrap/bootstrap.config";
 import { BootstrapAdministratorDto } from "@/auth/dto/bootstrap-administrator.dto";
 import type { EmailVerificationService } from "@/auth/registration/email-verification.service";
-import { GlobalRole } from "@/auth/authorization/global-role.enum";
-import { GlobalUserRole } from "@/auth/authorization/global-user-role.entity";
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import type { PasswordService } from "@/auth/accounts/password.service";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
 
@@ -47,15 +46,10 @@ describe("BootstrapService", () => {
     create: vi.fn((value: object) => value),
     save: vi.fn(),
   };
-  const roleRepository = {
-    create: vi.fn((value: object) => value),
-    save: vi.fn(),
-  };
   const manager = {
     getRepository: vi.fn((entity: unknown) => {
       if (entity === AuthenticationBootstrap) return bootstrapRepository;
       if (entity === BootstrapRegistrationAttempt) return attemptRepository;
-      if (entity === GlobalUserRole) return roleRepository;
       return userRepository;
     }),
     query: vi.fn(),
@@ -83,7 +77,6 @@ describe("BootstrapService", () => {
     userRepository.save.mockImplementation((value: object) =>
       Promise.resolve({ ...value, id: USER_ID }),
     );
-    roleRepository.save.mockResolvedValue(undefined);
     manager.query.mockResolvedValue([]);
     passwordService.hash.mockResolvedValue("encoded-password-hash");
     emailVerificationService.prepareForUser.mockResolvedValue({
@@ -142,13 +135,10 @@ describe("BootstrapService", () => {
         normalizedUsername: "administrator",
         normalizedEmail: "admin@example.org",
         status: UserStatus.Pending,
+        role: AccountRole.Administrator,
         emailVerifiedAt: null,
       }),
     );
-    expect(roleRepository.create).toHaveBeenCalledWith({
-      userId: USER_ID,
-      role: GlobalRole.Administrator,
-    });
     expect(emailVerificationService.prepareForUser).toHaveBeenCalledWith(
       manager,
       expect.objectContaining({ id: USER_ID }),

@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 
-import { GlobalRole } from "@/auth/authorization/global-role.enum";
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
 
 export class UserAdministrationResponseDto {
@@ -19,11 +19,11 @@ export class UserAdministrationResponseDto {
   @ApiProperty({ enum: UserStatus })
   status!: UserStatus;
 
+  @ApiProperty({ enum: AccountRole, nullable: true })
+  role!: AccountRole | null;
+
   @ApiProperty({ format: "date-time", nullable: true })
   emailVerifiedAt!: Date | null;
-
-  @ApiProperty({ enum: GlobalRole, isArray: true })
-  globalRoles!: GlobalRole[];
 
   @ApiProperty({ format: "date-time" })
   createdAt!: Date;

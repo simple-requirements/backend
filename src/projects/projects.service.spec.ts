@@ -40,6 +40,7 @@ interface CategoriesRepositoryMock {
 interface RequirementsRepositoryMock {
   create: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
+  existsBy: ReturnType<typeof vi.fn>;
   find: ReturnType<typeof vi.fn>;
   findOne: ReturnType<typeof vi.fn>;
   save: ReturnType<typeof vi.fn>;
@@ -200,7 +201,11 @@ function createCreateRequirementDto(
 function createUpdateRequirementDto(
   overrides: Partial<UpdateRequirementDto> = {},
 ): UpdateRequirementDto {
-  return { description: "Users must sign in with MFA.", changeReason: "Clarified authentication behavior.", ...overrides };
+  return {
+    description: "Users must sign in with MFA.",
+    changeReason: "Clarified authentication behavior.",
+    ...overrides,
+  };
 }
 
 describe("ProjectsService", () => {
@@ -229,6 +234,7 @@ describe("ProjectsService", () => {
     requirementsRepository = {
       create: vi.fn(),
       delete: vi.fn(),
+      existsBy: vi.fn(),
       find: vi.fn(),
       findOne: vi.fn(),
       save: vi.fn(),
@@ -434,26 +440,47 @@ describe("ProjectsService", () => {
   });
 
   describe("deletes", () => {
-    it("a project.", async () => {
+    it("an empty project.", async () => {
       const projectId = "9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b";
 
+      projectsRepository.findOne.mockResolvedValue(createProjectEntity());
+      requirementsRepository.existsBy.mockResolvedValue(false);
       projectsRepository.delete.mockResolvedValue({ affected: 1 });
 
       await service.delete(projectId);
 
+      expect(requirementsRepository.existsBy).toHaveBeenCalledWith({
+        projectId,
+      });
       expect(projectsRepository.delete).toHaveBeenCalledWith({ id: projectId });
+    });
+
+    it("rejects deletion when the project contains requirements.", async () => {
+      const projectId = "9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b";
+
+      projectsRepository.findOne.mockResolvedValue(createProjectEntity());
+      requirementsRepository.existsBy.mockResolvedValue(true);
+
+      await expect(service.delete(projectId)).rejects.toEqual(
+        new BadRequestException(
+          `Project with id "${projectId}" cannot be deleted because it contains requirements.`,
+        ),
+      );
+
+      expect(projectsRepository.delete).not.toHaveBeenCalled();
     });
 
     it("throws NotFoundException if the project does not exist.", async () => {
       const projectId = "9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b";
 
-      projectsRepository.delete.mockResolvedValue({ affected: 0 });
+      projectsRepository.findOne.mockResolvedValue(null);
 
       await expect(service.delete(projectId)).rejects.toBeInstanceOf(
         NotFoundException,
       );
 
-      expect(projectsRepository.delete).toHaveBeenCalledWith({ id: projectId });
+      expect(requirementsRepository.existsBy).not.toHaveBeenCalled();
+      expect(projectsRepository.delete).not.toHaveBeenCalled();
     });
   });
 
@@ -1154,7 +1181,7 @@ describe("ProjectsService", () => {
     });
 
     describe("updateRequirement", () => {
-      it("creates a revision and resets a changed approved requirement to draft.", async () => {
+      it("creates a content revision while preserving an approved requirement lifecycle state.", async () => {
         const existingRequirement = createRequirementEntity({
           status: RequirementStatus.Approved,
           revisionNumber: 2,
@@ -1162,12 +1189,14 @@ describe("ProjectsService", () => {
           approvedAt: new Date("2026-06-28T11:00:00.000Z"),
         });
         const revision = new RequirementRevision();
+        const approvedAt = new Date("2026-06-28T11:00:00.000Z");
+        existingRequirement.approvedAt = approvedAt;
         const savedRequirement = createRequirementEntity({
           description: "Users must sign in with MFA.",
           revisionNumber: 3,
-          status: RequirementStatus.Draft,
-          reviewer: null,
-          approvedAt: null,
+          status: RequirementStatus.Approved,
+          reviewer: "Jane Reviewer",
+          approvedAt,
         });
 
         projectsRepository.findOne.mockResolvedValue(createProjectEntity());
@@ -1193,22 +1222,24 @@ describe("ProjectsService", () => {
           revision,
         );
         expect(existingRequirement.revisionNumber).toBe(3);
-        expect(existingRequirement.status).toBe(RequirementStatus.Draft);
+        expect(existingRequirement.status).toBe(RequirementStatus.Approved);
         expect(existingRequirement.description).toBe(
           "Users must sign in with MFA.",
         );
         expect(existingRequirement.changeReason).toBe(
           "Clarified authentication behavior.",
         );
-        expect(existingRequirement.reviewer).toBeNull();
-        expect(existingRequirement.approvedAt).toBeNull();
+        expect(existingRequirement.reviewer).toBe("Jane Reviewer");
+        expect(existingRequirement.approvedAt).toEqual(approvedAt);
         expect(result.revisionNumber).toBe(3);
-        expect(result.status).toBe(RequirementStatus.Draft);
+        expect(result.status).toBe(RequirementStatus.Approved);
       });
 
       it("requires an explicit change reason for substantive edits.", async () => {
         projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(createRequirementEntity());
+        requirementsRepository.findOne.mockResolvedValue(
+          createRequirementEntity(),
+        );
 
         await expect(
           service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
@@ -1220,58 +1251,30 @@ describe("ProjectsService", () => {
         expect(requirementsRepository.save).not.toHaveBeenCalled();
       });
 
-      it("approves a draft requirement when a reviewer is provided.", async () => {
-        const existingRequirement = createRequirementEntity();
-        const revision = new RequirementRevision();
-        const savedRequirement = createRequirementEntity({
-          revisionNumber: 2,
-          status: RequirementStatus.Approved,
-          reviewer: "Jane Reviewer",
-          approvedAt: new Date("2026-06-28T11:00:00.000Z"),
-        });
+      it.each([RequirementStatus.Approved, RequirementStatus.Rejected])(
+        "requires the dedicated review decision endpoint for %s transitions.",
+        async (status) => {
+          projectsRepository.findOne.mockResolvedValue(createProjectEntity());
+          requirementsRepository.findOne.mockResolvedValue(
+            createRequirementEntity(),
+          );
 
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(existingRequirement);
-        requirementRevisionsRepository.create.mockReturnValue(revision);
-        requirementRevisionsRepository.save.mockResolvedValue(revision);
-        requirementsRepository.save.mockResolvedValue(savedRequirement);
+          await expect(
+            service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
+              status,
+              reviewer: "Jane Reviewer",
+              ...(status === RequirementStatus.Rejected
+                ? { rejectionReason: "Not suitable." }
+                : {}),
+            }),
+          ).rejects.toThrow(
+            "Requirement approval and rejection must use the review decision endpoints.",
+          );
 
-        const result = await service.updateRequirement(
-          PROJECT_ID,
-          REQUIREMENT_ID,
-          {
-            status: RequirementStatus.Approved,
-            reviewer: "Jane Reviewer",
-          },
-        );
-
-        expect(existingRequirement.status).toBe(RequirementStatus.Approved);
-        expect(existingRequirement.reviewer).toBe("Jane Reviewer");
-        expect(existingRequirement.approvedAt).toBeInstanceOf(Date);
-        expect(result.status).toBe(RequirementStatus.Approved);
-      });
-
-      it("rejects an invalid status transition from rejected to approved.", async () => {
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(
-          createRequirementEntity({ status: RequirementStatus.Rejected }),
-        );
-        requirementRevisionsRepository.create.mockReturnValue(
-          new RequirementRevision(),
-        );
-        requirementRevisionsRepository.save.mockResolvedValue(
-          new RequirementRevision(),
-        );
-
-        await expect(
-          service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {
-            status: RequirementStatus.Approved,
-            reviewer: "Jane Reviewer",
-          }),
-        ).rejects.toBeInstanceOf(BadRequestException);
-
-        expect(requirementsRepository.save).not.toHaveBeenCalled();
-      });
+          expect(requirementRevisionsRepository.save).not.toHaveBeenCalled();
+          expect(requirementsRepository.save).not.toHaveBeenCalled();
+        },
+      );
 
       it("requires an implementation ticket before an approved requirement can be implemented.", async () => {
         projectsRepository.findOne.mockResolvedValue(createProjectEntity());
@@ -1360,42 +1363,6 @@ describe("ProjectsService", () => {
         expect(existingRequirement.sequenceNumber).toBe(3);
         expect(existingRequirement.visibleKey).toBe("NFR-PERF-0003");
         expect(result.visibleKey).toBe("NFR-PERF-0003");
-      });
-
-      it("rejects a draft requirement when reviewer and rejection reason are provided.", async () => {
-        const existingRequirement = createRequirementEntity();
-        const revision = new RequirementRevision();
-        const savedRequirement = createRequirementEntity({
-          revisionNumber: 2,
-          status: RequirementStatus.Rejected,
-          reviewer: "Jane Reviewer",
-          rejectionReason: "The draft is not specific enough.",
-          rejectedAt: new Date("2026-06-28T11:00:00.000Z"),
-        });
-
-        projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(existingRequirement);
-        requirementRevisionsRepository.create.mockReturnValue(revision);
-        requirementRevisionsRepository.save.mockResolvedValue(revision);
-        requirementsRepository.save.mockResolvedValue(savedRequirement);
-
-        const result = await service.updateRequirement(
-          PROJECT_ID,
-          REQUIREMENT_ID,
-          {
-            status: RequirementStatus.Rejected,
-            reviewer: "Jane Reviewer",
-            rejectionReason: "The draft is not specific enough.",
-          },
-        );
-
-        expect(existingRequirement.status).toBe(RequirementStatus.Rejected);
-        expect(existingRequirement.reviewer).toBe("Jane Reviewer");
-        expect(existingRequirement.rejectionReason).toBe(
-          "The draft is not specific enough.",
-        );
-        expect(existingRequirement.rejectedAt).toBeInstanceOf(Date);
-        expect(result.status).toBe(RequirementStatus.Rejected);
       });
 
       it("sets an approved requirement obsolete with actor and reason without replacing the reviewer.", async () => {
@@ -1519,7 +1486,9 @@ describe("ProjectsService", () => {
 
       it("does not allow draft requirements to become obsolete.", async () => {
         projectsRepository.findOne.mockResolvedValue(createProjectEntity());
-        requirementsRepository.findOne.mockResolvedValue(createRequirementEntity());
+        requirementsRepository.findOne.mockResolvedValue(
+          createRequirementEntity(),
+        );
 
         await expect(
           service.updateRequirement(PROJECT_ID, REQUIREMENT_ID, {

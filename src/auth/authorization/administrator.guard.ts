@@ -5,17 +5,15 @@ import {
   Injectable,
 } from "@nestjs/common";
 
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import type { AuthenticatedRequest } from "@/auth/sessions/authenticated-request";
-import { GlobalRole } from "@/auth/authorization/global-role.enum";
 
 @Injectable()
 export class AdministratorGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
-    if (
-      !request.authentication.globalRoles.includes(GlobalRole.Administrator)
-    ) {
+    if (request.authentication.role !== AccountRole.Administrator) {
       throw new ForbiddenException("Administrator access is required.");
     }
 

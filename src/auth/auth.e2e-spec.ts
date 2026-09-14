@@ -20,6 +20,7 @@ interface PersistedUserRow {
   emailVerifiedAt: Date | null;
   id: string;
   passwordHash: string;
+  role: string | null;
   status: string;
 }
 
@@ -40,7 +41,7 @@ async function findPersistedUser(
   normalizedUsername: string,
 ): Promise<PersistedUserRow> {
   const result: unknown = await inspectionDataSource.query(
-    `SELECT id, status, password_hash AS "passwordHash", email_verified_at AS "emailVerifiedAt"
+    `SELECT id, status, role, password_hash AS "passwordHash", email_verified_at AS "emailVerifiedAt"
        FROM users
       WHERE normalized_username = $1`,
     [normalizedUsername],
@@ -128,10 +129,7 @@ function createRegistration() {
 }
 
 async function countRows(tableName: string): Promise<number> {
-  const allowedTables = new Set([
-    "authentication_bootstrap",
-    "global_user_roles",
-  ]);
+  const allowedTables = new Set(["authentication_bootstrap"]);
 
   if (!allowedTables.has(tableName)) {
     throw new Error(`Unsupported table "${tableName}".`);
@@ -145,6 +143,17 @@ async function countRows(tableName: string): Promise<number> {
     throw new Error(`Could not count rows in "${tableName}".`);
   }
 
+  return (result[0] as { count: number }).count;
+}
+
+async function countUsersWithRole(role: string): Promise<number> {
+  const result: unknown = await inspectionDataSource.query(
+    `SELECT COUNT(*)::integer AS count FROM users WHERE role = $1`,
+    [role],
+  );
+  if (!Array.isArray(result) || result.length !== 1) {
+    throw new Error(`Could not count users with role "${role}".`);
+  }
   return (result[0] as { count: number }).count;
 }
 
@@ -207,6 +216,7 @@ test.describe("Authentication API - POST /auth/register", () => {
     );
 
     expect(persistedUser.status).toBe("pending");
+    expect(persistedUser.role).toBeNull();
     expect(persistedUser.emailVerifiedAt).toBeNull();
     expect(persistedUser.passwordHash).toMatch(/^\$argon2id\$/);
     expect(persistedUser.passwordHash).not.toContain(registration.password);
@@ -373,7 +383,7 @@ test.describe("Authentication API - initial Administrator bootstrap", () => {
     const user = await findPersistedUser(registration.username.toLowerCase());
     expect(user.status).toBe("pending");
     await expect(countRows("authentication_bootstrap")).resolves.toBe(1);
-    await expect(countRows("global_user_roles")).resolves.toBe(1);
+    expect(user.role).toBe("administrator");
 
     const plaintextToken = `bootstrap-verification-${randomUUID()}`;
     await insertVerificationToken(user.id, plaintextToken);
@@ -414,7 +424,7 @@ test.describe("Authentication API - initial Administrator bootstrap", () => {
       message: "Bootstrap registration is not available.",
     });
     await expect(countRows("authentication_bootstrap")).resolves.toBe(0);
-    await expect(countRows("global_user_roles")).resolves.toBe(0);
+    await expect(countUsersWithRole("administrator")).resolves.toBe(0);
   });
 
   test("allows exactly one bootstrap result during concurrent attempts.", async ({
@@ -439,7 +449,7 @@ test.describe("Authentication API - initial Administrator bootstrap", () => {
 
     expect(responseStatuses).toEqual([202, 409, 409, 409]);
     await expect(countRows("authentication_bootstrap")).resolves.toBe(1);
-    await expect(countRows("global_user_roles")).resolves.toBe(1);
+    await expect(countUsersWithRole("administrator")).resolves.toBe(1);
   });
 });
 
@@ -470,7 +480,7 @@ test.describe("Authentication API - sessions and user administration", () => {
     expect(await me.json()).toMatchObject({
       id: administrator.userId,
       status: "active",
-      globalRoles: ["administrator"],
+      role: "administrator",
       projectMemberships: [],
     });
     expect((await request.post("/auth/logout", { headers })).status()).toBe(
@@ -493,11 +503,35 @@ test.describe("Authentication API - sessions and user administration", () => {
       `UPDATE users SET email_verified_at = NOW() WHERE id = $1`,
       [user.id],
     );
+    const prematureActivation = await request.patch(
+      `/admin/users/${user.id}/status`,
+      { headers, data: { status: "active" } },
+    );
+    expect(prematureActivation.status()).toBe(400);
+
+    const roleAssignment = await request.patch(`/admin/users/${user.id}/role`, {
+      headers,
+      data: { role: "viewer" },
+    });
+    expect(roleAssignment.status()).toBe(200);
+    expect(await roleAssignment.json()).toMatchObject({
+      id: user.id,
+      role: "viewer",
+    });
+
     const activation = await request.patch(`/admin/users/${user.id}/status`, {
       headers,
       data: { status: "active" },
     });
     expect(activation.status()).toBe(200);
+    expect(
+      (
+        await request.patch(`/admin/users/${user.id}/role`, {
+          headers,
+          data: { role: "developer" },
+        })
+      ).status(),
+    ).toBe(409);
     const login = await request.post("/auth/login", {
       data: {
         username: registration.username,
@@ -529,12 +563,20 @@ test.describe("Authentication API - sessions and user administration", () => {
   }) => {
     const administrator = await createActiveAdministrator(request);
     const headers = { Authorization: `Bearer ${administrator.accessToken}` };
-    const projectResponse = await request.post("/projects", {
+    const projectResponse = await request.post("/admin/projects", {
       headers,
       data: { name: "Membership project" },
     });
     expect(projectResponse.status()).toBe(201);
     const project = (await projectResponse.json()) as { id: string };
+    expect(
+      (
+        await request.put(
+          `/admin/projects/${project.id}/memberships/${administrator.userId}`,
+          { headers },
+        )
+      ).status(),
+    ).toBe(400);
     const registration = createRegistration();
     await request.post("/auth/register", { data: registration });
     const user = await findPersistedUser(registration.username.toLowerCase());
@@ -542,6 +584,14 @@ test.describe("Authentication API - sessions and user administration", () => {
       `UPDATE users SET email_verified_at = NOW() WHERE id = $1`,
       [user.id],
     );
+    expect(
+      (
+        await request.patch(`/admin/users/${user.id}/role`, {
+          headers,
+          data: { role: "developer" },
+        })
+      ).status(),
+    ).toBe(200);
     expect(
       (
         await request.patch(`/admin/users/${user.id}/status`, {
@@ -552,12 +602,12 @@ test.describe("Authentication API - sessions and user administration", () => {
     ).toBe(200);
     const response = await request.put(
       `/admin/projects/${project.id}/memberships/${user.id}`,
-      { headers, data: { roles: ["requirements_engineer", "developer"] } },
+      { headers },
     );
     expect(response.status()).toBe(200);
     expect(await response.json()).toMatchObject({
       userId: user.id,
-      roles: ["requirements_engineer", "developer"],
+      role: "developer",
     });
     const login = await request.post("/auth/login", {
       data: {
@@ -573,12 +623,8 @@ test.describe("Authentication API - sessions and user administration", () => {
     expect(memberMe.status()).toBe(200);
     expect(await memberMe.json()).toMatchObject({
       id: user.id,
-      projectMemberships: [
-        {
-          projectId: project.id,
-          roles: expect.arrayContaining(["requirements_engineer", "developer"]),
-        },
-      ],
+      role: "developer",
+      projectMemberships: [{ projectId: project.id }],
     });
     expect(
       (

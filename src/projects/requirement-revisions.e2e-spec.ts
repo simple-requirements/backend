@@ -14,7 +14,10 @@ test.describe('Requirement revisions API', () => {
         await api.approveRequirement(project.id, requirement.id);
 
         const updateResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { description: 'Current draft.', changeReason: 'Updated draft wording.' },
+            data: {
+                description: 'Updated approved requirement.',
+                changeReason: 'Updated approved requirement wording.',
+            },
         });
         expect(updateResponse.status()).toBe(200);
 
@@ -30,12 +33,12 @@ test.describe('Requirement revisions API', () => {
         expect(revisions.map((revision) => revision.status)).toEqual([
             RequirementStatus.Draft,
             RequirementStatus.Approved,
-            RequirementStatus.Draft,
+            RequirementStatus.Approved,
         ]);
         expect(revisions.map((revision) => revision.description)).toEqual([
             'Original draft.',
             'Original draft.',
-            'Current draft.',
+            'Updated approved requirement.',
         ]);
         expect(revisions.map((revision) => revision.changeType)).toEqual([
             'requirement_created',
@@ -45,12 +48,11 @@ test.describe('Requirement revisions API', () => {
         expect(revisions.map((revision) => revision.changeReason)).toEqual([
             'Requirement created.',
             'Requirement approved.',
-            'Updated draft wording.',
+            'Updated approved requirement wording.',
         ]);
         expect(revisions.every((revision) => revision.id === requirement.id)).toBe(true);
         expect(revisions.every((revision) => !('deletedAt' in revision))).toBe(true);
     });
-
 
     test('documents the revision comparison response in OpenAPI.', async ({ request }) => {
         const response = await request.get('/api/docs-json');
@@ -90,7 +92,10 @@ test.describe('Requirement revisions API', () => {
         await api.approveRequirement(project.id, requirement.id);
 
         const updateResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
-            data: { description: 'Current draft.', changeReason: 'Updated draft wording.' },
+            data: {
+                description: 'Updated approved requirement.',
+                changeReason: 'Updated approved requirement wording.',
+            },
         });
         expect(updateResponse.status()).toBe(200);
 
@@ -130,12 +135,12 @@ test.describe('Requirement revisions API', () => {
 
         const revisions = (await revisionsResponse.json()) as readonly RequirementResponseBody[];
         expect(revisions.map((revision) => revision.revisionNumber)).toEqual([1, 2, 3]);
-        expect(revisions[1]?.implementationTickets).toEqual([]);
-        expect(revisions[2]?.implementationTickets).toEqual([
+        expect(revisions[1].implementationTickets).toEqual([]);
+        expect(revisions[2].implementationTickets).toEqual([
             expect.objectContaining({ ticketId: 'SOLAR-4711' }),
         ]);
-        expect(revisions[2]?.changeType).toBe('implementation_ticket_created');
-        expect(revisions[2]?.changeReason).toBe('Implementation ticket SOLAR-4711 created.');
+        expect(revisions[2].changeType).toBe('implementation_ticket_created');
+        expect(revisions[2].changeReason).toBe('Implementation ticket SOLAR-4711 created.');
 
         const compareResponse = await request.get(
             `/projects/${project.id}/requirements/${requirement.id}/revisions/compare?from=2&to=3`,

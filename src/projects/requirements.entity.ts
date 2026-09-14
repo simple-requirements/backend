@@ -126,7 +126,7 @@ export class Requirement {
 
     @ManyToOne(() => Project, (project) => project.requirements, {
         nullable: false,
-        onDelete: 'CASCADE',
+        onDelete: 'RESTRICT',
         eager: true,
     })
     @JoinColumn({ name: 'project_id' })

@@ -5,12 +5,13 @@ import {
   confirmEmailVerificationSchema,
   confirmPasswordResetSchema,
   loginSchema,
-  projectMembershipSchema,
+  updateUserRoleSchema,
   registerUserSchema,
   resendEmailVerificationSchema,
   requestPasswordResetSchema,
   updateUserStatusSchema,
 } from "@/auth/dto/auth.schemas";
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
 
 const VALID_REGISTRATION = {
@@ -69,13 +70,11 @@ describe("registerUserSchema", () => {
   );
 });
 
-describe("membership and password recovery schemas", () => {
-  it("accepts unique project roles and valid recovery inputs.", () => {
+describe("role and password recovery schemas", () => {
+  it("accepts one account role and valid recovery inputs.", () => {
     expect(
-      projectMembershipSchema.parse({
-        roles: ["requirements_engineer", "developer"],
-      }),
-    ).toEqual({ roles: ["requirements_engineer", "developer"] });
+      updateUserRoleSchema.parse({ role: AccountRole.RequirementsEngineer }),
+    ).toEqual({ role: AccountRole.RequirementsEngineer });
     expect(
       requestPasswordResetSchema.parse({ email: " USER@Example.org " }),
     ).toEqual({ email: "user@example.org" });
@@ -86,11 +85,11 @@ describe("membership and password recovery schemas", () => {
       }).success,
     ).toBe(true);
   });
-  it("rejects duplicate roles, invalid email, and weak reset passwords.", () => {
-    expect(
-      projectMembershipSchema.safeParse({ roles: ["viewer", "viewer"] })
-        .success,
-    ).toBe(false);
+
+  it("rejects invalid roles, invalid email, and weak reset passwords.", () => {
+    expect(updateUserRoleSchema.safeParse({ role: "reviewer" }).success).toBe(
+      false,
+    );
     expect(
       requestPasswordResetSchema.safeParse({ email: "invalid" }).success,
     ).toBe(false);

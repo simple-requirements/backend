@@ -4,12 +4,12 @@ import type { ZodValidationSchema } from "@/common/pipes/zod-validation.pipe";
 import type { RegisterUserDto } from "@/auth/dto/register-user.dto";
 import type { ConfirmEmailVerificationDto } from "@/auth/dto/confirm-email-verification.dto";
 import type { ResendEmailVerificationDto } from "@/auth/dto/resend-email-verification.dto";
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import type { BootstrapAdministratorDto } from "@/auth/dto/bootstrap-administrator.dto";
 import type { LoginDto } from "@/auth/dto/login.dto";
+import type { UpdateUserRoleDto } from "@/auth/dto/update-user-role.dto";
 import type { UpdateUserStatusDto } from "@/auth/dto/update-user-status.dto";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
-import type { SetProjectMembershipDto } from "@/auth/dto/set-project-membership.dto";
-import { ProjectRole } from "@/auth/authorization/project-role.enum";
 import type { RequestPasswordResetDto } from "@/auth/dto/request-password-reset.dto";
 import type { ConfirmPasswordResetDto } from "@/auth/dto/confirm-password-reset.dto";
 
@@ -135,18 +135,9 @@ export const updateUserStatusSchema: ZodValidationSchema<UpdateUserStatusDto> =
     }),
   );
 
-export const projectMembershipSchema: ZodValidationSchema<SetProjectMembershipDto> =
-  objectBodySchema("Project membership request body must be an object.").pipe(
-    z.object({
-      roles: z
-        .array(z.enum(ProjectRole))
-        .min(1)
-        .max(3)
-        .refine(
-          (roles) => new Set(roles).size === roles.length,
-          "Roles must be unique.",
-        ),
-    }),
+export const updateUserRoleSchema: ZodValidationSchema<UpdateUserRoleDto> =
+  objectBodySchema("User role request body must be an object.").pipe(
+    z.object({ role: z.enum(AccountRole) }),
   );
 
 export const requestPasswordResetSchema: ZodValidationSchema<RequestPasswordResetDto> =

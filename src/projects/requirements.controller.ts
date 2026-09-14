@@ -71,10 +71,12 @@ export class RequirementsController {
   @RequireProjectPermission(ProjectPermission.Read)
   @ApiOperation({
     operationId: "listRequirementRevisions",
-    summary: "List immutable requirement revisions including the current revision.",
+    summary:
+      "List immutable requirement revisions including the current revision.",
   })
   @ApiOkResponse({
-    description: "Requirement revisions from 1..N including the current revision.",
+    description:
+      "Requirement revisions from 1..N including the current revision.",
     type: RequirementResponseDto,
     isArray: true,
   })
@@ -184,7 +186,8 @@ export class RequirementsController {
   @RequireProjectPermission(ProjectPermission.ManageRequirements)
   @ApiOperation({
     operationId: "updateRequirement",
-    summary: "Update a requirement.",
+    summary:
+      "Update requirement content or perform implementation/obsolescence transitions.",
   })
   @ApiParam({ name: "projectId", description: "Project identifier." })
   @ApiParam({ name: "requirementId", description: "Requirement identifier." })
@@ -194,7 +197,7 @@ export class RequirementsController {
   })
   @ApiBadRequestResponse({
     description:
-      "The request body is invalid or the status transition is not allowed.",
+      "The request body is invalid, the lifecycle transition is not allowed, or approval/rejection was sent to this endpoint.",
   })
   @ApiNotFoundResponse({
     description: "The project, category, or requirement was not found.",
@@ -207,11 +210,6 @@ export class RequirementsController {
     @Req() request: AuthenticatedRequest,
   ): Promise<RequirementResponseDto> {
     const trustedUpdate = updateRequirementDto;
-    if (
-      trustedUpdate.status === RequirementStatus.Approved ||
-      trustedUpdate.status === RequirementStatus.Rejected
-    )
-      trustedUpdate.reviewer = request.authentication.user.displayName;
     if (trustedUpdate.status === RequirementStatus.Obsolete)
       trustedUpdate.obsoletedBy = request.authentication.user.displayName;
     return this.projectsService.updateRequirement(
@@ -221,5 +219,4 @@ export class RequirementsController {
       revisionActorFromAuthenticatedUser(request.authentication.user),
     );
   }
-
 }

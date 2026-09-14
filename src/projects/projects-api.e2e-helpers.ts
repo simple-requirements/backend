@@ -2,10 +2,9 @@ import { expect, type APIRequestContext } from "@playwright/test";
 import { isValid, parseISO } from "date-fns";
 
 import { CategoryType } from "@/projects/category-type.enum";
-import { RequirementStatus } from "@/projects/requirement-status.enum";
+import type { RequirementStatus } from "@/projects/requirement-status.enum";
 import {
   E2E_ADMIN_ACCESS_TOKEN,
-  E2E_ADMIN_USER_ID,
   E2E_DEVELOPER_USER_ID,
   E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN,
   E2E_REQUIREMENTS_ENGINEER_USER_ID,
@@ -15,6 +14,7 @@ import {
 export interface ProjectResponseBody {
   id: string;
   name: string;
+  ticketUrlTemplate: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -35,7 +35,6 @@ export const E2E_ADMIN_HEADERS = {
 export const E2E_REQUIREMENTS_ENGINEER_HEADERS = {
   Authorization: `Bearer ${E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN}`,
 } as const;
-
 
 export function expectIsoDateString(value: string): void {
   const parsedDate = parseISO(value);
@@ -58,7 +57,7 @@ export async function createProject(
   request: APIRequestContext,
   name: string,
 ): Promise<ProjectResponseBody> {
-  const response = await request.post("/projects", {
+  const response = await request.post("/admin/projects", {
     data: { name },
     headers: E2E_ADMIN_HEADERS,
   });
@@ -67,29 +66,22 @@ export async function createProject(
 
   const project = (await response.json()) as ProjectResponseBody;
   const memberships = await Promise.all([
-    request.put(`/admin/projects/${project.id}/memberships/${E2E_ADMIN_USER_ID}`, {
-      data: { roles: ["viewer"] },
-      headers: E2E_ADMIN_HEADERS,
-    }),
     request.put(
       `/admin/projects/${project.id}/memberships/${E2E_REQUIREMENTS_ENGINEER_USER_ID}`,
-      {
-        data: { roles: ["requirements_engineer"] },
-        headers: E2E_ADMIN_HEADERS,
-      },
+      { headers: E2E_ADMIN_HEADERS },
     ),
     request.put(
       `/admin/projects/${project.id}/memberships/${E2E_DEVELOPER_USER_ID}`,
-      { data: { roles: ["developer"] }, headers: E2E_ADMIN_HEADERS },
+      { headers: E2E_ADMIN_HEADERS },
     ),
-    request.put(`/admin/projects/${project.id}/memberships/${E2E_VIEWER_USER_ID}`, {
-      data: { roles: ["viewer"] },
-      headers: E2E_ADMIN_HEADERS,
-    }),
+    request.put(
+      `/admin/projects/${project.id}/memberships/${E2E_VIEWER_USER_ID}`,
+      { headers: E2E_ADMIN_HEADERS },
+    ),
   ]);
 
   expect(memberships.map((membership) => membership.status())).toEqual([
-    200, 200, 200, 200,
+    200, 200, 200,
   ]);
   return project;
 }
@@ -296,10 +288,10 @@ export async function approveRequirement(
   requirementId: string,
   reviewer = "Requirements Engineer",
 ): Promise<RequirementResponseBody> {
-  const response = await request.patch(
-    `/projects/${projectId}/requirements/${requirementId}`,
+  const response = await request.post(
+    `/projects/${projectId}/requirements/${requirementId}/review/approve`,
     {
-      data: { status: RequirementStatus.Approved, reviewer },
+      data: { reviewer },
       headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
     },
   );

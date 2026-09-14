@@ -7,7 +7,6 @@ import type { AuthenticatedPrincipal } from "@/auth/sessions/authenticated-reque
 import { AuthenticationSession } from "@/auth/sessions/authentication-session.entity";
 import type { LoginDto } from "@/auth/dto/login.dto";
 import type { LoginResponseDto } from "@/auth/dto/login-response.dto";
-import { GlobalUserRole } from "@/auth/authorization/global-user-role.entity";
 import { LoginAttempt } from "@/auth/sessions/login-attempt.entity";
 import { PasswordService } from "@/auth/accounts/password.service";
 import { SessionTokenService } from "@/auth/sessions/session-token.service";
@@ -77,7 +76,8 @@ export class SessionService {
         user === null ||
         !passwordMatches ||
         user.status !== UserStatus.Active ||
-        user.emailVerifiedAt === null
+        user.emailVerifiedAt === null ||
+        user.role === null
       ) {
         await attempts.save(attempts.create({ sourceHash, usernameHash }));
         return null;
@@ -129,14 +129,12 @@ export class SessionService {
 
       session.lastActivityAt = now;
       await sessions.save(session);
-      const roles = await manager.getRepository(GlobalUserRole).findBy({
-        userId: session.userId,
-      });
+      if (session.user.role === null) return null;
 
       return {
         user: session.user,
         session,
-        globalRoles: roles.map((role) => role.role),
+        role: session.user.role,
       } satisfies AuthenticatedPrincipal;
     });
 
@@ -188,9 +186,9 @@ export class SessionService {
         revokedAt: null,
       }),
     );
-    const roles = await manager.getRepository(GlobalUserRole).findBy({
-      userId: user.id,
-    });
+    if (user.role === null) {
+      throw new UnauthorizedException(GENERIC_LOGIN_FAILURE);
+    }
 
     return {
       accessToken: generatedToken.plaintext,
@@ -200,7 +198,7 @@ export class SessionService {
         email: user.email,
         displayName: user.displayName,
         status: user.status,
-        globalRoles: roles.map((role) => role.role),
+        role: user.role,
       },
     };
   }

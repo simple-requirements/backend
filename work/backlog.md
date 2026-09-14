@@ -6,8 +6,8 @@ This backlog was revised against the latest uploaded frontend and backend on 202
 
 The current implemented scope is:
 
-- local account registration, verification, bootstrap Administrator registration, login, logout, password reset, memory-only SPA session handling, backend session hashing/expiry, user/session administration, project membership administration, and demo/E2E seed accounts;
-- Administrator project administration and global project read access;
+- local account registration, verification, bootstrap Administrator registration, login, logout, password reset, memory-only SPA session handling, backend session hashing/expiry, user/session administration, existing project membership administration, and demo/E2E seed accounts;
+- Administrator project administration;
 - project-scoped Requirements Engineer, Developer, and Viewer authorization;
 - basic projects, categories, requirements, review comments/replies/resolution, approval/rejection, obsolescence UI, implementation tickets, and sidebar/action-bar/account-menu UI.
 
@@ -15,16 +15,16 @@ The current source tree does **not** implement a metrics subsystem, requirement-
 
 ## Role summary
 
-| Role | Scope | Current privileges |
+| Role | Scope | Required privileges |
 | --- | --- | --- |
-| Administrator | Global | Can authenticate, read all projects, create/rename/delete projects, manage users, activate/deactivate accounts, revoke sessions, manage project memberships, configure project ticket URL templates, and open Administration. Does not manage requirement content, reviews, lifecycle, or tickets unless also assigned a project-scoped role. |
-| Requirements Engineer | Project-scoped | Can see only assigned projects; can read assigned project details/categories/requirements/reviews/tickets/revisions; can create/edit categories and requirements; can comment/reply/resolve review comments; can approve/reject draft requirements; can mark allowed requirements obsolete; can manage implementation tickets for approved requirements; can move approved requirements to implemented when tickets exist. Cannot create projects, manage users, manage memberships, or administer sessions. |
-| Developer | Project-scoped | Can see assigned projects, read project details and requirements, and create/update/remove implementation tickets while a requirement is approved. Cannot create/edit requirements, create/edit categories, review requirements, approve/reject/obsolete/implement lifecycle state, create projects, or administer users/memberships. |
-| Viewer | Project-scoped | Read-only access to assigned projects and requirement details, including lifecycle metadata, reviews, tickets, and revisions. |
+| Administrator | Global administrative | Target model: dedicated administration-only account role. Manages users, sessions, projects, memberships and administrative project settings; sees only project name, category names/counts, requirement count, memberships and administrative settings. Never becomes a project member and never accesses requirement content. |
+| Requirements Engineer | Project-scoped | Single fixed account role used for every project membership. Can read assigned project content; create/edit categories and requirements; review/comment/resolve; perform lifecycle transitions; and manage implementation tickets according to lifecycle rules. |
+| Developer | Project-scoped | Single fixed account role used for every project membership. Can read assigned project content and create/update/remove implementation tickets while requirements are approved; cannot edit requirements/categories, review, or change lifecycle state. |
+| Viewer | Project-scoped | Single fixed account role used for every project membership. Read-only access to assigned project content, including lifecycle metadata, reviews, tickets and revisions. |
 
 ## High-priority implementation mismatches
 
-The previously listed lifecycle/revision P0 mismatches have been resolved or reclassified by the revised requirements:
+The previously listed lifecycle/revision P0 mismatches have been resolved or reclassified by the revised requirements. The remaining high-priority mismatch is the Administrator architecture migration defined by WP2-WP6:
 
 - requirement deletion/recycle-bin behavior is no longer exposed by the current backend;
 - rejected requirements are terminal/read-only in the backend;
@@ -33,7 +33,7 @@ The previously listed lifecycle/revision P0 mismatches have been resolved or rec
 - finalized revision actor/change-type/change-reason metadata and clean `/revisions` plus `/revisions/compare` backend endpoints exist;
 - substantive requirement content/metadata/category/owner edits require an explicit non-empty user-entered `changeReason`, while lifecycle and ticket operations use deterministic server-derived reasons.
 
-No P0 conformance mismatch remains in this package. Remaining revision work is primarily frontend history/diff presentation and generated-client synchronization.
+The Administrator architecture is now authoritative in the requirements but is not yet fully implemented. WP2-WP6 therefore remain high-priority architecture work. Separate revision work is primarily frontend history/diff presentation and generated-client synchronization.
 
 ## Recently covered / remove from old backlog
 
@@ -42,13 +42,24 @@ No P0 conformance mismatch remains in this package. Remaining revision work is p
 | US-WF-001, US-REQ-003C/003D/003E | Covered for current lifecycle scope | Requirements are retained, rejected requirements are terminal/read-only, drafts approve/reject only, and obsolescence is limited to approved/implemented requirements. |
 | US-VER-001 revision core | Covered for current backend scope | Current-plus-archive storage, trusted revision actor metadata, explicit edit reasons, ticket-driven revisions/snapshots, and ordered history are implemented. |
 | US-VER-002 backend endpoints | Covered for backend stages | `/revisions` and `/revisions/compare` exist; frontend history/diff presentation remains. |
-| US-SEC-001, US-SEC-002, US-SEC-005 through US-SEC-012 | Covered for current scope | Local accounts, sessions, bootstrap, password reset, administration, memberships, authorization, and stable revision actor attribution are implemented across backend/frontend. |
-| User administration frontend | Covered | Users, activation/deactivation, and session revocation are visible in Administration. |
-| Project membership administration frontend | Covered | Administrator can assign, change, and remove Requirements Engineer/Developer/Viewer memberships. |
+| US-SEC-001, US-SEC-002, US-SEC-005 through US-SEC-012 | Partially covered; architecture migration required | Authentication/session foundations exist, but the new one-account-one-role model, Administrator membership prohibition, administration-only visibility, and dedicated Administrator workspace still require implementation. |
+| User administration frontend | Partially covered | User/session administration exists, but it must move into the dedicated Administrator workspace and adopt one-account-one-role administration. |
+| Project membership administration frontend | Partially covered | Membership management exists, but must enforce one fixed project role per account, exclude Administrator accounts, and move under Administrator `Projects`. |
 | Public account UI shell | Covered by new US-UI-001/002 scope | Login, registration, and reset pages now share spacing/button/link behavior. |
-| Account menu UI shell | Covered by new US-UI-003/004 scope | Cog-wheel action-bar menu, Administrator-only Administration item, Logout, layering, icon sizing, and hover styling are implemented. |
+| Account menu UI shell | Partial | Cog-wheel menu and Logout exist. The obsolete `Administration` navigation entry must be removed when the dedicated Administrator workspace is introduced. |
 | US-CAT-005 | Partially covered, no longer 0% | Category edit endpoint and frontend edit UI exist. Remaining concern is whether category key/type edits should be controlled after use. |
-| US-PRJ-001/002 | Mostly covered | Administrator project creation/listing and membership-filtered project listing work. Requirement counts are frontend-computed. |
+| US-PRJ-001/002 | Partial; architecture migration required | Project creation/listing exists, but Administrator listing must become summary-only and move to the dedicated Administrator API/workspace while project-scoped accounts remain membership-filtered. |
+
+## Administrator architecture migration backlog
+
+| Work package | Scope | Acceptance target |
+| --- | --- | --- |
+| WP2 | Backend role model | Every account has exactly one role; Administrator accounts cannot have project memberships; project-scoped accounts use one fixed role for all memberships; backend authorization denies Administrator project-content access. |
+| WP3 | Administrator REST API | Administrator-specific project summary/admin endpoints expose only project name, category names/counts, requirement count, memberships, and administrative project settings; project create/rename/delete and membership administration are available there. |
+| WP4 | Administrator workspace | Administrator login opens a dedicated workspace whose initial sidebar contains `Users & Sessions` and `Projects`; project-scoped roles keep the project workspace. |
+| WP5 | Administrator project administration | `Projects` provides project creation, rename, deletion, membership administration, summary metadata, and administrative project settings without exposing requirement/category detail content. |
+| WP6 | Frontend cleanup | Remove obsolete Administration menu navigation, old mixed-workspace administration routes/components, and stale permission assumptions. |
+| WP7 | Final verification | Regenerate derived API clients as required, run backend/frontend unit and E2E suites, verify OpenAPI contracts, migrations and authorization boundaries, and remove dead code. |
 
 ## Remaining functional backlog
 
@@ -70,6 +81,11 @@ No P0 conformance mismatch remains in this package. Remaining revision work is p
 
 ## Catalogue revisions made
 
+- Established one-account-one-role architecture: every account is exactly Administrator, Requirements Engineer, Developer, or Viewer; people needing multiple roles use separate accounts.
+- Replaced Administrator global project-content read access with administration-only project-summary visibility.
+- Defined the dedicated Administrator workspace (`Users & Sessions`, `Projects`) and removed the account-menu `Administration` navigation requirement.
+- Clarified that Administrator accounts never receive project memberships and project-scoped accounts use one fixed role for all memberships.
+
 - Added explicit frontend UI requirements US-UI-001 through US-UI-004 for public account forms, login links, account menu behavior, and systemwide hover styling.
 - Clarified that `Project Manager` and `Tester` in story text are stakeholder personas, not current authorization roles.
 - Clarified that current project creation privileges belong to Administrator.
@@ -80,8 +96,13 @@ No P0 conformance mismatch remains in this package. Remaining revision work is p
 
 ## Recommended next work packages
 
-1. **Frontend revision UI package**: synchronize the generated API client with the current backend OpenAPI contract and implement revision history/comparison presentation.
-2. **Category lifecycle package**: decide and enforce category key/type stability after use; add category deactivation.
-3. **Search/filter package**: implement the most valuable missing first-release requirement filters.
-4. **Review-task package**: add named Requirements Engineer assignments and personal pending-review lists.
-5. **Metrics/links/export foundations**: begin the larger first-release subsystems only after the remaining core lifecycle/search work is stable.
+1. **WP2 – Backend role model**: enforce one account/one role, fixed project role, Administrator membership prohibition, and Administrator project-content denial.
+2. **WP3 – Administrator REST API**: add summary-only project administration endpoints and move Administrator project/membership operations behind them.
+3. **WP4 – Administrator workspace**: introduce dedicated Administrator routing/shell/sidebar with `Users & Sessions` and `Projects`.
+4. **WP5 – Administrator project administration**: implement project create/rename/delete, memberships, summaries and administrative settings in the new workspace.
+5. **WP6 – Frontend cleanup**: remove obsolete mixed-workspace administration UI and the account-menu Administration item.
+6. **WP7 – Final verification**: migrations, generated-client synchronization, backend/frontend unit + E2E, OpenAPI verification, dead-code cleanup.
+
+## WP1 status
+
+WP1A established the new Administrator architecture. WP1B completed the catalogue/backlog consistency pass. Implementation proceeds with WP2 through WP7 as defined above.

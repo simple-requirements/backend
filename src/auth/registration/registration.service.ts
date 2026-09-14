@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { QueryFailedError, type Repository } from "typeorm";
 
@@ -51,6 +55,7 @@ export class RegistrationService {
       displayName: registration.displayName,
       passwordHash,
       status: UserStatus.Pending,
+      role: null,
       emailVerifiedAt: null,
     });
 
@@ -88,7 +93,18 @@ export class RegistrationService {
   }
 
   async activateUser(userId: string): Promise<User> {
-    return this.updateUser(userId, { status: UserStatus.Active });
+    const user = await this.findById(userId);
+    if (user === null) {
+      throw new NotFoundException(`User with id "${userId}" was not found.`);
+    }
+    if (user.role === null) {
+      throw new BadRequestException(
+        "An account role must be assigned before activation.",
+      );
+    }
+    return this.usersRepository.save(
+      Object.assign(user, { status: UserStatus.Active }),
+    );
   }
 
   async deactivateUser(userId: string): Promise<User> {

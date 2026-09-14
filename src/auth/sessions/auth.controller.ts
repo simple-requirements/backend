@@ -65,14 +65,14 @@ export class AuthController {
   async me(
     @Req() request: AuthenticatedRequest,
   ): Promise<AuthenticatedUserResponseDto> {
-    const { user, globalRoles } = request.authentication;
+    const { user, role } = request.authentication;
     return {
       id: user.id,
       username: user.username,
       email: user.email,
       displayName: user.displayName,
       status: user.status,
-      globalRoles: [...globalRoles],
+      role,
       projectMemberships: await this.memberships.listForUser(user.id),
     };
   }

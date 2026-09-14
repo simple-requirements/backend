@@ -2,8 +2,8 @@ import { UnauthorizedException } from "@nestjs/common";
 import type { DataSource, EntityManager } from "typeorm";
 import { describe, expect, it, vi } from "vitest";
 
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { AuthenticationSession } from "@/auth/sessions/authentication-session.entity";
-import { GlobalUserRole } from "@/auth/authorization/global-user-role.entity";
 import { LoginAttempt } from "@/auth/sessions/login-attempt.entity";
 import type { PasswordService } from "@/auth/accounts/password.service";
 import { SessionService } from "@/auth/sessions/session.service";
@@ -23,14 +23,12 @@ describe("SessionService login", () => {
       create: vi.fn((value) => value),
       save: vi.fn().mockResolvedValue(undefined),
     };
-    const roles = { findBy: vi.fn().mockResolvedValue([]) };
     const manager = {
       query: vi.fn().mockResolvedValue(undefined),
       getRepository: vi.fn((entity: unknown) => {
         if (entity === LoginAttempt) return attempts;
         if (entity === User) return users;
         if (entity === AuthenticationSession) return sessions;
-        if (entity === GlobalUserRole) return roles;
         throw new Error("Unexpected repository.");
       }),
     };
@@ -65,6 +63,7 @@ describe("SessionService login", () => {
       displayName: "User",
       passwordHash: "encoded",
       status: UserStatus.Active,
+      role: AccountRole.Viewer,
       emailVerifiedAt: new Date(),
     });
     const { service, sessions, passwordService } = setup(user, true);
@@ -89,6 +88,7 @@ describe("SessionService login", () => {
         normalizedUsername: "user",
         passwordHash: "encoded",
         status: UserStatus.Pending,
+        role: null,
         emailVerifiedAt: null,
       }),
       true,
@@ -98,9 +98,20 @@ describe("SessionService login", () => {
         normalizedUsername: "user",
         passwordHash: "encoded",
         status: UserStatus.Active,
+        role: AccountRole.Viewer,
         emailVerifiedAt: new Date(),
       }),
       false,
+    ],
+    [
+      Object.assign(new User(), {
+        normalizedUsername: "user",
+        passwordHash: "encoded",
+        status: UserStatus.Active,
+        role: null,
+        emailVerifiedAt: new Date(),
+      }),
+      true,
     ],
   ])(
     "returns the same failure for unknown, unavailable, and invalid credentials.",

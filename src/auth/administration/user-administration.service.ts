@@ -1,16 +1,17 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { DataSource } from "typeorm";
 
-import type { SessionResponseDto } from "@/auth/dto/session-response.dto";
-import type { UserAdministrationResponseDto } from "@/auth/dto/user-administration-response.dto";
-import { GlobalUserRole } from "@/auth/authorization/global-user-role.entity";
-import { SessionService } from "@/auth/sessions/session.service";
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
 import { User } from "@/auth/accounts/users.entity";
+import type { SessionResponseDto } from "@/auth/dto/session-response.dto";
+import type { UserAdministrationResponseDto } from "@/auth/dto/user-administration-response.dto";
+import { SessionService } from "@/auth/sessions/session.service";
 
 @Injectable()
 export class UserAdministrationService {
@@ -23,15 +24,35 @@ export class UserAdministrationService {
     const users = await this.dataSource.getRepository(User).find({
       order: { username: "ASC" },
     });
-    return this.toResponses(users);
+    return users.map((user) => this.toResponse(user));
   }
 
   async find(userId: string): Promise<UserAdministrationResponseDto> {
+    return this.toResponse(await this.requireUser(userId));
+  }
+
+  async assignRole(
+    userId: string,
+    role: AccountRole,
+  ): Promise<UserAdministrationResponseDto> {
     const user = await this.requireUser(userId);
-    const roles = await this.dataSource
-      .getRepository(GlobalUserRole)
-      .findBy({ userId });
-    return this.toResponse(user, roles);
+    if (user.status === UserStatus.Active) {
+      throw new ConflictException(
+        "The role of an active account cannot be changed.",
+      );
+    }
+    if (
+      user.status === UserStatus.Deactivated &&
+      user.role !== null &&
+      user.role !== role
+    ) {
+      throw new ConflictException(
+        "The role of a previously assigned deactivated account cannot be changed.",
+      );
+    }
+    user.role = role;
+    await this.dataSource.getRepository(User).save(user);
+    return this.toResponse(user);
   }
 
   async updateStatus(
@@ -39,17 +60,24 @@ export class UserAdministrationService {
     status: UserStatus.Active | UserStatus.Deactivated,
   ): Promise<UserAdministrationResponseDto> {
     const user = await this.requireUser(userId);
-    if (status === UserStatus.Active && user.emailVerifiedAt === null) {
-      throw new BadRequestException(
-        "The user's email address must be verified before activation.",
-      );
+    if (status === UserStatus.Active) {
+      if (user.emailVerifiedAt === null) {
+        throw new BadRequestException(
+          "The user's email address must be verified before activation.",
+        );
+      }
+      if (user.role === null) {
+        throw new BadRequestException(
+          "An account role must be assigned before activation.",
+        );
+      }
     }
     user.status = status;
     await this.dataSource.getRepository(User).save(user);
     if (status === UserStatus.Deactivated) {
       await this.sessions.revokeAllForUser(userId);
     }
-    return this.find(userId);
+    return this.toResponse(user);
   }
 
   async listSessions(userId: string): Promise<SessionResponseDto[]> {
@@ -85,27 +113,15 @@ export class UserAdministrationService {
     return user;
   }
 
-  private async toResponses(
-    users: User[],
-  ): Promise<UserAdministrationResponseDto[]> {
-    const roles = await this.dataSource.getRepository(GlobalUserRole).find();
-    return users.map((user) => this.toResponse(user, roles));
-  }
-
-  private toResponse(
-    user: User,
-    roles: GlobalUserRole[],
-  ): UserAdministrationResponseDto {
+  private toResponse(user: User): UserAdministrationResponseDto {
     return {
       id: user.id,
       username: user.username,
       email: user.email,
       displayName: user.displayName,
       status: user.status,
+      role: user.role,
       emailVerifiedAt: user.emailVerifiedAt,
-      globalRoles: roles
-        .filter(({ userId }) => userId === user.id)
-        .map(({ role }) => role),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

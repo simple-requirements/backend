@@ -146,12 +146,27 @@ test.describe("Requirements API - GET /projects/{projectId}/requirements", () =>
 });
 
 test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requirementId}", () => {
-  test("approves, implements, and rejects invalid backward transitions.", async ({
+  test("uses review decisions for approval and keeps generic PATCH for later lifecycle transitions.", async ({
     request,
     api,
     draftRequirement,
   }) => {
     const { project, category, requirement } = draftRequirement;
+
+    const genericApprovalResponse = await request.patch(
+      `/projects/${project.id}/requirements/${requirement.id}`,
+      {
+        data: {
+          status: RequirementStatus.Approved,
+          reviewer: "Requirements Engineer",
+        },
+      },
+    );
+
+    expect(genericApprovalResponse.status()).toBe(400);
+    expect(((await genericApprovalResponse.json()) as ErrorResponseBody).message).toContain(
+      "Requirement approval and rejection must use the review decision endpoints.",
+    );
 
     const approvedRequirement = await api.approveRequirement(
       project.id,
@@ -184,6 +199,9 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
     );
 
     expect(rejectApprovedResponse.status()).toBe(400);
+    expect(((await rejectApprovedResponse.json()) as ErrorResponseBody).message).toContain(
+      "Requirement approval and rejection must use the review decision endpoints.",
+    );
 
     const implementationTicket = await api.createImplementationTicket(
       project.id,
@@ -214,7 +232,7 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
     }
   });
 
-  test("changes an approved requirement by creating a new draft revision.", async ({
+  test("changes an approved requirement while preserving its approved lifecycle state.", async ({
     request,
     api,
     draftRequirement,
@@ -240,12 +258,12 @@ test.describe("Requirements API - PATCH /projects/{projectId}/requirements/{requ
       projectId: project.id,
       categoryId: category.id,
       revisionNumber: 3,
-      status: RequirementStatus.Draft,
+      status: RequirementStatus.Approved,
       description: "Users must sign in with MFA.",
       priority: "p2",
     });
-    expect(updatedRequirement.reviewer).toBeNull();
-    expect(updatedRequirement.approvedAt).toBeNull();
+    expect(updatedRequirement.reviewer).toBe("Requirements Engineer");
+    expect(updatedRequirement.approvedAt).not.toBeNull();
   });
 
   test("requires an explicit change reason for substantive requirement edits.", async ({

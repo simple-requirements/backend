@@ -1,11 +1,11 @@
 import type { Request } from "express";
 
-import type { AuthenticationSession } from "@/auth/sessions/authentication-session.entity";
-import type { GlobalRole } from "@/auth/authorization/global-role.enum";
+import type { AccountRole } from "@/auth/accounts/account-role.enum";
 import type { User } from "@/auth/accounts/users.entity";
+import type { AuthenticationSession } from "@/auth/sessions/authentication-session.entity";
 
 export interface AuthenticatedPrincipal {
-  globalRoles: readonly GlobalRole[];
+  role: AccountRole;
   session: AuthenticationSession;
   user: User;
 }

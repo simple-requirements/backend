@@ -8,12 +8,18 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
 
 @Entity({ name: "users" })
 @Index("UQ_users_normalized_username", ["normalizedUsername"], { unique: true })
 @Index("UQ_users_normalized_email", ["normalizedEmail"], { unique: true })
 @Check("CHK_users_status", `"status" IN ('pending', 'active', 'deactivated')`)
+@Check(
+  "CHK_users_role",
+  `"role" IS NULL OR "role" IN ('administrator', 'requirements_engineer', 'developer', 'viewer')`,
+)
+@Check("CHK_users_active_role", `"status" <> 'active' OR "role" IS NOT NULL`)
 export class User {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -38,6 +44,9 @@ export class User {
 
   @Column({ type: "varchar", length: 16, default: UserStatus.Pending })
   status!: UserStatus;
+
+  @Column({ type: "varchar", length: 32, nullable: true })
+  role!: AccountRole | null;
 
   @Column({ type: "timestamptz", name: "email_verified_at", nullable: true })
   emailVerifiedAt!: Date | null;

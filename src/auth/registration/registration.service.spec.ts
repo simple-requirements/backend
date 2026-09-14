@@ -8,6 +8,7 @@ import type { RegisterUserDto } from "@/auth/dto/register-user.dto";
 import { EmailVerificationService } from "@/auth/registration/email-verification.service";
 import { PasswordService } from "@/auth/accounts/password.service";
 import { SessionService } from "@/auth/sessions/session.service";
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
 import { User } from "@/auth/accounts/users.entity";
 
@@ -76,6 +77,7 @@ describe("RegistrationService", () => {
       // eslint-disable-next-line sonarjs/no-hardcoded-passwords
       passwordHash: "$argon2id$hashed-password",
       status: UserStatus.Pending,
+      role: null,
       emailVerifiedAt: null,
     });
     expect(usersRepository.create.mock.calls[0]?.[0]).not.toHaveProperty(
@@ -131,6 +133,7 @@ describe("RegistrationService", () => {
       const user = Object.assign(new User(), {
         id: "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
         status: UserStatus.Pending,
+        role: AccountRole.Viewer,
       });
       usersRepository.findOneBy.mockResolvedValue(user);
 
@@ -146,6 +149,20 @@ describe("RegistrationService", () => {
       );
     },
   );
+
+  it("does not activate a pending account without an assigned role.", async () => {
+    const user = Object.assign(new User(), {
+      id: "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
+      status: UserStatus.Pending,
+      role: null,
+    });
+    usersRepository.findOneBy.mockResolvedValue(user);
+
+    await expect(service.activateUser(user.id)).rejects.toThrow(
+      "An account role must be assigned before activation.",
+    );
+    expect(usersRepository.save).not.toHaveBeenCalled();
+  });
 
   it("changes only the stored password hash through the internal service.", async () => {
     const user = Object.assign(new User(), {

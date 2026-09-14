@@ -23,8 +23,7 @@ import {
   type PendingVerificationDelivery,
   EmailVerificationService,
 } from "@/auth/registration/email-verification.service";
-import { GlobalRole } from "@/auth/authorization/global-role.enum";
-import { GlobalUserRole } from "@/auth/authorization/global-user-role.entity";
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { PasswordService } from "@/auth/accounts/password.service";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
 import { User } from "@/auth/accounts/users.entity";
@@ -126,15 +125,8 @@ export class BootstrapService implements OnApplicationBootstrap {
             displayName: registration.displayName,
             passwordHash,
             status: UserStatus.Pending,
+            role: AccountRole.Administrator,
             emailVerifiedAt: null,
-          }),
-        );
-
-        const roleRepository = manager.getRepository(GlobalUserRole);
-        await roleRepository.save(
-          roleRepository.create({
-            userId: user.id,
-            role: GlobalRole.Administrator,
           }),
         );
 

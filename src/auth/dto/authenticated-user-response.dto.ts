@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
-import { GlobalRole } from "@/auth/authorization/global-role.enum";
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { UserStatus } from "@/auth/accounts/user-status.enum";
 import { AuthenticatedProjectMembershipDto } from "@/auth/dto/authenticated-project-membership.dto";
 
@@ -20,8 +20,8 @@ export class AuthenticatedUserResponseDto {
   @ApiProperty({ enum: UserStatus })
   status!: UserStatus;
 
-  @ApiProperty({ enum: GlobalRole, isArray: true })
-  globalRoles!: GlobalRole[];
+  @ApiProperty({ enum: AccountRole })
+  role!: AccountRole;
 
   @ApiPropertyOptional({
     type: AuthenticatedProjectMembershipDto,

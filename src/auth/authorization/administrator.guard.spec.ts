@@ -1,25 +1,27 @@
 import { ForbiddenException, type ExecutionContext } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
 
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { AdministratorGuard } from "@/auth/authorization/administrator.guard";
-import { GlobalRole } from "@/auth/authorization/global-role.enum";
 
-function context(globalRoles: GlobalRole[]): ExecutionContext {
+function context(role: AccountRole): ExecutionContext {
   return {
-    switchToHttp: () => ({
-      getRequest: () => ({ authentication: { globalRoles } }),
-    }),
-  } as ExecutionContext;
+    switchToHttp: () => ({ getRequest: () => ({ authentication: { role } }) }),
+  } as unknown as ExecutionContext;
 }
 
 describe("AdministratorGuard", () => {
   const guard = new AdministratorGuard();
 
-  it("allows a global Administrator.", () => {
-    expect(guard.canActivate(context([GlobalRole.Administrator]))).toBe(true);
+  it("allows an Administrator account.", () => {
+    expect(guard.canActivate(context(AccountRole.Administrator))).toBe(true);
   });
 
-  it("rejects an authenticated user without the Administrator role.", () => {
-    expect(() => guard.canActivate(context([]))).toThrow(ForbiddenException);
+  it.each([
+    AccountRole.RequirementsEngineer,
+    AccountRole.Developer,
+    AccountRole.Viewer,
+  ])("rejects the non-Administrator role %s.", (role) => {
+    expect(() => guard.canActivate(context(role))).toThrow(ForbiddenException);
   });
 });

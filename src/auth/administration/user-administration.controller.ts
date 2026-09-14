@@ -18,8 +18,12 @@ import {
 } from "@nestjs/swagger";
 
 import { AdministratorGuard } from "@/auth/authorization/administrator.guard";
-import { updateUserStatusSchema } from "@/auth/dto/auth.schemas";
+import {
+  updateUserRoleSchema,
+  updateUserStatusSchema,
+} from "@/auth/dto/auth.schemas";
 import { SessionResponseDto } from "@/auth/dto/session-response.dto";
+import { UpdateUserRoleDto } from "@/auth/dto/update-user-role.dto";
 import { UpdateUserStatusDto } from "@/auth/dto/update-user-status.dto";
 import { UserAdministrationResponseDto } from "@/auth/dto/user-administration-response.dto";
 import { SessionAuthGuard } from "@/auth/sessions/session-auth.guard";
@@ -45,6 +49,16 @@ export class UserAdministrationController {
     @Param("userId", ParseUUIDPipe) userId: string,
   ): Promise<UserAdministrationResponseDto> {
     return this.users.find(userId);
+  }
+
+  @Patch(":userId/role")
+  @ApiOkResponse({ type: UserAdministrationResponseDto })
+  updateRole(
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body(new ZodValidationPipe(updateUserRoleSchema))
+    update: UpdateUserRoleDto,
+  ): Promise<UserAdministrationResponseDto> {
+    return this.users.assignRole(userId, update.role);
   }
 
   @Patch(":userId/status")

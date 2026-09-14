@@ -2,24 +2,26 @@ import { ForbiddenException, type ExecutionContext } from "@nestjs/common";
 import type { Reflector } from "@nestjs/core";
 import type { DataSource } from "typeorm";
 import { describe, expect, it, vi } from "vitest";
-import { GlobalRole } from "@/auth/authorization/global-role.enum";
+
+import { AccountRole } from "@/auth/accounts/account-role.enum";
 import { ProjectAuthorizationGuard } from "@/auth/authorization/project-authorization.guard";
 import { ProjectPermission } from "@/auth/authorization/project-permission";
-import { ProjectRole } from "@/auth/authorization/project-role.enum";
 
 function setup(
   permission: ProjectPermission,
-  roles: ProjectRole[] = [],
-  globalRoles: GlobalRole[] = [],
+  role: AccountRole,
+  hasMembership = false,
 ) {
   const reflector = { getAllAndOverride: vi.fn().mockReturnValue(permission) };
   const repository = {
-    findBy: vi.fn().mockResolvedValue(roles.map((role) => ({ role }))),
+    findOneBy: vi
+      .fn()
+      .mockResolvedValue(hasMembership ? { id: "membership" } : null),
   };
   const dataSource = { getRepository: vi.fn().mockReturnValue(repository) };
   const request = {
     params: { projectId: "project-id" },
-    authentication: { user: { id: "user-id" }, globalRoles },
+    authentication: { user: { id: "user-id" }, role },
   };
   const context = {
     getHandler: vi.fn(),
@@ -32,56 +34,52 @@ function setup(
       dataSource as unknown as DataSource,
     ),
     context,
+    repository,
   };
 }
 
 describe("ProjectAuthorizationGuard", () => {
-  it("allows global Administrators to read project records and administer projects.", async () => {
-    for (const permission of [
-      ProjectPermission.ReadProject,
-      ProjectPermission.Administer,
-    ]) {
-      const { guard, context } = setup(
-        permission,
-        [],
-        [GlobalRole.Administrator],
-      );
-      await expect(guard.canActivate(context)).resolves.toBe(true);
-    }
-  });
-  it("does not allow global Administrators to read project contents without membership.", async () => {
-    const { guard, context } = setup(
-      ProjectPermission.Read,
-      [],
-      [GlobalRole.Administrator],
-    );
-    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
-  });
+  it.each([ProjectPermission.ReadProject, ProjectPermission.Read])(
+    "rejects Administrator access to project-scoped permission %s.",
+    async (permission) => {
+      const content = setup(permission, AccountRole.Administrator);
+      await expect(
+        content.guard.canActivate(content.context),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(content.repository.findOneBy).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([
-    [ProjectPermission.Read, ProjectRole.Viewer],
-    [ProjectPermission.ManageRequirements, ProjectRole.RequirementsEngineer],
-    [ProjectPermission.ManageTickets, ProjectRole.Developer],
+    [ProjectPermission.Read, AccountRole.Viewer],
+    [ProjectPermission.ReadProject, AccountRole.Developer],
+    [ProjectPermission.ManageRequirements, AccountRole.RequirementsEngineer],
+    [ProjectPermission.ManageTickets, AccountRole.Developer],
   ])(
-    "allows %s through the matching project role.",
+    "allows %s through the matching project-scoped role with membership.",
     async (permission, role) => {
-      const { guard, context } = setup(permission, [role]);
+      const { guard, context } = setup(permission, role, true);
       await expect(guard.canActivate(context)).resolves.toBe(true);
     },
   );
-  it("rejects an Administrator requirement mutation without project membership.", async () => {
+
+  it("rejects project-scoped access without membership.", async () => {
     const { guard, context } = setup(
-      ProjectPermission.ManageRequirements,
-      [],
-      [GlobalRole.Administrator],
+      ProjectPermission.Read,
+      AccountRole.RequirementsEngineer,
+      false,
     );
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });
-  it("rejects authentication without project membership.", async () => {
-    const { guard, context } = setup(ProjectPermission.Read);
+
+  it("does not allow Developer accounts to mutate requirement content.", async () => {
+    const { guard, context } = setup(
+      ProjectPermission.ManageRequirements,
+      AccountRole.Developer,
+      true,
+    );
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
