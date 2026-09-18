@@ -33,7 +33,9 @@ const reviewAuthorSchema = trimmedStringSchema(
     'Review comment author must be a string.',
     'Review comment author must not be empty.',
 );
-const serverDerivedReviewAuthorSchema = reviewAuthorSchema.optional().transform((author) => author ?? SERVER_DERIVED_ACTOR);
+const serverDerivedReviewAuthorSchema = reviewAuthorSchema
+    .optional()
+    .transform((author) => author ?? SERVER_DERIVED_ACTOR);
 const reviewerSchema = trimmedStringSchema('Reviewer must be a string.', 'Reviewer must not be empty.');
 const serverDerivedReviewerSchema = reviewerSchema.optional().transform((reviewer) => reviewer ?? SERVER_DERIVED_ACTOR);
 const rejectionReasonSchema = trimmedStringSchema(

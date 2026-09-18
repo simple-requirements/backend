@@ -1,8 +1,8 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
-import { AccountRole } from "@/auth/accounts/account-role.enum";
+import { AccountRole } from '@/auth/accounts/account-role.enum';
 
 export class UpdateUserRoleDto {
-  @ApiProperty({ enum: AccountRole })
-  role!: AccountRole;
+    @ApiProperty({ enum: AccountRole })
+    role!: AccountRole;
 }

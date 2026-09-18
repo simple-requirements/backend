@@ -21,12 +21,8 @@ import {
 @Entity({ name: 'requirements' })
 @Index('IDX_requirements_project_id', ['projectId'])
 @Index('IDX_requirements_category_id', ['categoryId'])
-@Index('UQ_requirements_project_key', ['projectId', 'visibleKey'], {
-    unique: true,
-})
-@Index('UQ_requirements_category_sequence', ['categoryId', 'sequenceNumber'], {
-    unique: true,
-})
+@Index('UQ_requirements_project_key', ['projectId', 'visibleKey'], { unique: true })
+@Index('UQ_requirements_category_sequence', ['categoryId', 'sequenceNumber'], { unique: true })
 @Check('CHK_requirements_status', `"status" IN ('draft', 'approved', 'implemented', 'obsolete', 'rejected')`)
 @Check('CHK_requirements_sequence_number_range', '"sequence_number" > 0 AND "sequence_number" <= 9999')
 @Check('CHK_requirements_revision_number_range', '"revision_number" > 0')
@@ -90,17 +86,11 @@ export class Requirement {
     @Column({ type: 'varchar', length: 120, nullable: true })
     reviewer!: string | null;
 
-    @Column({
-        type: 'varchar',
-        length: 120,
-        name: 'obsoleted_by',
-        nullable: true,
-    })
+    @Column({ type: 'varchar', length: 120, name: 'obsoleted_by', nullable: true })
     obsoletedBy!: string | null;
 
     @Column({ type: 'timestamptz', name: 'rejected_at', nullable: true })
     rejectedAt!: Date | null;
-
 
     @Column({ type: 'timestamptz', name: 'approved_at', nullable: true })
     approvedAt!: Date | null;
@@ -124,11 +114,7 @@ export class Requirement {
     @JoinColumn({ name: 'category_id' })
     category!: Relation<Category>;
 
-    @ManyToOne(() => Project, (project) => project.requirements, {
-        nullable: false,
-        onDelete: 'RESTRICT',
-        eager: true,
-    })
+    @ManyToOne(() => Project, (project) => project.requirements, { nullable: false, onDelete: 'RESTRICT', eager: true })
     @JoinColumn({ name: 'project_id' })
     project!: Relation<Project>;
 

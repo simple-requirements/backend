@@ -72,19 +72,13 @@ export class RequirementRevision {
     @Column({ type: 'varchar', length: 120, nullable: true })
     reviewer!: string | null;
 
-    @Column({
-        type: 'varchar',
-        length: 120,
-        name: 'obsoleted_by',
-        nullable: true,
-    })
+    @Column({ type: 'varchar', length: 120, name: 'obsoleted_by', nullable: true })
     obsoletedBy!: string | null;
     @Column({ type: 'jsonb', name: 'implementation_tickets', default: () => "'[]'::jsonb" })
     implementationTickets!: { id: string; ticketId: string; completedBy: string; completedAt: string }[];
 
     @Column({ type: 'timestamptz', name: 'rejected_at', nullable: true })
     rejectedAt!: Date | null;
-
 
     @Column({ type: 'timestamptz', name: 'approved_at', nullable: true })
     approvedAt!: Date | null;
@@ -104,10 +98,7 @@ export class RequirementRevision {
     @Column({ type: 'timestamptz', name: 'updated_at' })
     updatedAt!: Date;
 
-    @ManyToOne(() => Requirement, (requirement) => requirement.revisions, {
-        nullable: false,
-        onDelete: 'CASCADE',
-    })
+    @ManyToOne(() => Requirement, (requirement) => requirement.revisions, { nullable: false, onDelete: 'CASCADE' })
     @JoinColumn({ name: 'requirement_id' })
     requirement!: Relation<Requirement>;
 }

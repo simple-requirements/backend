@@ -1,5 +1,15 @@
 import { Requirement } from '@/projects/requirements.entity';
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
+import {
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    JoinColumn,
+    ManyToOne,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
+    type Relation,
+} from 'typeorm';
 
 @Entity({ name: 'requirement_implementation_tickets' })
 @Index('IDX_implementation_tickets_requirement_id', ['requirementId'])
@@ -19,7 +29,10 @@ export class RequirementImplementationTicket {
     createdAt!: Date;
     @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
     updatedAt!: Date;
-    @ManyToOne(() => Requirement, (requirement) => requirement.implementationTickets, { nullable: false, onDelete: 'CASCADE' })
+    @ManyToOne(() => Requirement, (requirement) => requirement.implementationTickets, {
+        nullable: false,
+        onDelete: 'CASCADE',
+    })
     @JoinColumn({ name: 'requirement_id' })
     requirement!: Relation<Requirement>;
 }

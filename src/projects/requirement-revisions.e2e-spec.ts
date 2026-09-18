@@ -8,7 +8,11 @@ import {
 } from '@/projects/projects-api.e2e-helpers';
 
 test.describe('Requirement revisions API', () => {
-    test('returns immutable revisions including the current requirement revision.', async ({ request, api, draftRequirement }) => {
+    test('returns immutable revisions including the current requirement revision.', async ({
+        request,
+        api,
+        draftRequirement,
+    }) => {
         const { project, requirement } = draftRequirement;
 
         await api.approveRequirement(project.id, requirement.id);
@@ -21,9 +25,7 @@ test.describe('Requirement revisions API', () => {
         });
         expect(updateResponse.status()).toBe(200);
 
-        const revisionsResponse = await request.get(
-            `/projects/${project.id}/requirements/${requirement.id}/revisions`,
-        );
+        const revisionsResponse = await request.get(`/projects/${project.id}/requirements/${requirement.id}/revisions`);
 
         expect(revisionsResponse.status()).toBe(200);
 
@@ -68,9 +70,7 @@ test.describe('Requirement revisions API', () => {
                             string,
                             {
                                 readonly content?: {
-                                    readonly 'application/json'?: {
-                                        readonly schema?: { readonly $ref?: string };
-                                    };
+                                    readonly 'application/json'?: { readonly schema?: { readonly $ref?: string } };
                                 };
                             }
                         >;
@@ -79,7 +79,7 @@ test.describe('Requirement revisions API', () => {
             >;
         };
         const schema =
-            document.paths['/projects/{projectId}/requirements/{requirementId}/revisions/compare']?.get?.responses?.[
+            document.paths['/projects/{projectId}/requirements/{requirementId}/revisions/compare'].get?.responses?.[
                 '200'
             ]?.content?.['application/json']?.schema;
 
@@ -122,23 +122,23 @@ test.describe('Requirement revisions API', () => {
         expect(body.differences.map((difference) => difference.field)).toContain('description');
     });
 
-    test('creates revisions for implementation-ticket changes and compares ticket snapshots.', async ({ request, api, draftRequirement }) => {
+    test('creates revisions for implementation-ticket changes and compares ticket snapshots.', async ({
+        request,
+        api,
+        draftRequirement,
+    }) => {
         const { project, requirement } = draftRequirement;
 
         await api.approveRequirement(project.id, requirement.id);
         await api.createImplementationTicket(project.id, requirement.id, 'SOLAR-4711');
 
-        const revisionsResponse = await request.get(
-            `/projects/${project.id}/requirements/${requirement.id}/revisions`,
-        );
+        const revisionsResponse = await request.get(`/projects/${project.id}/requirements/${requirement.id}/revisions`);
         expect(revisionsResponse.status()).toBe(200);
 
         const revisions = (await revisionsResponse.json()) as readonly RequirementResponseBody[];
         expect(revisions.map((revision) => revision.revisionNumber)).toEqual([1, 2, 3]);
         expect(revisions[1].implementationTickets).toEqual([]);
-        expect(revisions[2].implementationTickets).toEqual([
-            expect.objectContaining({ ticketId: 'SOLAR-4711' }),
-        ]);
+        expect(revisions[2].implementationTickets).toEqual([expect.objectContaining({ ticketId: 'SOLAR-4711' })]);
         expect(revisions[2].changeType).toBe('implementation_ticket_created');
         expect(revisions[2].changeReason).toBe('Implementation ticket SOLAR-4711 created.');
 
@@ -147,9 +147,7 @@ test.describe('Requirement revisions API', () => {
         );
         expect(compareResponse.status()).toBe(200);
 
-        const body = (await compareResponse.json()) as {
-            readonly differences: readonly { readonly field: string }[];
-        };
+        const body = (await compareResponse.json()) as { readonly differences: readonly { readonly field: string }[] };
         expect(body.differences.map((difference) => difference.field)).toContain('implementationTickets');
     });
 

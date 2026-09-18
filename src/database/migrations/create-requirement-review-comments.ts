@@ -37,10 +37,7 @@ export class CreateRequirementReviewCommentsTable1720000000020 implements Migrat
                     { name: 'IDX_requirement_review_comments_status', columnNames: ['status'] },
                 ],
                 checks: [
-                    {
-                        name: 'CHK_requirement_review_comments_status',
-                        expression: `"status" IN ('open', 'closed')`,
-                    },
+                    { name: 'CHK_requirement_review_comments_status', expression: `"status" IN ('open', 'closed')` },
                     {
                         name: 'CHK_requirement_review_comments_created_revision_range',
                         expression: '"created_for_revision_number" > 0',

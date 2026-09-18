@@ -146,7 +146,7 @@ The frontend styling review intentionally borrows Bulma's compositional principl
 
 Completed restructuring steps:
 
-1. **Buttons and icons — complete.** Shared `src/styles/_Buttons.scss` and `src/styles/_Icons.scss` provide composable classes such as `ui-button`, visual modifiers (`--primary`, `--outline`, `--danger`, `--ghost`, `--transparent`), context/size modifiers (`--action`, `--dialog`, `--form`), and composition modifiers (`--icon-only`, `--with-icon`). Repeated button-style mixins were removed. `package.json` includes `test:pages` (`vitest run test/pages`).
+1. **Buttons and icons — complete.** Shared `src/styles/_Buttons.scss` and `src/styles/_Icons.scss` provide composable classes such as `ui-button`, visual modifiers (`--primary`, `--outline`, `--danger`, `--ghost`, `--transparent`), context/size modifiers (`--action`, `--dialog`, `--form`), and composition modifiers (`--icon-only`, `--with-icon`). Repeated button-style mixins were removed. Page specs are part of the normal Vitest unit suite; there is no separate `test:pages` script.
 2. **Panels and native tables — complete.** Shared `src/styles/_Panels.scss` and `src/styles/_Tables.scss` centralize panel surfaces/layout modifiers and native-table wrapper/cell/header/action patterns. Administration tables/panels, category/requirement list/form/detail panels, requirement ticket detail tables, and implementation-ticket tables are migrated to the shared classes. PrimeReact DataTable-specific mixins remain because they are a separate low-duplication integration layer.
 3. **Forms and dialogs — complete.** Shared `src/styles/_Forms.scss` and `src/styles/_Dialogs.scss` now own reusable field, control, message, form-action, dialog shell/header/content/title/message/action patterns. Project/category/requirement forms and the project, membership, role, lifecycle, review, category-delete, unsaved-navigation, and implementation-ticket dialogs use the shared classes. The obsolete form/dialog mixins were removed from `_UiMixins.scss`.
 4. **Public account pages — complete.** Shared `src/styles/_PublicAccount.scss` centralizes the Login/PublicAccount/Bootstrap page shell, card widths, form controls, public-account buttons/loading state, action links, validation text, and feedback messages. The old page-specific Login/PublicAccount/Bootstrap SCSS files are removed.
@@ -155,6 +155,18 @@ Completed restructuring steps:
 The five-step frontend SCSS/design-system restructuring is complete. There is no remaining styling-refactor step in this sequence. Future styling work should preserve the established compositional `ui-*` primitives and only add shared tokens/classes when there is demonstrated reuse.
 
 Do not replace feature-specific BEM classes wholesale. Shared `ui-*` classes should own reusable visual primitives; feature SCSS should retain feature-specific layout, widths, grids, and exceptional states.
+
+
+### TanStack Query / TanStack DB boundary follow-up — 2026-09-19
+
+The hybrid server-state architecture has been reviewed and tightened without replacing either library:
+
+- React Query remains the remote request/cache/invalidation foundation. TanStack DB remains the reactive read model for projects, project categories and project requirements. Administration/session/review workflow datasets continue to use direct React Query where shared reactive entity identity is not useful.
+- Sidebar requirement counters now use `Project.requirementCount` from the projects collection. Do not restore one `list requirements` query per sidebar project; requirement creation must invalidate the projects query so the authoritative summary count refreshes.
+- Category requirement counters now use `Category.requirementCount` from the categories collection. Requirement create/update invalidates the category list so category moves and creations refresh those summary counts. Do not reload the entire requirements collection merely to calculate category counts.
+- Authentication-boundary clearing now explicitly cleans up the projects/categories/requirements TanStack DB collections before clearing the QueryClient cache. Scoped collection caches are discarded and the global projects collection is recreated, preventing rows from one authenticated account from surviving into the next session. Logout and HTTP 401 handling await this cleanup.
+- Review comment/summary Query keys are centralized in `reviewApi.ts`; reads and mutation invalidations must use those helpers rather than duplicating array literals.
+- `LoadingOverlay` intentionally remains a direct React Query consumer of the projects query because it needs request lifecycle/error/retry state rather than a domain projection. It shares the same query key/cache and is an explicit exception, not an alternate domain read model.
 
 ### Product work still outstanding after the styling refactor
 
@@ -173,5 +185,61 @@ The earlier exploratory implementation of WP-E/F in an assistant working tree wa
 - `pnpm` may be unavailable in the assistant runtime even when the uploaded dependency tree exists. When repository binaries are available, direct execution of those exact binaries has been accepted by the user as a fallback. Never use `npm`/`npx` in the frontend repository because `AGENTS.md` forbids them.
 - The frontend full Vitest suite has sometimes taken longer than the execution window even while continuously reporting passes. Distinguish targeted/build validation from complete-suite completion rather than overstating results.
 - Frontend E2E fixtures run against persistent backend state. Do not restore the old destructive `resetTestBackend()` behavior: projects with requirements are intentionally undeletable. New retained-data scenarios should create a unique project and navigate/assert through its id or resolved unique name instead of assuming the database can be emptied between scenarios.
-- E2E follow-up on 2026-09-18: `requirements.steps.ts` derives its project type from `createPersistentTestProject` (avoiding the `@typescript-eslint/consistent-type-imports` lint failure), and `resetTestBackend()` clears logical-to-unique project-name aliases between scenarios. A subsequent Playwright run reached 30/39 passing and exposed nine stale setup/locator failures. The current frontend fix uses the dedicated `/review/approve` endpoint when permission scenarios need an approved fixture, selects Administrator projects through exact links in the `Administrative project list` region, accepts the post-create/post-rename project-details route when asserting project administration state, scopes membership project selection to the administration list to avoid sidebar collisions, and scopes the removed `Sessions`-section assertion to the selected-user detail region with an exact heading match. These are E2E compatibility fixes for already-intended production behavior; do not restore generic PATCH approval or old button-based administration project locators.
+- E2E follow-up on 2026-09-18/19: `requirements.steps.ts` derives its project type from `createPersistentTestProject` (avoiding the `@typescript-eslint/consistent-type-imports` lint failure), and `resetTestBackend()` clears logical-to-unique project-name aliases between scenarios. The suite improved from 30/39 to 35/39 passing after fixing approval setup, project-name isolation, post-create/post-rename assertions, membership locator collisions, and the removed user-detail Sessions expectation. The final four reported failures were stale semantic locators: Administrator navigation exposes `Projects` as an expandable button, and project selection must be scoped to the `All projects` table rather than a removed `Administrative project list` region. Do not restore generic PATCH approval, old button-row locators, or the removed administration-list region.
 - The user reported all backend unit and E2E tests green after WP-A and subsequent backend application checkpoints.
+
+### Unit/lint follow-up after TanStack boundary cleanup — 2026-09-19
+
+- The collection cleanup specs keep the cleanup spies in an explicitly typed `cleanupMocks` array owned by the hoisted test fixture. Do not inspect `createCollection.mock.results[*].value.cleanup`; Vitest exposes that path as `any`, which breaks both TypeScript and `@typescript-eslint/no-unsafe-*`.
+- `pnpm test:unit` runs `vitest run`, which includes all `test/**/*.spec.{ts,tsx}` files, including `test/pages`. The separate `test:pages` script has been removed; `pnpm test:unit:coverage` continues to run the same complete unit/component/page suite with coverage.
+
+- The user confirmed the frontend E2E suite is fully green after the previous locator/setup fixes. Preserve those E2E semantics; no E2E changes were required in this follow-up.
+- A regression caused by eager authentication-boundary imports was fixed: `authenticationFailure.ts` now loads `resetDomainCollections` lazily inside `clearUserScopedState()`. This prevents ordinary API/module tests that intentionally mock only `useLiveQuery`/`eq` or generated project helpers from instantiating unrelated TanStack DB collections at module-import time, while logout/401 cleanup behavior remains awaited and unchanged.
+- `projectsCollection.spec.ts` now recreates the resettable global projects collection in `beforeEach`, so collection-option assertions remain isolated after Vitest mock clearing. Collection cleanup assertions capture the Vitest cleanup spy from the mocked `createCollection` result and assert on that spy directly; they do not reach through the production `Collection.cleanup` type or pass an unbound method reference. The category and requirement collection cleanup specs use the same pattern, keeping both `pnpm typecheck` and `pnpm lint` satisfied.
+- Generated TypeDoc browser assets under `docs/assets/**` are excluded from ESLint's typed project-service pass. They are generated documentation output and are not part of the TypeScript source project; do not add them to application tsconfig files merely to satisfy lint.
+
+### Frontend AGENTS compliance cleanup — 2026-09-19
+
+The first two packages from the frontend architecture/performance review are complete against the `frontend(2).zip` baseline.
+
+1. **Architecture cleanup — complete.** Production code outside `src/api` no longer imports Orval-generated project query-key helpers directly; `projectsApi.ts` exposes the domain-facing query-key helper. Application/admin/authentication route construction and route matching are centralized under `src/router` (`applicationRoutes.ts`, `authenticationRoutes.ts`, `administrationRoutes.ts`, and `projectRoutes.ts`). The authentication helper module now contains only authentication return-state logic. The transient toast event bus was moved out of `src/stores` into `src/components/Feedback/toastEvents.ts`, leaving `src/stores` for TanStack Store state as required by `AGENTS.md`. Confirmed dead compatibility/duplicate files were removed: `src/pages/ProjectRequirements/ProjectRequirementsPage.tsx`, `src/pages/ProjectRequirements/List/CategoryTable.tsx`, `src/components/Feedback/toastMessages.ts`, and `src/e2eAuthenticationHarness.ts`.
+2. **E2E semantic-locator cleanup — complete.** Requirement/category PrimeReact tables have stable accessible names; requirement/category detail panels expose named regions; project summary/status groups have semantic accessible names; expandable navigation root buttons expose stable labels independent of badges. Playwright BDD step definitions now use roles, accessible names, labels, and visible semantic content instead of CSS class selectors/incidental PrimeReact DOM structure. Do not reintroduce `.p-datatable-*`, feature BEM class, or nth-cell locators when a semantic locator exists.
+
+The performance packages from that review are now complete:
+
+3. **Route lazy loading — complete.** Route-level page modules are loaded through React Router route-object `lazy`; the application shell (`RootLayout`) and authorization guards remain eager so route matching and access control stay immediately available. Public-account, Administrator, project, category, requirement, form, and review pages are split behind dynamic route-module imports in `src/router/routeModules.ts`. Do not replace this with eager page imports in `src/router/index.tsx` unless a measured regression requires it.
+4. **Intent prefetching — complete.** Project sidebar hover/focus intent preloads the target route module and warms the matching TanStack Query cache using the same generated query keys that back the TanStack DB category/requirement collections. Project-overview intent warms both categories and requirements; Requirements and Categories subitems warm only their corresponding dataset. Administrator navigation preloads its target route modules on intent. Prefetching is event-driven, not render-driven, so rendering many projects must not issue per-project background requests. Speculative prefetch failures are intentionally swallowed; real navigation remains responsible for surfaced request errors.
+
+Packages 1–4 are architecture/performance work and must not be confused with WP-E product functionality.
+
+### Architecture cleanup repair — 2026-09-19
+
+The AGENTS compliance cleanup originally referenced new route/toast modules that were not tracked in Git, so the user's `git diff HEAD~1 HEAD` handoff omitted them. This caused 28 Vitest suites and the E2E Vite build to fail with unresolved imports. The repair adds the missing tracked files: `src/router/applicationRoutes.ts`, `src/router/authenticationRoutes.ts`, `src/router/administrationRoutes.ts`, `src/components/Feedback/toastEvents.ts`, and `test/router/administrationRoutes.spec.ts`. Future patches that introduce new files must ensure those files are added to Git before generating `git diff HEAD~1 HEAD`, otherwise the diff cannot contain them.
+
+### Architecture/E2E cleanup follow-up — 2026-09-19
+
+Typed ESLint exposed four stale type imports after route parsing moved into `src/router`: `ProjectNavigationList.tsx`, `useProjectNavigation.ts`, and their two component specs imported `ActiveProjectRoute` from `useActiveProjectRoute.ts`, which does not export that type. They now import the type directly from `src/router/projectRoutes.ts`, its owning module. This removes the resulting error-typed values and all nine reported `no-unsafe-*` lint failures without changing runtime behavior.
+
+The category-to-requirement E2E scenario also had an unscoped `page.getByLabel('Category')` locator. After the sidebar accessibility cleanup, the project navigation button (for example `Category BDD Project`) legitimately also matches that fuzzy label query. The step now scopes `Category` and `Priority` form controls to the named `Create requirement` form region and uses exact labels. Preserve that form-region scoping rather than weakening accessible names.
+
+### Frontend route lazy loading / intent prefetch — 2026-09-19
+
+- `src/router/index.tsx` keeps only shell/guard components eager; route pages use lazy route modules from `src/router/routeModules.ts`, producing feature-oriented Vite chunks without manual chunk configuration.
+- `ExpandableNavigationItem` exposes optional parent/subitem intent callbacks and composes them with existing tooltip mouse/focus behavior. Preserve both mouse and keyboard intent paths.
+- `useProjectNavigation` owns project-navigation prefetch orchestration. Overview intent preloads the project-details route and warms categories + requirements; requirements/categories intent preloads only the matching list route and query.
+- `src/api/projectPrefetch.ts` uses `queryClient.prefetchQuery(...)` with the exact collection-backing query keys and domain-facing request wrappers. This is deliberate: React Query remains the transport/cache layer and TanStack DB consumes the warmed cache when its collection becomes active.
+- Administrator sidebar intent preloads the users/projects route modules. It does not add extra data prefetch because those administration queries are already active while that sidebar is mounted.
+- Do not prefetch every project during render. Hover/focus intent is the guard against N+1 speculative requests.
+- Unit coverage was added for intent callback wiring, project-prefetch routing, and query warming behavior. Full `pnpm format`, `pnpm lint`, `pnpm build`, `pnpm test:unit:coverage`, and `pnpm test:e2e` still require execution in the user's dependency-installed repository.
+
+
+### Frontend coverage strengthening — 2026-09-21
+
+The current `coverage/clover.xml` was reviewed after all frontend tests were green. The report showed several meaningful hooks/routes/workflows at 0% or very low direct unit/component coverage because higher-level page specs intentionally mocked them. A targeted coverage pass was added rather than chasing trivial coverage:
+
+- Added direct permission-route coverage for `ProjectPermissionRoute`, including successful access plus read/manage redirects.
+- Added deterministic inactivity-window coverage for `sessionStatus.ts`.
+- Added focused hook coverage for Administrator project/user orchestration, user presence, project details statistics, review queries, review mutation execution, and implementation-ticket editing.
+- Added focused page coverage for requirement details and requirement review behavior, including ActionBar context, review redirects, approval navigation/invalidation, editable/read-only review behavior, and incomplete-route handling.
+- The coverage pass intentionally did not add low-value specs for glue-only files such as `App.tsx`, router wiring, tiny toast/event primitives, or thin API forwarding wrappers. Continue preferring behavior/business-rule coverage over a mechanical one-spec-per-file target.
+- No production behavior changed in this pass, so full Playwright E2E is not required solely for these test additions. The normal frontend finish gates still apply; run `pnpm format`, `pnpm lint`, `pnpm build`, and `pnpm test:unit:coverage` in the dependency-installed repository and inspect the regenerated coverage report.

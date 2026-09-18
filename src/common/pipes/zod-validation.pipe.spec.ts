@@ -6,9 +6,7 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
 
 describe('ZodValidationPipe', () => {
     it('returns the parsed value.', () => {
-        const pipe = new ZodValidationPipe(
-            z.object({ name: z.string().transform((value) => value.trim()) }),
-        );
+        const pipe = new ZodValidationPipe(z.object({ name: z.string().transform((value) => value.trim()) }));
 
         const result = pipe.transform({ name: '  Test project  ' });
 
