@@ -87,6 +87,7 @@ describe("UserAdministrationService role model", () => {
       service.updateStatus(
         "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
         UserStatus.Active,
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       ),
     ).rejects.toEqual(
       new BadRequestException(
@@ -104,6 +105,7 @@ describe("UserAdministrationService role model", () => {
       service.updateStatus(
         "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
         UserStatus.Active,
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       ),
     ).resolves.toMatchObject({
       status: UserStatus.Active,
@@ -118,6 +120,7 @@ describe("UserAdministrationService role model", () => {
       service.updateStatus(
         "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
         UserStatus.Deactivated,
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       ),
     ).resolves.toMatchObject({
       status: UserStatus.Deactivated,
@@ -126,6 +129,37 @@ describe("UserAdministrationService role model", () => {
     expect(sessions.revokeAllForUser).toHaveBeenCalledWith(
       "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11",
     );
+  });
+
+  it("blocks an Administrator from deactivating their own account.", async () => {
+    const selfId = "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11";
+    repository.findOneBy.mockResolvedValue(
+      user({ status: UserStatus.Active, role: AccountRole.Administrator }),
+    );
+
+    await expect(
+      service.updateStatus(selfId, UserStatus.Deactivated, selfId),
+    ).rejects.toEqual(
+      new BadRequestException(
+        "Administrators cannot deactivate their own account.",
+      ),
+    );
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(sessions.revokeAllForUser).not.toHaveBeenCalled();
+  });
+
+  it("blocks an Administrator from revoking their own sessions through administration.", async () => {
+    const selfId = "3a7f9e0c-8d9c-4a5f-a3d2-1a44a28e0d11";
+    repository.findOneBy.mockResolvedValue(
+      user({ status: UserStatus.Active, role: AccountRole.Administrator }),
+    );
+
+    await expect(service.revokeAllSessions(selfId, selfId)).rejects.toEqual(
+      new BadRequestException(
+        "Administrators cannot revoke their own sessions through administration. Use Logout instead.",
+      ),
+    );
+    expect(sessions.revokeAllForUser).not.toHaveBeenCalled();
   });
 
   it("allows a deactivated account to change its project-scoped role.", async () => {

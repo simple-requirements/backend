@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -28,6 +29,7 @@ import { SessionResponseDto } from "@/auth/dto/session-response.dto";
 import { UpdateUserRoleDto } from "@/auth/dto/update-user-role.dto";
 import { UpdateUserStatusDto } from "@/auth/dto/update-user-status.dto";
 import { UserAdministrationResponseDto } from "@/auth/dto/user-administration-response.dto";
+import type { AuthenticatedRequest } from "@/auth/sessions/authenticated-request";
 import { SessionAuthGuard } from "@/auth/sessions/session-auth.guard";
 import { UserAdministrationService } from "@/auth/administration/user-administration.service";
 import { ZodValidationPipe } from "@/common/pipes/zod-validation.pipe";
@@ -78,8 +80,13 @@ export class UserAdministrationController {
     @Param("userId", ParseUUIDPipe) userId: string,
     @Body(new ZodValidationPipe(updateUserStatusSchema))
     update: UpdateUserStatusDto,
+    @Req() request: AuthenticatedRequest,
   ): Promise<UserAdministrationResponseDto> {
-    return this.users.updateStatus(userId, update.status);
+    return this.users.updateStatus(
+      userId,
+      update.status,
+      request.authentication.user.id,
+    );
   }
 
   @Get(":userId/sessions")
@@ -93,8 +100,11 @@ export class UserAdministrationController {
   @Post(":userId/sessions/revoke")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse()
-  revokeAll(@Param("userId", ParseUUIDPipe) userId: string): Promise<void> {
-    return this.users.revokeAllSessions(userId);
+  revokeAll(
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<void> {
+    return this.users.revokeAllSessions(userId, request.authentication.user.id);
   }
 
   @Post(":userId/sessions/:sessionId/revoke")
@@ -103,7 +113,12 @@ export class UserAdministrationController {
   revokeOne(
     @Param("userId", ParseUUIDPipe) userId: string,
     @Param("sessionId", ParseUUIDPipe) sessionId: string,
+    @Req() request: AuthenticatedRequest,
   ): Promise<void> {
-    return this.users.revokeSession(userId, sessionId);
+    return this.users.revokeSession(
+      userId,
+      sessionId,
+      request.authentication.user.id,
+    );
   }
 }

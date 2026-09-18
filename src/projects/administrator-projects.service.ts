@@ -55,21 +55,34 @@ export class AdministratorProjectsService {
   private async toSummary(
     project: ProjectResponseDto,
   ): Promise<AdministratorProjectSummaryResponseDto> {
-    const [categories, requirementCount, memberships] = await Promise.all([
+    const [categories, memberships] = await Promise.all([
       this.categories.find({
         where: { projectId: project.id },
-        select: { name: true },
+        select: { id: true, name: true },
         order: { name: "ASC" },
       }),
-      this.requirements.countBy({ projectId: project.id }),
       this.memberships.list(project.id),
     ]);
+    const categorySummaries = await Promise.all(
+      categories.map(async ({ id, name }) => ({
+        name,
+        requirementCount: await this.requirements.countBy({
+          projectId: project.id,
+          categoryId: id,
+        }),
+      })),
+    );
+    const requirementCount = categorySummaries.reduce(
+      (total, category) => total + category.requirementCount,
+      0,
+    );
 
     return {
       id: project.id,
       name: project.name,
       categoryNames: categories.map(({ name }) => name),
       categoryCount: categories.length,
+      categories: categorySummaries,
       requirementCount,
       memberships,
       ticketUrlTemplate: project.ticketUrlTemplate,

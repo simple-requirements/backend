@@ -64,8 +64,14 @@ export class UserAdministrationService {
   async updateStatus(
     userId: string,
     status: UserStatus.Active | UserStatus.Deactivated,
+    actingUserId: string,
   ): Promise<UserAdministrationResponseDto> {
     const user = await this.requireUser(userId);
+    if (status === UserStatus.Deactivated && actingUserId === userId) {
+      throw new BadRequestException(
+        "Administrators cannot deactivate their own account.",
+      );
+    }
     if (status === UserStatus.Active) {
       if (user.emailVerifiedAt === null) {
         throw new BadRequestException(
@@ -91,8 +97,13 @@ export class UserAdministrationService {
     return this.sessions.listForUser(userId);
   }
 
-  async revokeSession(userId: string, sessionId: string): Promise<void> {
+  async revokeSession(
+    userId: string,
+    sessionId: string,
+    actingUserId: string,
+  ): Promise<void> {
     await this.requireUser(userId);
+    this.assertNotSelfSessionAdministration(userId, actingUserId);
     const session = (await this.sessions.listForUser(userId)).find(
       ({ id }) => id === sessionId,
     );
@@ -104,9 +115,21 @@ export class UserAdministrationService {
     await this.sessions.revokeSession(sessionId);
   }
 
-  async revokeAllSessions(userId: string): Promise<void> {
+  async revokeAllSessions(userId: string, actingUserId: string): Promise<void> {
     await this.requireUser(userId);
+    this.assertNotSelfSessionAdministration(userId, actingUserId);
     await this.sessions.revokeAllForUser(userId);
+  }
+
+  private assertNotSelfSessionAdministration(
+    userId: string,
+    actingUserId: string,
+  ): void {
+    if (actingUserId === userId) {
+      throw new BadRequestException(
+        "Administrators cannot revoke their own sessions through administration. Use Logout instead.",
+      );
+    }
   }
 
   private async requireUser(userId: string): Promise<User> {

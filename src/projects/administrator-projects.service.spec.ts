@@ -45,10 +45,15 @@ describe("AdministratorProjectsService", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     categories.find.mockResolvedValue([
-      { name: "Authentication" },
-      { name: "Reporting" },
+      { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Authentication" },
+      { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Reporting" },
     ]);
-    requirements.countBy.mockResolvedValue(7);
+    requirements.countBy.mockImplementation(
+      ({ categoryId }: { categoryId: string }) =>
+        Promise.resolve(
+          categoryId === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" ? 4 : 3,
+        ),
+    );
     memberships.list.mockResolvedValue([
       {
         userId: "6f147f85-e0d0-4f23-a8d8-b4a385c5f0f4",
@@ -68,6 +73,10 @@ describe("AdministratorProjectsService", () => {
         name: "Admin project",
         categoryNames: ["Authentication", "Reporting"],
         categoryCount: 2,
+        categories: [
+          { name: "Authentication", requirementCount: 4 },
+          { name: "Reporting", requirementCount: 3 },
+        ],
         requirementCount: 7,
         memberships: [
           {
@@ -83,11 +92,17 @@ describe("AdministratorProjectsService", () => {
 
     expect(categories.find).toHaveBeenCalledWith({
       where: { projectId: PROJECT_ID },
-      select: { name: true },
+      select: { id: true, name: true },
       order: { name: "ASC" },
     });
-    expect(requirements.countBy).toHaveBeenCalledWith({
+    expect(requirements.countBy).toHaveBeenCalledTimes(2);
+    expect(requirements.countBy).toHaveBeenNthCalledWith(1, {
       projectId: PROJECT_ID,
+      categoryId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    });
+    expect(requirements.countBy).toHaveBeenNthCalledWith(2, {
+      projectId: PROJECT_ID,
+      categoryId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     });
     expect(memberships.list).toHaveBeenCalledWith(PROJECT_ID);
   });
@@ -105,6 +120,7 @@ describe("AdministratorProjectsService", () => {
     expect(projects.create).toHaveBeenCalledWith({ name: "Admin project" });
     expect(result.categoryNames).toEqual([]);
     expect(result.categoryCount).toBe(0);
+    expect(result.categories).toEqual([]);
     expect(result.requirementCount).toBe(0);
     expect(result.memberships).toEqual([]);
   });
