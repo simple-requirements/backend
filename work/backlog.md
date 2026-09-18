@@ -104,3 +104,73 @@ The Administrator architecture defined by WP2-WP6 is implemented: one-account/on
 ## WP1 status
 
 WP1A established the new Administrator architecture. WP1B completed the catalogue/backlog consistency pass. Implementation proceeds with WP2 through WP7 as defined above.
+
+## Continuation handoff — 2026-09-18
+
+This section is the continuation handoff for future implementation chats. If older scheduling/status text elsewhere in this backlog conflicts with this section, use this section for execution planning while continuing to treat `work/requirements.md` as the authoritative product specification.
+
+### Repository and delivery workflow
+
+- Repository roots on the user's machine are `/home/node/backend` and `/home/node/frontend`.
+- Every implementation delivery should use the same three filenames: `backend.patch`, `frontend.patch`, and `apply-patches.sh`.
+- `apply-patches.sh` must target the repository roots above, preflight applicable patches with `git apply --check`, skip empty/already-applied patches, and avoid partial application when a preflight fails.
+- Patches should be repository-relative (`src/...`, `work/...`) because the wrapper applies them with `git -C /home/node/backend` or `git -C /home/node/frontend`.
+- New files must be included in Git before creating a commit diff; otherwise `git diff HEAD~1 HEAD` will not contain them. This previously caused `_Buttons.scss` and `_Icons.scss` to be omitted from a patch.
+- Both repositories contain mandatory `AGENTS.md` files. Read the applicable file before modifying either repository.
+- Frontend generated/derived files such as `src/api/generated`, `coverage`, Playwright reports, generated BDD tests, and `vitest-json-report.json` must not be manually edited.
+- When the backend OpenAPI contract changes, regenerate the frontend API client through the normal `pnpm api:generate` workflow rather than editing generated Orval output.
+
+### Completed correctness and architecture work
+
+- **WP-A — Lifecycle Integrity: complete.** Generic requirement PATCH cannot approve/reject; dedicated review decisions enforce review invariants. Approved content edits remain `approved`, preserve approval metadata, and create `content_changed` revisions with explicit change reasons. Backend unit and PostgreSQL E2E tests were reported green by the user after application.
+- **WP-B — Project deletion/retention semantics: complete.** Project deletion is allowed only for projects with zero requirements. Requirement-to-project deletion uses `RESTRICT`, preventing cascading destruction of retained requirement history. The frontend disables `Delete project` when `requirementCount > 0`.
+- **WP-C — Domain/authorization conformance regression coverage: complete.** API-level conformance coverage was added without changing WP-B files.
+- **WP-D — Administrator architecture reconciliation: complete.** One-account/one-role, Administrator membership prohibition, Administrator project-content denial, dedicated Administrator APIs/workspace, and cleanup of the old mixed Administration navigation are implemented.
+- **WP7 remains the final verification package**, not a place to defer known feature work. It must eventually cover API regeneration, backend/frontend unit + E2E, migrations, OpenAPI contracts, authorization boundaries, and dead-code cleanup.
+
+### Administrator workspace — current behavior
+
+- Administrator workspace navigation contains expandable `Users & Sessions` and `Projects` sections. Sidebar icons use the normal workspace sizing. Users/projects appear as children and route to their detail views.
+- User overview is a full-width table showing user, status, role, creation time, email-verification time, logged-in presence, and account/session actions. Physical user deletion is intentionally absent because accounts are retained/deactivated by requirements.
+- User detail no longer contains a Sessions history section or a separate role dropdown. The Role metadata value opens the role-change dialog.
+- Role-change workflow: an active logged-out target account is temporarily deactivated before role editing and restored after the dialog closes; a logged-in target cannot enter that workflow and receives an error toast. A previously pending/deactivated account retains its prior state. Promotion to Administrator is blocked while project memberships exist.
+- The signed-in Administrator cannot deactivate their own account or revoke their own session from administration; they must use the normal account-menu Logout action.
+- Project overview is a full-width table. Project detail has separate summary, Categories, Ticket URL template, and Project memberships panels.
+- Category administration summary shows each category and its requirement count.
+- Project actions (`New project`, `Rename project`, conditional `Delete project`, `Add membership`) are in the shared ActionBar. `Add membership` opens a dialog. Membership removal is an icon action.
+
+### Frontend SCSS/design-system restructuring
+
+The frontend styling review intentionally borrows Bulma's compositional principle (base class plus stackable modifiers) without adding Bulma as a dependency; PrimeReact remains the UI component library.
+
+Completed restructuring steps:
+
+1. **Buttons and icons — complete.** Shared `src/styles/_Buttons.scss` and `src/styles/_Icons.scss` provide composable classes such as `ui-button`, visual modifiers (`--primary`, `--outline`, `--danger`, `--ghost`, `--transparent`), context/size modifiers (`--action`, `--dialog`, `--form`), and composition modifiers (`--icon-only`, `--with-icon`). Repeated button-style mixins were removed. `package.json` includes `test:pages` (`vitest run test/pages`).
+2. **Panels and native tables — complete.** Shared `src/styles/_Panels.scss` and `src/styles/_Tables.scss` centralize panel surfaces/layout modifiers and native-table wrapper/cell/header/action patterns. Administration tables/panels, category/requirement list/form/detail panels, requirement ticket detail tables, and implementation-ticket tables are migrated to the shared classes. PrimeReact DataTable-specific mixins remain because they are a separate low-duplication integration layer.
+3. **Forms and dialogs — complete.** Shared `src/styles/_Forms.scss` and `src/styles/_Dialogs.scss` now own reusable field, control, message, form-action, dialog shell/header/content/title/message/action patterns. Project/category/requirement forms and the project, membership, role, lifecycle, review, category-delete, unsaved-navigation, and implementation-ticket dialogs use the shared classes. The obsolete form/dialog mixins were removed from `_UiMixins.scss`.
+4. **Public account pages — complete, retained in the sequence until Step 5 starts.** Shared `src/styles/_PublicAccount.scss` now centralizes the Login/PublicAccount/Bootstrap page shell, card widths, form controls, public-account buttons/loading state, action links, validation text, and feedback messages. The old page-specific Login/PublicAccount/Bootstrap SCSS files are removed. Per the requested workflow, keep Step 4 visible below until work on Step 5 actually starts.
+
+Remaining styling restructuring sequence:
+
+4. **Public account pages — complete; keep listed until Step 5 starts.** Do not remove this line before Step 5 work begins.
+5. **Token cleanup:** replace obvious repeated raw spacing/sizing values with existing tokens without tokenizing genuinely one-off dimensions.
+
+Do not replace feature-specific BEM classes wholesale. Shared `ui-*` classes should own reusable visual primitives; feature SCSS should retain feature-specific layout, widths, grids, and exceptional states.
+
+### Product work still outstanding after the styling refactor
+
+The styling work does not replace product backlog implementation. The next product packages remain:
+
+1. **WP-E / US-VER-002 frontend stage:** revision-history and revision-comparison UI using the already implemented backend `/revisions` and `/revisions/compare` endpoints. Generated frontend API synchronization must be verified/regenerated as needed.
+2. **WP-F first-release completion**, processed as independent subpackages: F1 Metrics; F2 structured Requirement Links; F3 Search/Filtering/Views; F4 Review Assignment Tasks; F5 Export architecture/formats.
+3. **WP-G Category/Requirement identity controls:** category deactivation/stability, controlled reclassification, permanent previous-key aliases/search, and related identity rules.
+4. **WP7 final verification** after known functionality is complete.
+
+The earlier exploratory implementation of WP-E/F in an assistant working tree was never delivered and must **not** be treated as part of the user's source. Only applied patches/user-provided current source count as implemented.
+
+### Validation/environment notes
+
+- The user can run backend PostgreSQL E2E tests locally; the assistant environment generally cannot because no PostgreSQL service is available. Do not interpret unexecuted E2E as passing.
+- `pnpm` may be unavailable in the assistant runtime even when the uploaded dependency tree exists. When repository binaries are available, direct execution of those exact binaries has been accepted by the user as a fallback. Never use `npm`/`npx` in the frontend repository because `AGENTS.md` forbids them.
+- The frontend full Vitest suite has sometimes taken longer than the execution window even while continuously reporting passes. Distinguish targeted/build validation from complete-suite completion rather than overstating results.
+- The user reported all backend unit and E2E tests green after WP-A and subsequent backend application checkpoints.
