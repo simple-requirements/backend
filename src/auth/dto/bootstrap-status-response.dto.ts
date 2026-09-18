@@ -1,6 +1,6 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 export class BootstrapStatusResponseDto {
-  @ApiProperty({ example: true })
-  registrationAvailable!: boolean;
+    @ApiProperty({ example: true })
+    registrationAvailable!: boolean;
 }

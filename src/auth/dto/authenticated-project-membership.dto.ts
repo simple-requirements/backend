@@ -1,6 +1,6 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 export class AuthenticatedProjectMembershipDto {
-  @ApiProperty({ format: "uuid" })
-  projectId!: string;
+    @ApiProperty({ format: 'uuid' })
+    projectId!: string;
 }
