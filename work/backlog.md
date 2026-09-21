@@ -2,7 +2,7 @@
 
 ## Scope
 
-This backlog was revised against the latest uploaded frontend and backend on 2026-09-12 and updated after lifecycle/revision conformance work. It reflects the current source tree rather than older backend-only inspection notes. The requirements catalogue remains authoritative; this file tracks only work that is still incomplete or intentionally deferred.
+This backlog was revised against the latest uploaded frontend and backend on 2026-09-21 and updated after Release 1.0.0 was created. It reflects the current source tree rather than older backend-only inspection notes. The requirements catalogue remains authoritative; this file tracks only work that is still incomplete or intentionally deferred. Release 1.0.0 is an established release baseline; outstanding items below are post-1.0.0 work unless explicitly stated otherwise.
 
 The current implemented scope is:
 
@@ -24,7 +24,7 @@ The current source tree does **not** implement a metrics subsystem, requirement-
 
 ## High-priority implementation mismatches
 
-The previously listed lifecycle/revision P0 mismatches and the Administrator architecture migration have been resolved in the current source. The remaining high-priority work is first-release functional completion plus final release verification:
+The previously listed lifecycle/revision P0 mismatches and the Administrator architecture migration have been resolved in the current source. Release 1.0.0 has already been created, so the remaining high-priority work is post-1.0.0 functional completion plus verification for the next release:
 
 - requirement deletion/recycle-bin behavior is no longer exposed by the current backend;
 - rejected requirements are terminal/read-only in the backend;
@@ -59,7 +59,7 @@ The Administrator architecture defined by WP2-WP6 is implemented: one-account/on
 | WP4          | Administrator workspace — complete              | Administrator login opens a dedicated workspace whose initial sidebar contains `Users & Sessions` and `Projects`; project-scoped roles keep the project workspace.                                                                                           |
 | WP5          | Administrator project administration — complete | `Projects` provides project creation, rename, deletion, membership administration, summary metadata, and administrative project settings without exposing requirement/category detail content.                                                               |
 | WP6          | Frontend cleanup — complete                     | Remove obsolete Administration menu navigation, old mixed-workspace administration routes/components, and stale permission assumptions.                                                                                                                      |
-| WP7          | Final verification                              | Regenerate derived API clients as required, run backend/frontend unit and E2E suites, verify OpenAPI contracts, migrations and authorization boundaries, and remove dead code.                                                                               |
+| WP7          | Next-release verification                       | For each release after 1.0.0, regenerate derived API clients as required, run backend/frontend unit and E2E suites, verify OpenAPI contracts, migrations and authorization boundaries, and remove dead code after the selected release scope is complete.     |
 
 ## Remaining functional backlog
 
@@ -94,16 +94,20 @@ The Administrator architecture defined by WP2-WP6 is implemented: one-account/on
 - Confirmed implementation-ticket changes as revision-producing operations with historical ticket snapshots.
 - Finalized change-reason policy: substantive requirement edits require explicit user reasons; lifecycle and ticket reasons are derived server-side.
 
-## Recommended next work packages
+## Release baseline and recommended next work packages
 
-1. **Revision history/diff UI**: complete the remaining frontend stage of US-VER-002.
-2. **First-release functional completion**: metrics, requirement links, search/views, review assignment tasks, and export architecture.
-3. **Category/identity controls**: controlled category lifecycle and requirement reclassification/aliasing.
-4. **WP7 – Final verification**: migrations, generated-client synchronization, backend/frontend unit + E2E, OpenAPI verification, authorization boundaries, and dead-code cleanup.
+**Release 1.0.0 has been created.** Its creation happened earlier than the backlog originally planned. Do not reinterpret unfinished items as part of 1.0.0 merely because the release exists; they remain outstanding and should be scheduled into subsequent releases.
+
+Recommended execution order after the 1.0.0 baseline:
+
+1. **WP-E / US-VER-002 — Revision history/diff UI**: complete the remaining frontend stage against the already implemented backend revision-history and comparison endpoints.
+2. **WP-F — Post-1.0 functional expansion**, processed as independent subpackages: F1 Metrics; F2 structured Requirement Links; F3 Search/Filtering/Views; F4 Review Assignment Tasks; F5 Export architecture/formats.
+3. **WP-G — Category/Requirement identity controls**: controlled category lifecycle and requirement reclassification/aliasing.
+4. **WP7 — Next-release verification**: migrations, generated-client synchronization, backend/frontend unit + E2E, OpenAPI verification, authorization boundaries, and dead-code cleanup after the functionality targeted for that release is complete.
 
 ## WP1 status
 
-WP1A established the new Administrator architecture. WP1B completed the catalogue/backlog consistency pass. Implementation proceeds with WP2 through WP7 as defined above.
+WP1A established the new Administrator architecture. WP1B completed the catalogue/backlog consistency pass. WP2 through WP6 are complete. Release 1.0.0 has been created; execution now proceeds with WP-E, WP-F, and WP-G as post-1.0.0 product work, with WP7 used to verify whichever scope is selected for the next release.
 
 ## Continuation handoff — 2026-09-18
 
@@ -127,7 +131,7 @@ This section is the continuation handoff for future implementation chats. If old
 - **WP-C — Domain/authorization conformance regression coverage: complete.** API-level conformance coverage was added without changing WP-B files.
 - **WP-D — Administrator architecture reconciliation: complete.** One-account/one-role, Administrator membership prohibition, Administrator project-content denial, dedicated Administrator APIs/workspace, and cleanup of the old mixed Administration navigation are implemented.
 - **Frontend real-backend E2E retention regression: fixed in the current handoff.** The E2E reset helper must never try to delete projects that contain retained requirements. It deletes only zero-requirement projects; scenarios that create requirements use uniquely named persistent projects and isolate themselves by the created project id. Project-list assertions tolerate unrelated retained projects. The stale user-administration E2E expectation for `@username` in the user detail view was also removed because that field was intentionally removed from the detail layout. The uploaded failing report showed 31 scenarios blocked by the prohibited project deletion and one stale user-detail assertion.
-- **WP7 remains the final verification package**, not a place to defer known feature work. It must eventually cover API regeneration, backend/frontend unit + E2E, migrations, OpenAPI contracts, authorization boundaries, and dead-code cleanup.
+- **Release 1.0.0 is already established. WP7 remains a release-verification package for subsequent releases**, not a place to defer known feature work. For each release that follows 1.0.0, it should cover API regeneration, backend/frontend unit + E2E, migrations, OpenAPI contracts, authorization boundaries, and dead-code cleanup after the selected product scope is complete.
 
 ### Administrator workspace — current behavior
 
@@ -168,14 +172,16 @@ The hybrid server-state architecture has been reviewed and tightened without rep
 - Review comment/summary Query keys are centralized in `reviewApi.ts`; reads and mutation invalidations must use those helpers rather than duplicating array literals.
 - `LoadingOverlay` intentionally remains a direct React Query consumer of the projects query because it needs request lifecycle/error/retry state rather than a domain projection. It shares the same query key/cache and is an explicit exception, not an alternate domain read model.
 
-### Product work still outstanding after the styling refactor
+### Product work still outstanding after Release 1.0.0
 
-The styling work does not replace product backlog implementation. The next product packages remain:
+Release 1.0.0 was created before the backlog's originally planned functional-completion point. The styling work does not replace product backlog implementation, and the items below were not retroactively completed by creating the release. The next product packages remain:
 
-1. **WP-E / US-VER-002 frontend stage:** revision-history and revision-comparison UI using the already implemented backend `/revisions` and `/revisions/compare` endpoints. Generated frontend API synchronization must be verified/regenerated as needed.
-2. **WP-F first-release completion**, processed as independent subpackages: F1 Metrics; F2 structured Requirement Links; F3 Search/Filtering/Views; F4 Review Assignment Tasks; F5 Export architecture/formats.
+1. **WP-E / US-VER-002 frontend stage:**
+   - **WP-E1 — complete:** the frontend revision contract is synchronized with the existing Orval-generated `/revisions` and `/revisions/compare` operations. Requirement details now include an in-place revision-history panel showing revision number/current marker, change type, reason, actor, and timestamp with loading/error/empty states. Revision-producing frontend workflows invalidate the revision-history query together with the current requirement data. No backend API behavior changed.
+   - **WP-E2 — next:** add revision selection and the revision-comparison/diff UI within the existing requirement detail experience, using `/revisions/compare`.
+2. **WP-F post-1.0 functional expansion**, processed as independent subpackages: F1 Metrics; F2 structured Requirement Links; F3 Search/Filtering/Views; F4 Review Assignment Tasks; F5 Export architecture/formats.
 3. **WP-G Category/Requirement identity controls:** category deactivation/stability, controlled reclassification, permanent previous-key aliases/search, and related identity rules.
-4. **WP7 final verification** after known functionality is complete.
+4. **WP7 next-release verification** after the functionality selected for the next release is complete.
 
 The earlier exploratory implementation of WP-E/F in an assistant working tree was never delivered and must **not** be treated as part of the user's source. Only applied patches/user-provided current source count as implemented.
 
