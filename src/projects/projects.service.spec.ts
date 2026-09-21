@@ -38,6 +38,7 @@ interface CategoriesRepositoryMock {
 }
 
 interface RequirementsRepositoryMock {
+    countBy: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
     existsBy: ReturnType<typeof vi.fn>;
@@ -193,6 +194,7 @@ describe('ProjectsService', () => {
         projectsRepository = { create: vi.fn(), delete: vi.fn(), find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
         categoriesRepository = { create: vi.fn(), delete: vi.fn(), find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
         requirementsRepository = {
+            countBy: vi.fn(),
             create: vi.fn(),
             delete: vi.fn(),
             existsBy: vi.fn(),
@@ -231,6 +233,7 @@ describe('ProjectsService', () => {
 
     beforeEach(() => {
         vi.resetAllMocks();
+        requirementsRepository.countBy.mockResolvedValue(0);
     });
 
     describe('finds', () => {
@@ -238,6 +241,7 @@ describe('ProjectsService', () => {
             const project = createProjectEntity({ id: PROJECT_ID, name: 'Test project' });
 
             projectsRepository.findOne.mockResolvedValue(project);
+            requirementsRepository.countBy.mockResolvedValue(3);
 
             const result = await service.findOne(PROJECT_ID);
 
@@ -245,6 +249,7 @@ describe('ProjectsService', () => {
             expect(result).toEqual({
                 id: PROJECT_ID,
                 name: 'Test project',
+                requirementCount: 3,
                 createdAt: new Date('2026-06-28T10:00:00.000Z'),
                 updatedAt: new Date('2026-06-28T10:00:00.000Z'),
             });
@@ -270,6 +275,7 @@ describe('ProjectsService', () => {
             });
 
             projectsRepository.find.mockResolvedValue([alphaProject, betaProject]);
+            requirementsRepository.countBy.mockResolvedValueOnce(2).mockResolvedValueOnce(5);
 
             const result = await service.findAll();
 
@@ -279,12 +285,14 @@ describe('ProjectsService', () => {
                 {
                     id: '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2a',
                     name: 'Alpha project',
+                    requirementCount: 2,
                     createdAt: new Date('2026-06-28T10:00:00.000Z'),
                     updatedAt: new Date('2026-06-28T10:00:00.000Z'),
                 },
                 {
                     id: '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b',
                     name: 'Beta project',
+                    requirementCount: 5,
                     createdAt: new Date('2026-06-28T10:00:00.000Z'),
                     updatedAt: new Date('2026-06-28T10:00:00.000Z'),
                 },
@@ -314,6 +322,7 @@ describe('ProjectsService', () => {
             expect(result).toEqual({
                 id: '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b',
                 name: 'Test project',
+                requirementCount: 0,
                 createdAt: new Date('2026-06-28T10:00:00.000Z'),
                 updatedAt: new Date('2026-06-28T10:00:00.000Z'),
             });
@@ -344,6 +353,7 @@ describe('ProjectsService', () => {
             expect(result).toEqual({
                 id: projectId,
                 name: 'New project name',
+                requirementCount: 0,
                 createdAt: new Date('2026-06-28T10:00:00.000Z'),
                 updatedAt: new Date('2026-06-28T11:00:00.000Z'),
             });

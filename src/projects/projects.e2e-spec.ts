@@ -4,9 +4,11 @@ import { demoProjects } from '@/database/seeding/demo-projects';
 import { expect, test } from '@/projects/projects-api.e2e-fixtures';
 
 import {
+    expectAdministratorProjectSummaryResponseBody,
     expectProjectResponseBody,
     E2E_ADMIN_HEADERS,
     E2E_REQUIREMENTS_ENGINEER_HEADERS,
+    type AdministratorProjectSummaryResponseBody,
     type ErrorResponseBody,
     type ProjectResponseBody,
 } from '@/projects/projects-api.e2e-helpers';
@@ -37,6 +39,8 @@ test.describe('Projects API - GET /projects/{id}', () => {
     test('gets a project.', async ({ request, api }) => {
         const projectName = `Playwright API get project ${randomUUID()}`;
         const createdProject = await api.createProject(projectName);
+        const category = await api.createCategory(createdProject.id, 'Requirement count', 'CNT');
+        await api.createRequirement(createdProject.id, category.id, 'Counted requirement.');
 
         const response = await request.get(`/projects/${createdProject.id}`, {
             headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
@@ -48,6 +52,7 @@ test.describe('Projects API - GET /projects/{id}', () => {
 
         expect(body.id).toBe(createdProject.id);
         expect(body.createdAt).toBe(createdProject.createdAt);
+        expect(body.requirementCount).toBe(1);
         expectProjectResponseBody(body, projectName);
     });
 
@@ -86,7 +91,7 @@ test.describe('Project administration API - GET /admin/projects', () => {
         expect(body.memberships).toHaveLength(3);
         expect(body).toHaveProperty('ticketUrlTemplate');
         expect(body).not.toHaveProperty('requirements');
-        expect(body).not.toHaveProperty('categories');
+        expect(body.categories).toEqual([{ name: 'Security', requirementCount: 1 }]);
         expect(JSON.stringify(body)).not.toContain('This content must not be returned in the administrator summary.');
 
         const detailResponse = await request.get(`/admin/projects/${project.id}`, { headers: E2E_ADMIN_HEADERS });
@@ -125,9 +130,9 @@ test.describe('Project administration API - POST /admin/projects', () => {
 
         expect(response.status()).toBe(201);
 
-        const body = (await response.json()) as ProjectResponseBody;
+        const body = (await response.json()) as AdministratorProjectSummaryResponseBody;
 
-        expectProjectResponseBody(body, projectName);
+        expectAdministratorProjectSummaryResponseBody(body, projectName);
     });
 
     test('rejects an empty project name.', async ({ request }) => {
@@ -158,12 +163,11 @@ test.describe('Project administration API - PATCH /admin/projects/{id}', () => {
 
         expect(response.status()).toBe(200);
 
-        const body = (await response.json()) as ProjectResponseBody;
+        const body = (await response.json()) as AdministratorProjectSummaryResponseBody;
 
+        expectAdministratorProjectSummaryResponseBody(body, updatedProjectName);
         expect(body.id).toBe(createdProject.id);
-        expect(body.createdAt).toBe(createdProject.createdAt);
         expect(body.ticketUrlTemplate).toBe(ticketUrlTemplate);
-        expectProjectResponseBody(body, updatedProjectName);
     });
 
     test('rejects an empty project name while updating.', async ({ request }) => {

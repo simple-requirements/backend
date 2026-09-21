@@ -6,6 +6,9 @@ export class ProjectResponseDto {
 
     @ApiProperty({ example: 'Test project', description: 'Human-readable project name.' })
     name!: string;
+
+    @ApiProperty({ example: 12, description: 'Number of requirements currently contained in the project.' })
+    requirementCount!: number;
     @ApiPropertyOptional({ example: 'https://github.com/xxx/{ticket-id}', nullable: true })
     ticketUrlTemplate!: string | null;
 

@@ -99,7 +99,7 @@ export class ProjectsService {
             :   { where: { id: In(projectIds) }, order: { name: 'ASC' } },
         );
 
-        return projects.map((project) => this.toProjectResponseDto(project));
+        return Promise.all(projects.map((project) => this.toProjectResponseDto(project)));
     }
 
     async findOne(id: string): Promise<ProjectResponseDto> {
@@ -651,10 +651,13 @@ export class ProjectsService {
         }
     }
 
-    private toProjectResponseDto(project: Project): ProjectResponseDto {
+    private async toProjectResponseDto(project: Project): Promise<ProjectResponseDto> {
+        const requirementCount = await this.requirementsRepository.countBy({ projectId: project.id });
+
         return {
             id: project.id,
             name: project.name,
+            requirementCount,
             ticketUrlTemplate: project.ticketUrlTemplate,
             createdAt: project.createdAt,
             updatedAt: project.updatedAt,

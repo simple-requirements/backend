@@ -14,9 +14,21 @@ import {
 export interface ProjectResponseBody {
     id: string;
     name: string;
+    requirementCount: number;
     ticketUrlTemplate: string | null;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface AdministratorProjectSummaryResponseBody {
+    id: string;
+    name: string;
+    categoryNames: string[];
+    categoryCount: number;
+    categories: { name: string; requirementCount: number }[];
+    requirementCount: number;
+    memberships: unknown[];
+    ticketUrlTemplate: string | null;
 }
 
 export interface ErrorResponseBody {
@@ -26,6 +38,19 @@ export interface ErrorResponseBody {
 }
 
 export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function expectAdministratorProjectSummaryResponseBody(
+    body: AdministratorProjectSummaryResponseBody,
+    expectedName: string,
+): void {
+    expect(body.id).toMatch(UUID_REGEX);
+    expect(body.name).toBe(expectedName);
+    expect(body.categoryNames).toEqual(expect.any(Array));
+    expect(body.categoryCount).toBeGreaterThanOrEqual(0);
+    expect(body.categories).toEqual(expect.any(Array));
+    expect(body.requirementCount).toBeGreaterThanOrEqual(0);
+    expect(body.memberships).toEqual(expect.any(Array));
+}
 
 export const E2E_ADMIN_HEADERS = { Authorization: `Bearer ${E2E_ADMIN_ACCESS_TOKEN}` } as const;
 
@@ -43,6 +68,7 @@ export function expectIsoDateString(value: string): void {
 export function expectProjectResponseBody(body: ProjectResponseBody, expectedName: string): void {
     expect(body.id).toMatch(UUID_REGEX);
     expect(body.name).toBe(expectedName);
+    expect(body.requirementCount).toBeGreaterThanOrEqual(0);
     expectIsoDateString(body.createdAt);
     expectIsoDateString(body.updatedAt);
 }
@@ -52,7 +78,7 @@ export async function createProject(request: APIRequestContext, name: string): P
 
     expect(response.status()).toBe(201);
 
-    const project = (await response.json()) as ProjectResponseBody;
+    const project = (await response.json()) as AdministratorProjectSummaryResponseBody;
     const memberships = await Promise.all([
         request.put(`/admin/projects/${project.id}/memberships/${E2E_REQUIREMENTS_ENGINEER_USER_ID}`, {
             headers: E2E_ADMIN_HEADERS,
@@ -64,7 +90,13 @@ export async function createProject(request: APIRequestContext, name: string): P
     ]);
 
     expect(memberships.map((membership) => membership.status())).toEqual([200, 200, 200]);
-    return project;
+
+    const projectResponse = await request.get(`/projects/${project.id}`, {
+        headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+    });
+    expect(projectResponse.status()).toBe(200);
+
+    return (await projectResponse.json()) as ProjectResponseBody;
 }
 
 export interface CategoryResponseBody {
