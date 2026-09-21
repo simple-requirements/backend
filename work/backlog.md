@@ -33,7 +33,7 @@ The previously listed lifecycle/revision P0 mismatches and the Administrator arc
 - finalized revision actor/change-type/change-reason metadata and clean `/revisions` plus `/revisions/compare` backend endpoints exist;
 - substantive requirement content/metadata/category/owner edits require an explicit non-empty user-entered `changeReason`, while lifecycle and ticket operations use deterministic server-derived reasons.
 
-The Administrator architecture defined by WP2-WP6 is implemented: one-account/one-role authorization, Administrator membership prohibition, content denial, dedicated Administrator APIs/workspace, and removal of the obsolete mixed-workspace navigation are present. Revision work is now limited to the frontend history/diff presentation and generated-client synchronization when OpenAPI generation is available.
+The Administrator architecture defined by WP2-WP6 is implemented: one-account/one-role authorization, Administrator membership prohibition, content denial, dedicated Administrator APIs/workspace, and removal of the obsolete mixed-workspace navigation are present. WP-E / US-VER-002 revision history and comparison presentation is now complete in the frontend against the generated revision API contract.
 
 ## Recently covered / remove from old backlog
 
@@ -41,7 +41,7 @@ The Administrator architecture defined by WP2-WP6 is implemented: one-account/on
 | ----------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-WF-001, US-REQ-003C/003D/003E                      | Covered for current lifecycle scope              | Requirements are retained, rejected requirements are terminal/read-only, drafts approve/reject only, and obsolescence is limited to approved/implemented requirements.                            |
 | US-VER-001 revision core                              | Covered for current backend scope                | Current-plus-archive storage, trusted revision actor metadata, explicit edit reasons, ticket-driven revisions/snapshots, and ordered history are implemented.                                     |
-| US-VER-002 backend endpoints                          | Covered for backend stages                       | `/revisions` and `/revisions/compare` exist; frontend history/diff presentation remains.                                                                                                          |
+| US-VER-002 revision history/comparison                | Covered                                          | `/revisions` and `/revisions/compare` are exposed through the frontend API layer; requirement details show history plus selectable field-level revision comparison.                                  |
 | US-SEC-001, US-SEC-002, US-SEC-005 through US-SEC-012 | Covered for current architecture scope           | One-account/one-role enforcement, Administrator membership prohibition, administration-only visibility, dedicated Administrator APIs/workspace, and project-scoped authorization are implemented. |
 | User administration frontend                          | Covered                                          | User/session administration is hosted in the dedicated Administrator workspace and uses the one-account/one-role model.                                                                           |
 | Project membership administration frontend            | Covered                                          | Membership management is under Administrator `Projects`, excludes Administrator accounts, and uses each account's fixed project role.                                                             |
@@ -71,7 +71,7 @@ The Administrator architecture defined by WP2-WP6 is implemented: one-account/on
 | Metrics                                    | US-MET-001 through US-MET-024                                                                                                             | Not covered in current source | No metric model, API, parser/linking, rendering, validation, usage view, deactivation, impact analysis, or metric export support exists in the inspected source.                                                                 |
 | Requirement links                          | US-REF-001 through US-REF-016                                                                                                             | Not covered in current source | No structured requirement-link model/API/UI/export support exists in the inspected source.                                                                                                                                       |
 | Review assignment/tasks                    | US-WF-006                                                                                                                                 |                   Not covered | Review comments/replies/resolution and approve/reject exist, but assigning review tasks to named users and personal pending-review lists are missing.                                                                            |
-| Revision history/comparison UI             | US-VER-002                                                                                                                                |                       Partial | Backend current-plus-archive history, actor metadata, ticket snapshots, `/revisions`, and `/revisions/compare` are implemented. Remaining work is generated-client synchronization plus the frontend revision-history/diff view. |
+| Revision history/comparison UI             | US-VER-002                                                                                                                                |                       Covered | Requirement details include revision history plus selectable from/to revision comparison using the backend `/revisions/compare` differences, including ticket snapshots and loading/error/empty states.                         |
 | Change requests                            | US-VER-003, US-VER-004                                                                                                                    |                   Not covered | No controlled change-request workflow for approved requirement changes exists.                                                                                                                                                   |
 | Import/export                              | US-IO-001 through US-IO-007, US-EXP-\* if retained                                                                                        | Not covered in current source | No CSV/Excel/JSON/YAML/XML/ReqIF/GitHub Markdown/AsciiDoc import/export controllers or adapters exist in the inspected source. PDF remains out of current scope unless explicitly reintroduced.                                  |
 | Traceability and impact analysis           | US-TRC-001 through US-TRC-003, US-REF-013, US-MET-015, US-MET-017, US-MET-020                                                             |                   Not covered | No traceability matrix, missing-traceability analysis, link-aware impact analysis, or baseline snapshots exist.                                                                                                                  |
@@ -100,14 +100,16 @@ The Administrator architecture defined by WP2-WP6 is implemented: one-account/on
 
 Recommended execution order after the 1.0.0 baseline:
 
-1. **WP-E / US-VER-002 — Revision history/diff UI**: complete the remaining frontend stage against the already implemented backend revision-history and comparison endpoints.
-2. **WP-F — Post-1.0 functional expansion**, processed as independent subpackages: F1 Metrics; F2 structured Requirement Links; F3 Search/Filtering/Views; F4 Review Assignment Tasks; F5 Export architecture/formats.
+1. **WP-F1 — Metrics:** begin the post-1.0 functional expansion with the metric model/API/parser-linking/rendering package.
+2. **WP-F2 through WP-F5 — Remaining post-1.0 functional expansion:** structured Requirement Links; Search/Filtering/Views; Review Assignment Tasks; Export architecture/formats.
 3. **WP-G — Category/Requirement identity controls**: controlled category lifecycle and requirement reclassification/aliasing.
 4. **WP7 — Next-release verification**: migrations, generated-client synchronization, backend/frontend unit + E2E, OpenAPI verification, authorization boundaries, and dead-code cleanup after the functionality targeted for that release is complete.
 
+**WP-E / US-VER-002 is complete:** WP-E1 added the in-place requirement revision history and synchronized frontend contract usage; WP-E2 adds revision selection and field-level comparison in the same requirement detail experience.
+
 ## WP1 status
 
-WP1A established the new Administrator architecture. WP1B completed the catalogue/backlog consistency pass. WP2 through WP6 are complete. Release 1.0.0 has been created; execution now proceeds with WP-E, WP-F, and WP-G as post-1.0.0 product work, with WP7 used to verify whichever scope is selected for the next release.
+WP1A established the new Administrator architecture. WP1B completed the catalogue/backlog consistency pass. WP2 through WP6 and WP-E are complete. Release 1.0.0 has been created; execution now proceeds with WP-F and WP-G as post-1.0.0 product work, with WP7 used to verify whichever scope is selected for the next release.
 
 ## Continuation handoff — 2026-09-18
 
@@ -176,10 +178,10 @@ The hybrid server-state architecture has been reviewed and tightened without rep
 
 Release 1.0.0 was created before the backlog's originally planned functional-completion point. The styling work does not replace product backlog implementation, and the items below were not retroactively completed by creating the release. The next product packages remain:
 
-1. **WP-E / US-VER-002 frontend stage:**
-   - **WP-E1 — complete:** the frontend revision contract is synchronized with the existing Orval-generated `/revisions` and `/revisions/compare` operations. Requirement details now include an in-place revision-history panel showing revision number/current marker, change type, reason, actor, and timestamp with loading/error/empty states. Revision-producing frontend workflows invalidate the revision-history query together with the current requirement data. No backend API behavior changed.
-   - **WP-E2 — next:** add revision selection and the revision-comparison/diff UI within the existing requirement detail experience, using `/revisions/compare`.
-2. **WP-F post-1.0 functional expansion**, processed as independent subpackages: F1 Metrics; F2 structured Requirement Links; F3 Search/Filtering/Views; F4 Review Assignment Tasks; F5 Export architecture/formats.
+1. **WP-E / US-VER-002 frontend stage — complete:**
+   - **WP-E1 — complete:** the frontend revision contract is synchronized with the existing Orval-generated `/revisions` and `/revisions/compare` operations. Requirement details include an in-place revision-history panel showing revision number, change type, reason, actor, and timestamp with loading/error/empty states. Revision-producing frontend workflows invalidate the revision-history query together with current requirement data.
+   - **WP-E2 — complete:** requirement details provide From/To revision selection and render backend-computed field-level differences from `/revisions/compare`, including readable implementation-ticket snapshots plus comparison loading/error/no-difference states.
+2. **WP-F1 — next:** Metrics. Continue WP-F afterward with F2 structured Requirement Links; F3 Search/Filtering/Views; F4 Review Assignment Tasks; F5 Export architecture/formats.
 3. **WP-G Category/Requirement identity controls:** category deactivation/stability, controlled reclassification, permanent previous-key aliases/search, and related identity rules.
 4. **WP7 next-release verification** after the functionality selected for the next release is complete.
 
