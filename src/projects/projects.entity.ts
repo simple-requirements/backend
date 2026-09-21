@@ -1,0 +1,36 @@
+import { Category } from '@/projects/categories.entity';
+import { Requirement } from '@/projects/requirements.entity';
+import {
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    OneToMany,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
+    type Relation,
+} from 'typeorm';
+
+@Entity({ name: 'projects' })
+@Index('IDX_projects_name', ['name'])
+export class Project {
+    @PrimaryGeneratedColumn('uuid')
+    id!: string;
+
+    @Column({ type: 'varchar', length: 255 })
+    name!: string;
+    @Column({ type: 'text', name: 'ticket_url_template', nullable: true })
+    ticketUrlTemplate!: string | null;
+
+    @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
+    createdAt!: Date;
+
+    @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
+    updatedAt!: Date;
+
+    @OneToMany(() => Category, (category) => category.project)
+    categories!: Relation<Category>[];
+
+    @OneToMany(() => Requirement, (requirement) => requirement.project)
+    requirements!: Relation<Requirement>[];
+}
