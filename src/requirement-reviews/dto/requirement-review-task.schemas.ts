@@ -7,7 +7,7 @@ import type {
 import { RequirementReviewTaskStatus } from '@/requirement-reviews/requirement-review-task-status.enum';
 
 export const assignRequirementReviewTaskSchema = z.object({
-    assigneeUserId: z.string().uuid(),
+    assigneeUserId: z.uuid(),
 }) satisfies z.ZodType<AssignRequirementReviewTaskDto>;
 
 export const updateRequirementReviewTaskSchema = z.object({

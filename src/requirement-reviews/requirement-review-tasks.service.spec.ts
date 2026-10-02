@@ -120,7 +120,7 @@ describe('RequirementReviewTasksService', () => {
     it('completes a pending task without changing requirement content.', async () => {
         const pending = task();
         tasks.findOne.mockResolvedValue(pending);
-        tasks.save.mockImplementation(async (value: RequirementReviewTask) => value);
+        tasks.save.mockImplementation((value: RequirementReviewTask) => Promise.resolve(value));
 
         const result = await service.updateStatus(
             PROJECT_ID,
