@@ -23,7 +23,7 @@ export class RequirementMetricReferenceService {
         if (keys.length === 0) return [];
 
         const metrics = await this.findProjectMetrics(requirement.projectId, keys);
-        const existingMetricIds = new Set((requirement.metrics ?? []).map((metric) => metric.id));
+        const existingMetricIds = new Set(requirement.metrics.map((metric) => metric.id));
 
         for (const metric of metrics) {
             if (!metric.active && !existingMetricIds.has(metric.id)) {

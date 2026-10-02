@@ -248,8 +248,8 @@ describe('ProjectsService', () => {
         metricReferences.prepareForDescription.mockResolvedValue([]);
         metricReferences.describe.mockResolvedValue([]);
         metricReferences.snapshot.mockReturnValue([]);
-        metricReferences.renderCurrent.mockImplementation(
-            async (_projectId: string, description: string | null) => description,
+        metricReferences.renderCurrent.mockImplementation((_projectId: string, description: string | null) =>
+            Promise.resolve(description),
         );
     });
 
