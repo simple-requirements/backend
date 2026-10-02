@@ -33,7 +33,10 @@ export class RequirementLinksController {
 
     @Get()
     @RequireProjectPermission(ProjectPermission.Read)
-    @ApiOperation({ operationId: 'getRequirementLinks', summary: 'List incoming and outgoing links for a requirement.' })
+    @ApiOperation({
+        operationId: 'getRequirementLinks',
+        summary: 'List incoming and outgoing links for a requirement.',
+    })
     @ApiParam({ name: 'projectId', description: 'Project identifier.' })
     @ApiParam({ name: 'requirementId', description: 'Selected requirement identifier.' })
     @ApiOkResponse({ type: RequirementLinksOverviewDto })
@@ -47,7 +50,10 @@ export class RequirementLinksController {
 
     @Post()
     @RequireProjectPermission(ProjectPermission.ManageRequirements)
-    @ApiOperation({ operationId: 'createRequirementLink', summary: 'Create a references link to a target requirement key.' })
+    @ApiOperation({
+        operationId: 'createRequirementLink',
+        summary: 'Create a references link to a target requirement key.',
+    })
     @ApiParam({ name: 'projectId', description: 'Project identifier.' })
     @ApiParam({ name: 'requirementId', description: 'Source requirement identifier.' })
     @ApiCreatedResponse({ type: RequirementLinkResponseDto })
@@ -63,7 +69,10 @@ export class RequirementLinksController {
 
     @Patch(':linkId')
     @RequireProjectPermission(ProjectPermission.ManageRequirements)
-    @ApiOperation({ operationId: 'updateRequirementLink', summary: 'Correct the target of an existing requirement link.' })
+    @ApiOperation({
+        operationId: 'updateRequirementLink',
+        summary: 'Correct the target of an existing requirement link.',
+    })
     @ApiParam({ name: 'projectId', description: 'Project identifier.' })
     @ApiParam({ name: 'requirementId', description: 'Source requirement identifier.' })
     @ApiParam({ name: 'linkId', description: 'Requirement-link identifier.' })

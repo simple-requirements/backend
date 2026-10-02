@@ -9,7 +9,13 @@ export class CreateMetricsTable1790000000000 implements MigrationInterface {
             new Table({
                 name: 'metrics',
                 columns: [
-                    { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'gen_random_uuid()' },
+                    {
+                        name: 'id',
+                        type: 'uuid',
+                        isPrimary: true,
+                        generationStrategy: 'uuid',
+                        default: 'gen_random_uuid()',
+                    },
                     { name: 'project_id', type: 'uuid', isNullable: false },
                     { name: 'key', type: 'varchar', length: '8', isNullable: false },
                     { name: 'value', type: 'text', isNullable: false },

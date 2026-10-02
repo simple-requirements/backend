@@ -192,13 +192,13 @@ test.describe('Requirement revisions API', () => {
         });
         expect(deactivateResponse.status()).toBe(200);
 
-        const removeReferenceResponse = await request.patch(
-            `/projects/${project.id}/requirements/${requirement.id}`,
-            {
-                data: { description: 'The response time target is documented elsewhere.', changeReason: 'Removed metric reference.' },
-                headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+        const removeReferenceResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
+            data: {
+                description: 'The response time target is documented elsewhere.',
+                changeReason: 'Removed metric reference.',
             },
-        );
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+        });
         expect(removeReferenceResponse.status()).toBe(200);
 
         const revisionsResponse = await request.get(`/projects/${project.id}/requirements/${requirement.id}/revisions`);
@@ -227,7 +227,10 @@ test.describe('Requirement revisions API', () => {
         });
     });
 
-    test('captures current metric values for lifecycle and implementation-ticket revisions.', async ({ request, api }) => {
+    test('captures current metric values for lifecycle and implementation-ticket revisions.', async ({
+        request,
+        api,
+    }) => {
         const project = await api.createProject(`Metric lifecycle snapshots ${randomUUID()}`);
         const category = await api.createCategory(project.id, 'Performance', 'PERF');
         const metricResponse = await request.post(`/projects/${project.id}/metrics`, {

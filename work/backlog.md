@@ -397,14 +397,21 @@ Acceptance criteria:
 ## Deferred metric-related work
 
 ### WP-F3 — Search / filtering / views
-Status: **Planned**
+Status: **Implemented — validation pending**
 
-Metric-related search/filter functionality belongs here rather than WP-F1.
+Implements the first-release search/filter/view stories US-VIEW-001, US-VIEW-002, US-VIEW-003, US-VIEW-005, and US-VIEW-006 plus the unresolved-metric filter deferred from WP-F1.
 
-Includes, among other search/filter requirements:
+Implemented:
 
-- filtering requirements that contain unresolved metric references;
-- broader requirement filtering/search functionality described by the relevant US-MET/search stories.
+- project-local search by visible key, description, source, owner, and status;
+- rejected/obsolete requirements hidden from the normal active view and explicitly includable/filterable;
+- combinable filters for category-derived type, category, category key, status, priority, owner, metric, linked requirement, and unresolved metric references;
+- exact visible-key matches remain directly openable from filtered results;
+- sortable requirement-table columns and user-selectable column visibility;
+- readable specification/document view with visible keys, derived type/category, rendered metric references, and structured outgoing requirement links;
+- unit coverage for filter semantics and frontend E2E coverage for search/filter/document switching.
+
+Saved custom views (US-VIEW-004) and relationship graph visualization (US-VIEW-007) remain backlog work.
 
 ### WP-F5 — Export
 Status: **Planned**
@@ -418,7 +425,7 @@ Exports must eventually use the appropriate resolved/frozen representation requi
 ## Later WP-F packages
 
 ### WP-F2 — Requirement links / traceability
-Status: **Implemented — validation pending**
+Status: **Complete**
 
 Implements the first-release requirement-link stories independently from metric references (US-REF-001, US-REF-002, US-REF-003, US-REF-004, US-REF-006, US-REF-007, US-REF-008, US-REF-009, US-REF-010, US-REF-011, and US-REF-012). Requirement-link export remains in WP-F5; broader search/filter work remains in WP-F3.
 
@@ -453,7 +460,7 @@ Acceptance criteria:
 - Administrator has no project-content access.
 
 ### WP-F3 — Search / filtering / views
-Status: **Planned**
+Status: **Implemented — validation pending**
 
 ### WP-F4 — Review assignment tasks
 Status: **Planned**
@@ -485,4 +492,4 @@ Proceed in this order:
 9. WP-F5 — Export
 10. WP-G — remaining identity/access-control work
 
-The immediate next step is **WP-F2 validation**. After it is green, the next implementation package is **WP-F3**.
+WP-F2 validation is green. The immediate next step is **WP-F3 validation**. After it is green, the next implementation package is **WP-F4**.

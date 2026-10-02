@@ -39,5 +39,8 @@ export function renderRequirementMetricSnapshot(
     if (description === null) return null;
 
     const valuesByKey = new Map(snapshots.map((snapshot) => [snapshot.key, snapshot.value]));
-    return description.replace(METRIC_REFERENCE_PATTERN, (placeholder, key: string) => valuesByKey.get(key) ?? placeholder);
+    return description.replace(
+        METRIC_REFERENCE_PATTERN,
+        (placeholder, key: string) => valuesByKey.get(key) ?? placeholder,
+    );
 }

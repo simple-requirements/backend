@@ -7,10 +7,7 @@ export class CreateRequirementLinks1790000003000 implements MigrationInterface {
     async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.createUniqueConstraint(
             'requirements',
-            new TableUnique({
-                name: 'UQ_requirements_id_project_id',
-                columnNames: ['id', 'project_id'],
-            }),
+            new TableUnique({ name: 'UQ_requirements_id_project_id', columnNames: ['id', 'project_id'] }),
         );
 
         await queryRunner.createTable(
@@ -26,7 +23,10 @@ export class CreateRequirementLinks1790000003000 implements MigrationInterface {
                     { name: 'updated_at', type: 'timestamptz', default: 'now()' },
                 ],
                 uniques: [
-                    { name: 'UQ_requirement_links_source_target', columnNames: ['source_requirement_id', 'target_requirement_id'] },
+                    {
+                        name: 'UQ_requirement_links_source_target',
+                        columnNames: ['source_requirement_id', 'target_requirement_id'],
+                    },
                 ],
                 indices: [
                     { name: 'IDX_requirement_links_project_id', columnNames: ['project_id'] },
@@ -34,11 +34,23 @@ export class CreateRequirementLinks1790000003000 implements MigrationInterface {
                     { name: 'IDX_requirement_links_target_requirement_id', columnNames: ['target_requirement_id'] },
                 ],
                 checks: [
-                    { name: 'CHK_requirement_links_relationship_type', expression: `"relationship_type" = 'references'` },
-                    { name: 'CHK_requirement_links_not_self', expression: '"source_requirement_id" <> "target_requirement_id"' },
+                    {
+                        name: 'CHK_requirement_links_relationship_type',
+                        expression: `"relationship_type" = 'references'`,
+                    },
+                    {
+                        name: 'CHK_requirement_links_not_self',
+                        expression: '"source_requirement_id" <> "target_requirement_id"',
+                    },
                 ],
                 foreignKeys: [
-                    { name: 'FK_requirement_links_project_id', columnNames: ['project_id'], referencedTableName: 'projects', referencedColumnNames: ['id'], onDelete: 'RESTRICT' },
+                    {
+                        name: 'FK_requirement_links_project_id',
+                        columnNames: ['project_id'],
+                        referencedTableName: 'projects',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'RESTRICT',
+                    },
                     {
                         name: 'FK_requirement_links_source_requirement_project',
                         columnNames: ['source_requirement_id', 'project_id'],

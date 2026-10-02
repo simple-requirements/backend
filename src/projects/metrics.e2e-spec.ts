@@ -38,7 +38,9 @@ test.describe('Metrics API', () => {
         const firstResponse = await createMetric(request, firstProject.id);
         const secondResponse = await createMetric(request, firstProject.id, '1000 ms');
         const otherProjectResponse = await createMetric(request, secondProject.id, '500 ms');
-        expect([firstResponse.status(), secondResponse.status(), otherProjectResponse.status()]).toEqual([201, 201, 201]);
+        expect([firstResponse.status(), secondResponse.status(), otherProjectResponse.status()]).toEqual([
+            201, 201, 201,
+        ]);
 
         const first = (await firstResponse.json()) as MetricBody;
         const second = (await secondResponse.json()) as MetricBody;
@@ -47,11 +49,12 @@ test.describe('Metrics API', () => {
         expect(second.key).toBe('MET-0002');
         expect(other.key).toBe('MET-0001');
 
-        const listResponse = await request.get(`/projects/${firstProject.id}/metrics`, {
-            headers: E2E_VIEWER_HEADERS,
-        });
+        const listResponse = await request.get(`/projects/${firstProject.id}/metrics`, { headers: E2E_VIEWER_HEADERS });
         expect(listResponse.status()).toBe(200);
-        expect(((await listResponse.json()) as MetricBody[]).map((metric) => metric.key)).toEqual(['MET-0001', 'MET-0002']);
+        expect(((await listResponse.json()) as MetricBody[]).map((metric) => metric.key)).toEqual([
+            'MET-0001',
+            'MET-0002',
+        ]);
 
         const getResponse = await request.get(`/projects/${firstProject.id}/metrics/${first.id}`, {
             headers: E2E_DEVELOPER_HEADERS,
@@ -60,7 +63,10 @@ test.describe('Metrics API', () => {
         expect(((await getResponse.json()) as MetricBody).id).toBe(first.id);
     });
 
-    test('updates value/description without accepting a client key and deactivates without deleting.', async ({ request, api }) => {
+    test('updates value/description without accepting a client key and deactivates without deleting.', async ({
+        request,
+        api,
+    }) => {
         const project = await api.createProject(`Metrics mutation project ${randomUUID()}`);
         const createdResponse = await createMetric(request, project.id);
         const created = (await createdResponse.json()) as MetricBody;
@@ -95,7 +101,12 @@ test.describe('Metrics API', () => {
             data: { value: '   ' },
         });
         expect(response.status()).toBe(400);
-        expectErrorResponseBody((await response.json()) as ErrorResponseBody, 400, 'Metric value must not be empty.', 'Bad Request');
+        expectErrorResponseBody(
+            (await response.json()) as ErrorResponseBody,
+            400,
+            'Metric value must not be empty.',
+            'Bad Request',
+        );
     });
 
     test('allows Developer/Viewer read access but denies mutation.', async ({ request, api }) => {
@@ -105,10 +116,23 @@ test.describe('Metrics API', () => {
 
         for (const headers of [E2E_DEVELOPER_HEADERS, E2E_VIEWER_HEADERS]) {
             expect((await request.get(`/projects/${project.id}/metrics`, { headers })).status()).toBe(200);
-            expect((await request.get(`/projects/${project.id}/metrics/${created.id}`, { headers })).status()).toBe(200);
-            expect((await request.post(`/projects/${project.id}/metrics`, { headers, data: { value: '1 s' } })).status()).toBe(403);
-            expect((await request.patch(`/projects/${project.id}/metrics/${created.id}`, { headers, data: { value: '1 s' } })).status()).toBe(403);
-            expect((await request.post(`/projects/${project.id}/metrics/${created.id}/deactivate`, { headers })).status()).toBe(403);
+            expect((await request.get(`/projects/${project.id}/metrics/${created.id}`, { headers })).status()).toBe(
+                200,
+            );
+            expect(
+                (await request.post(`/projects/${project.id}/metrics`, { headers, data: { value: '1 s' } })).status(),
+            ).toBe(403);
+            expect(
+                (
+                    await request.patch(`/projects/${project.id}/metrics/${created.id}`, {
+                        headers,
+                        data: { value: '1 s' },
+                    })
+                ).status(),
+            ).toBe(403);
+            expect(
+                (await request.post(`/projects/${project.id}/metrics/${created.id}/deactivate`, { headers })).status(),
+            ).toBe(403);
         }
     });
 
@@ -120,7 +144,10 @@ test.describe('Metrics API', () => {
         for (const response of [
             await request.get(`/projects/${project.id}/metrics`, { headers: E2E_ADMIN_HEADERS }),
             await request.get(`/projects/${project.id}/metrics/${created.id}`, { headers: E2E_ADMIN_HEADERS }),
-            await request.post(`/projects/${project.id}/metrics`, { headers: E2E_ADMIN_HEADERS, data: { value: '1 s' } }),
+            await request.post(`/projects/${project.id}/metrics`, {
+                headers: E2E_ADMIN_HEADERS,
+                data: { value: '1 s' },
+            }),
         ]) {
             expect(response.status()).toBe(403);
         }

@@ -27,7 +27,9 @@ export class RequirementMetricReferenceService {
 
         for (const metric of metrics) {
             if (!metric.active && !existingMetricIds.has(metric.id)) {
-                throw new BadRequestException(`Metric reference "${metric.key}" cannot be added because the metric is deactivated.`);
+                throw new BadRequestException(
+                    `Metric reference "${metric.key}" cannot be added because the metric is deactivated.`,
+                );
             }
         }
 
@@ -52,7 +54,6 @@ export class RequirementMetricReferenceService {
             };
         });
     }
-
 
     snapshot(description: string | null, metrics: readonly Metric[]): RequirementMetricSnapshot[] {
         return createRequirementMetricSnapshot(description, metrics);

@@ -15,7 +15,6 @@ import {
     type RequirementResponseBody,
 } from '@/projects/projects-api.e2e-helpers';
 
-
 type MetricBody = Readonly<{ id: string; key: string; active: boolean }>;
 
 async function createMetric(request: APIRequestContext, projectId: string, value = '2000 ms'): Promise<MetricBody> {
@@ -81,7 +80,10 @@ test.describe('Requirements API - POST /projects/{projectId}/requirements', () =
 });
 
 test.describe('Requirement metric references', () => {
-    test('resolves project-local placeholders, deduplicates repeated references, and reports unknown keys.', async ({ request, api }) => {
+    test('resolves project-local placeholders, deduplicates repeated references, and reports unknown keys.', async ({
+        request,
+        api,
+    }) => {
         const project = await api.createProject(`Requirement metrics ${randomUUID()}`);
         const category = await api.createCategory(project.id, 'Performance', 'PERF', CategoryType.NFR);
         const metric = await createMetric(request, project.id);
@@ -111,7 +113,10 @@ test.describe('Requirement metric references', () => {
         ]);
     });
 
-    test('recalculates links after edits and preserves existing links after deactivation.', async ({ request, api }) => {
+    test('recalculates links after edits and preserves existing links after deactivation.', async ({
+        request,
+        api,
+    }) => {
         const project = await api.createProject(`Requirement metric edits ${randomUUID()}`);
         const category = await api.createCategory(project.id, 'Performance', 'PERF', CategoryType.NFR);
         const firstMetric = await createMetric(request, project.id);
@@ -128,9 +133,11 @@ test.describe('Requirement metric references', () => {
         ]);
 
         expect(
-            (await request.post(`/projects/${project.id}/metrics/${secondMetric.id}/deactivate`, {
-                headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
-            })).status(),
+            (
+                await request.post(`/projects/${project.id}/metrics/${secondMetric.id}/deactivate`, {
+                    headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+                })
+            ).status(),
         ).toBe(200);
         const retainResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
             headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,

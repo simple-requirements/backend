@@ -13,11 +13,7 @@ const SOURCE_ID = '22222222-2222-4222-8222-222222222222';
 const TARGET_ID = '33333333-3333-4333-8333-333333333333';
 const SECOND_TARGET_ID = '44444444-4444-4444-8444-444444444444';
 
-function requirement(
-    id: string,
-    visibleKey: string,
-    type: CategoryType = CategoryType.FR,
-): Requirement {
+function requirement(id: string, visibleKey: string, type: CategoryType = CategoryType.FR): Requirement {
     return {
         id,
         projectId: PROJECT_ID,
@@ -73,7 +69,9 @@ describe('RequirementLinksService', () => {
     it('creates a fixed references link after resolving the target visible key.', async () => {
         requirementsRepository.findOne.mockResolvedValueOnce(source).mockResolvedValueOnce(target);
         linksRepository.existsBy.mockResolvedValue(false);
-        linksRepository.save.mockImplementation((value) => Promise.resolve({ ...value, id: 'link-id', createdAt: new Date(), updatedAt: new Date() }));
+        linksRepository.save.mockImplementation((value) =>
+            Promise.resolve({ ...value, id: 'link-id', createdAt: new Date(), updatedAt: new Date() }),
+        );
 
         const result = await service.create(PROJECT_ID, SOURCE_ID, target.visibleKey);
 
@@ -87,11 +85,15 @@ describe('RequirementLinksService', () => {
 
     it('blocks self-links and duplicate links.', async () => {
         requirementsRepository.findOne.mockResolvedValueOnce(source).mockResolvedValueOnce(source);
-        await expect(service.create(PROJECT_ID, SOURCE_ID, source.visibleKey)).rejects.toBeInstanceOf(BadRequestException);
+        await expect(service.create(PROJECT_ID, SOURCE_ID, source.visibleKey)).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
 
         requirementsRepository.findOne.mockResolvedValueOnce(source).mockResolvedValueOnce(target);
         linksRepository.existsBy.mockResolvedValue(true);
-        await expect(service.create(PROJECT_ID, SOURCE_ID, target.visibleKey)).rejects.toBeInstanceOf(BadRequestException);
+        await expect(service.create(PROJECT_ID, SOURCE_ID, target.visibleKey)).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
     });
 
     it('returns a clear not-found error for an unknown target key.', async () => {

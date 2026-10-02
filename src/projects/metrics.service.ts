@@ -44,13 +44,9 @@ export class MetricsService {
             const nextNumber = latest?.key ? Number(latest.key.slice(4)) + 1 : 1;
             if (nextNumber > 9999) throw new BadRequestException('Metric key space is exhausted for this project.');
             const key = `MET-${String(nextNumber).padStart(4, '0')}`;
-            const metric = manager.getRepository(Metric).create({
-                projectId,
-                key,
-                value: input.value,
-                description: input.description ?? '',
-                active: true,
-            });
+            const metric = manager
+                .getRepository(Metric)
+                .create({ projectId, key, value: input.value, description: input.description ?? '', active: true });
             return manager.getRepository(Metric).save(metric);
         });
     }

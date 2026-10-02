@@ -56,7 +56,9 @@ describe('RequirementMetricReferenceService', () => {
             where: { projectId: PROJECT_ID, key: expect.anything() },
             order: { key: 'ASC' },
         });
-        expect(metricsRepository.find).not.toHaveBeenCalledWith(expect.objectContaining({ where: { projectId: OTHER_PROJECT_ID } }));
+        expect(metricsRepository.find).not.toHaveBeenCalledWith(
+            expect.objectContaining({ where: { projectId: OTHER_PROJECT_ID } }),
+        );
     });
 
     it('deduplicates resolved relations and permits unresolved keys to remain in raw text.', async () => {
@@ -79,11 +81,15 @@ describe('RequirementMetricReferenceService', () => {
         const inactive = metric('MET-0001', false);
         metricsRepository.find.mockResolvedValue([inactive]);
 
-        await expect(service.prepareForDescription(requirement([inactive]), '[~MET-0001]')).resolves.toEqual([inactive]);
+        await expect(service.prepareForDescription(requirement([inactive]), '[~MET-0001]')).resolves.toEqual([
+            inactive,
+        ]);
     });
 
     it('removes relations when placeholders are removed.', async () => {
-        expect(await service.prepareForDescription(requirement([metric('MET-0001')]), 'No metric reference now.')).toEqual([]);
+        expect(
+            await service.prepareForDescription(requirement([metric('MET-0001')]), 'No metric reference now.'),
+        ).toEqual([]);
         expect(metricsRepository.find).not.toHaveBeenCalled();
     });
 });

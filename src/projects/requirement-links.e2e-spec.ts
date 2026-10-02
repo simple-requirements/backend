@@ -144,10 +144,7 @@ test.describe('Requirement links API', () => {
 
         const updateResponse = await request.patch(
             `/projects/${project.id}/requirements/${source.id}/links/${link.id}`,
-            {
-                headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
-                data: { targetKey: secondTarget.visibleKey },
-            },
+            { headers: E2E_REQUIREMENTS_ENGINEER_HEADERS, data: { targetKey: secondTarget.visibleKey } },
         );
         expect(updateResponse.status()).toBe(200);
         expect(((await updateResponse.json()) as LinkBody).target.requirementId).toBe(secondTarget.id);
@@ -156,7 +153,9 @@ test.describe('Requirement links API', () => {
             headers: E2E_VIEWER_HEADERS,
         });
         expect(sourceResponse.status()).toBe(200);
-        expect(((await sourceResponse.json()) as { description: string }).description).toBe('Source text mentions nothing.');
+        expect(((await sourceResponse.json()) as { description: string }).description).toBe(
+            'Source text mentions nothing.',
+        );
 
         const deleteResponse = await request.delete(
             `/projects/${project.id}/requirements/${source.id}/links/${link.id}`,
@@ -209,7 +208,10 @@ test.describe('Requirement links API', () => {
         expect(afterTextRemoval.outgoing[0]?.target.requirementId).toBe(firstTarget.id);
     });
 
-    test('allows Developer and Viewer to read, but only Requirements Engineer can mutate; Administrator has no access.', async ({ request, api }) => {
+    test('allows Developer and Viewer to read, but only Requirements Engineer can mutate; Administrator has no access.', async ({
+        request,
+        api,
+    }) => {
         const { project, source, firstTarget, secondTarget } = await setupLinkedRequirements(api);
         const createResponse = await request.post(`/projects/${project.id}/requirements/${source.id}/links`, {
             headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
@@ -218,7 +220,9 @@ test.describe('Requirement links API', () => {
         const link = (await createResponse.json()) as LinkBody;
 
         for (const headers of [E2E_DEVELOPER_HEADERS, E2E_VIEWER_HEADERS]) {
-            expect((await request.get(`/projects/${project.id}/requirements/${source.id}/links`, { headers })).status()).toBe(200);
+            expect(
+                (await request.get(`/projects/${project.id}/requirements/${source.id}/links`, { headers })).status(),
+            ).toBe(200);
             expect(
                 (
                     await request.post(`/projects/${project.id}/requirements/${source.id}/links`, {

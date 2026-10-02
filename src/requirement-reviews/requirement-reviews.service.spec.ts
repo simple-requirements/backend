@@ -160,7 +160,9 @@ describe('RequirementReviewsService', () => {
     });
 
     it('blocks approval while syntactically valid metric references are unresolved.', async () => {
-        requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ description: 'Below [~MET-9999].' }));
+        requirementsRepository.findOne.mockResolvedValue(
+            createRequirementEntity({ description: 'Below [~MET-9999].' }),
+        );
         reviewCommentsRepository.count.mockResolvedValue(0);
         metricReferences.unresolvedKeys.mockResolvedValue(['MET-9999']);
 

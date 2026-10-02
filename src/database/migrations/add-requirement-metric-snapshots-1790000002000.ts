@@ -14,12 +14,7 @@ export class AddRequirementMetricSnapshots1790000002000 implements MigrationInte
         await queryRunner.addColumn('requirements', column);
         await queryRunner.addColumn(
             'requirement_revisions',
-            new TableColumn({
-                name: 'metric_snapshots',
-                type: 'jsonb',
-                isNullable: false,
-                default: "'[]'::jsonb",
-            }),
+            new TableColumn({ name: 'metric_snapshots', type: 'jsonb', isNullable: false, default: "'[]'::jsonb" }),
         );
 
         await queryRunner.query(`

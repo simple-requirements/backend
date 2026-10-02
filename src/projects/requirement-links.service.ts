@@ -22,11 +22,11 @@ export class RequirementLinksService {
     async overview(projectId: string, requirementId: string): Promise<RequirementLinksOverviewDto> {
         await this.getRequirementOrThrow(projectId, requirementId);
         const links = await this.linksRepository.find({
-            where: [{ projectId, sourceRequirementId: requirementId }, { projectId, targetRequirementId: requirementId }],
-            relations: {
-                sourceRequirement: { category: true },
-                targetRequirement: { category: true },
-            },
+            where: [
+                { projectId, sourceRequirementId: requirementId },
+                { projectId, targetRequirementId: requirementId },
+            ],
+            relations: { sourceRequirement: { category: true }, targetRequirement: { category: true } },
             order: { createdAt: 'ASC' },
         });
         return {
@@ -35,7 +35,11 @@ export class RequirementLinksService {
         };
     }
 
-    async create(projectId: string, sourceRequirementId: string, targetKey: string): Promise<RequirementLinkResponseDto> {
+    async create(
+        projectId: string,
+        sourceRequirementId: string,
+        targetKey: string,
+    ): Promise<RequirementLinkResponseDto> {
         const source = await this.getRequirementOrThrow(projectId, sourceRequirementId);
         const target = await this.getRequirementByKeyOrThrow(projectId, targetKey);
         this.assertNotSelf(source, target);
@@ -81,7 +85,9 @@ export class RequirementLinksService {
             relations: { category: true },
         });
         if (requirement === null) {
-            throw new NotFoundException(`Requirement with id "${requirementId}" in project "${projectId}" was not found.`);
+            throw new NotFoundException(
+                `Requirement with id "${requirementId}" in project "${projectId}" was not found.`,
+            );
         }
         return requirement;
     }
@@ -92,18 +98,21 @@ export class RequirementLinksService {
             relations: { category: true },
         });
         if (requirement === null) {
-            throw new NotFoundException(`Requirement with key "${visibleKey}" in project "${projectId}" was not found.`);
+            throw new NotFoundException(
+                `Requirement with key "${visibleKey}" in project "${projectId}" was not found.`,
+            );
         }
         return requirement;
     }
 
-    private async getLinkOrThrow(projectId: string, sourceRequirementId: string, linkId: string): Promise<RequirementLink> {
+    private async getLinkOrThrow(
+        projectId: string,
+        sourceRequirementId: string,
+        linkId: string,
+    ): Promise<RequirementLink> {
         const link = await this.linksRepository.findOne({
             where: { id: linkId, projectId, sourceRequirementId },
-            relations: {
-                sourceRequirement: { category: true },
-                targetRequirement: { category: true },
-            },
+            relations: { sourceRequirement: { category: true }, targetRequirement: { category: true } },
         });
         if (link === null) throw new NotFoundException(`Requirement link with id "${linkId}" was not found.`);
         return link;
