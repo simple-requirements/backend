@@ -5,9 +5,11 @@ import { CategoryType } from '@/projects/category-type.enum';
 import type { RequirementStatus } from '@/projects/requirement-status.enum';
 import {
     E2E_ADMIN_ACCESS_TOKEN,
+    E2E_DEVELOPER_ACCESS_TOKEN,
     E2E_DEVELOPER_USER_ID,
     E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN,
     E2E_REQUIREMENTS_ENGINEER_USER_ID,
+    E2E_VIEWER_ACCESS_TOKEN,
     E2E_VIEWER_USER_ID,
 } from '@/database/seeding/seed-e2e-authentication';
 
@@ -57,6 +59,9 @@ export const E2E_ADMIN_HEADERS = { Authorization: `Bearer ${E2E_ADMIN_ACCESS_TOK
 export const E2E_REQUIREMENTS_ENGINEER_HEADERS = {
     Authorization: `Bearer ${E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN}`,
 } as const;
+
+export const E2E_DEVELOPER_HEADERS = { Authorization: `Bearer ${E2E_DEVELOPER_ACCESS_TOKEN}` } as const;
+export const E2E_VIEWER_HEADERS = { Authorization: `Bearer ${E2E_VIEWER_ACCESS_TOKEN}` } as const;
 
 export function expectIsoDateString(value: string): void {
     const parsedDate = parseISO(value);
@@ -176,6 +181,14 @@ export async function createCategory(
     return (await response.json()) as CategoryResponseBody;
 }
 
+export interface RequirementMetricReferenceResponseBody {
+    key: string;
+    metricId: string | null;
+    value: string | null;
+    resolved: boolean;
+    active: boolean | null;
+}
+
 export interface RequirementResponseBody {
     id: string;
     projectId: string;
@@ -190,6 +203,8 @@ export interface RequirementResponseBody {
     changedByDisplayName: string;
     status: RequirementStatus;
     description: string | null;
+    renderedDescription?: string | null;
+    metricReferences?: RequirementMetricReferenceResponseBody[];
     priority: string | null;
     owner: string | null;
     rationale: string | null;

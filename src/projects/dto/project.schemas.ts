@@ -6,9 +6,11 @@ import { CATEGORY_KEY_PATTERN } from '@/projects/requirement.constants';
 import type { CreateCategoryDto } from '@/projects/dto/create-category.dto';
 import type { CreateProjectDto } from '@/projects/dto/create-project.dto';
 import type { CreateRequirementDto } from '@/projects/dto/create-requirement.dto';
+import type { CreateMetricDto } from '@/projects/dto/create-metric.dto';
 import type { UpdateCategoryDto } from '@/projects/dto/update-category.dto';
 import type { UpdateProjectDto } from '@/projects/dto/update-project.dto';
 import type { UpdateRequirementDto } from '@/projects/dto/update-requirement.dto';
+import type { UpdateMetricDto } from '@/projects/dto/update-metric.dto';
 import type { UpsertImplementationTicketDto } from '@/projects/dto/implementation-ticket.dto';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 
@@ -132,6 +134,9 @@ const requirementStatusSchema = z.custom<RequirementStatus>(
 const projectRequestBodySchema = requestBodySchema('Project request body must be an object.');
 const categoryRequestBodySchema = requestBodySchema('Category request body must be an object.');
 const requirementRequestBodySchema = requestBodySchema('Requirement request body must be an object.');
+const metricRequestBodySchema = requestBodySchema('Metric request body must be an object.');
+const metricValueSchema = trimmedStringSchema('Metric value must be a string.', 'Metric value must not be empty.');
+const metricDescriptionSchema = z.string({ error: 'Metric description must be a string.' }).trim();
 
 export const createProjectSchema: ZodValidationSchema<CreateProjectDto> = projectRequestBodySchema.pipe(
     z.object({ name: projectNameSchema }),
@@ -174,6 +179,18 @@ export const updateCategorySchema: ZodValidationSchema<UpdateCategoryDto> = cate
                 categoryPatch.name !== undefined || categoryPatch.key !== undefined || categoryPatch.type !== undefined,
             { message: 'At least one category field must be provided.' },
         ),
+);
+
+export const createMetricSchema: ZodValidationSchema<CreateMetricDto> = metricRequestBodySchema.pipe(
+    z.object({ value: metricValueSchema, description: metricDescriptionSchema.optional() }),
+);
+
+export const updateMetricSchema: ZodValidationSchema<UpdateMetricDto> = metricRequestBodySchema.pipe(
+    z
+        .object({ value: metricValueSchema.optional(), description: metricDescriptionSchema.optional() })
+        .refine((metricPatch) => metricPatch.value !== undefined || metricPatch.description !== undefined, {
+            message: 'At least one metric field must be provided.',
+        }),
 );
 
 export const createRequirementSchema: ZodValidationSchema<CreateRequirementDto> = requirementRequestBodySchema.pipe(

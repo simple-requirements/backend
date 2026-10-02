@@ -17,6 +17,13 @@ import { AuthModule } from '@/auth/auth.module';
 import { RequirementLifecycleService } from '@/projects/requirements/requirement-lifecycle.service';
 import { RequirementResponseMapper } from '@/projects/requirements/requirement-response.mapper';
 import { RequirementRevisionService } from '@/projects/requirements/requirement-revision.service';
+import { Metric } from '@/projects/metrics.entity';
+import { MetricsController } from '@/projects/metrics.controller';
+import { MetricsService } from '@/projects/metrics.service';
+import { RequirementMetricReferenceService } from '@/projects/requirements/requirement-metric-reference.service';
+import { RequirementLink } from '@/projects/requirement-links.entity';
+import { RequirementLinksController } from '@/projects/requirement-links.controller';
+import { RequirementLinksService } from '@/projects/requirement-links.service';
 
 @Module({
     imports: [
@@ -27,6 +34,8 @@ import { RequirementRevisionService } from '@/projects/requirements/requirement-
             Requirement,
             RequirementRevision,
             RequirementImplementationTicket,
+            Metric,
+            RequirementLink,
         ]),
     ],
     controllers: [
@@ -35,6 +44,8 @@ import { RequirementRevisionService } from '@/projects/requirements/requirement-
         CategoriesController,
         RequirementsController,
         ImplementationTicketsController,
+        MetricsController,
+        RequirementLinksController,
     ],
     providers: [
         AdministratorProjectsService,
@@ -42,8 +53,17 @@ import { RequirementRevisionService } from '@/projects/requirements/requirement-
         RequirementLifecycleService,
         RequirementResponseMapper,
         RequirementRevisionService,
+        RequirementMetricReferenceService,
+        MetricsService,
+        RequirementLinksService,
     ],
-    exports: [ProjectsService, RequirementLifecycleService, RequirementResponseMapper, RequirementRevisionService],
+    exports: [
+        ProjectsService,
+        RequirementLifecycleService,
+        RequirementResponseMapper,
+        RequirementRevisionService,
+        RequirementMetricReferenceService,
+    ],
 })
 // Nest modules are declarative; the decorator contains the module configuration.
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class

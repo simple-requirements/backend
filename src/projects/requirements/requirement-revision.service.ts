@@ -36,6 +36,7 @@ export class RequirementRevisionService {
             changedByDisplayName: requirement.changedByDisplayName,
             status: requirement.status,
             description: requirement.description,
+            metricSnapshots: requirement.metricSnapshots,
             priority: requirement.priority,
             owner: requirement.owner,
             rationale: requirement.rationale,

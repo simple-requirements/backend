@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
 import type { ImplementationTicketResponseDto } from '@/projects/dto/implementation-ticket.dto';
+import type { RequirementMetricReferenceDto } from '@/projects/dto/requirement-metric-reference.dto';
 import type { RequirementResponseDto } from '@/projects/dto/requirement-response.dto';
 import { RequirementImplementationTicket } from '@/projects/requirement-implementation-ticket.entity';
 import { RequirementRevision } from '@/projects/requirement-revisions.entity';
 import { Requirement } from '@/projects/requirements.entity';
+import { renderRequirementMetricSnapshot } from '@/projects/requirements/requirement-metric-snapshot';
 
 @Injectable()
 export class RequirementResponseMapper {
@@ -23,6 +25,7 @@ export class RequirementResponseMapper {
             changedByDisplayName: revision.changedByDisplayName,
             status: revision.status,
             description: revision.description,
+            renderedDescription: renderRequirementMetricSnapshot(revision.description, revision.metricSnapshots),
             priority: revision.priority,
             owner: revision.owner,
             rationale: revision.rationale,
@@ -47,7 +50,11 @@ export class RequirementResponseMapper {
         };
     }
 
-    fromRequirement(requirement: Requirement): RequirementResponseDto {
+    fromRequirement(
+        requirement: Requirement,
+        metricReferences?: RequirementMetricReferenceDto[],
+        renderedDescription?: string | null,
+    ): RequirementResponseDto {
         const template = requirement.implementationTickets.length === 0 ? null : requirement.project.ticketUrlTemplate;
 
         return {
@@ -64,6 +71,8 @@ export class RequirementResponseMapper {
             changedByDisplayName: requirement.changedByDisplayName,
             status: requirement.status,
             description: requirement.description,
+            ...(renderedDescription === undefined ? {} : { renderedDescription }),
+            metricReferences,
             priority: requirement.priority,
             owner: requirement.owner,
             rationale: requirement.rationale,

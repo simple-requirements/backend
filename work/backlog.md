@@ -1,253 +1,488 @@
-# Product backlog: current not fully covered requirements
-
-## Scope
-
-This backlog was revised against the latest uploaded frontend and backend on 2026-09-21 and updated after Release 1.0.0 was created. It reflects the current source tree rather than older backend-only inspection notes. The requirements catalogue remains authoritative; this file tracks only work that is still incomplete or intentionally deferred. Release 1.0.0 is an established release baseline; outstanding items below are post-1.0.0 work unless explicitly stated otherwise.
-
-The current implemented scope is:
-
-- local account registration, verification, bootstrap Administrator registration, login, logout, password reset, memory-only SPA session handling, backend session hashing/expiry, user/session administration, existing project membership administration, and demo/E2E seed accounts;
-- Administrator project administration;
-- project-scoped Requirements Engineer, Developer, and Viewer authorization;
-- basic projects, categories, requirements, review comments/replies/resolution, approval/rejection, obsolescence UI, implementation tickets, and sidebar/action-bar/account-menu UI.
-
-The current source tree does **not** implement a metrics subsystem, requirement-link subsystem, export/import subsystem, traceability matrix, baselines, attachments, tags, verification criteria, requirement-change requests, personal review-task assignment, or the frontend revision-history/diff view. The backend does expose finalized revision-history and revision-comparison endpoints.
-
-## Role summary
+# Backlog
 
-| Role                  | Scope                 | Required privileges                                                                                                                                                                                                                                                                                                             |
-| --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Administrator         | Global administrative | Target model: dedicated administration-only account role. Manages users, sessions, projects, memberships and administrative project settings; sees only project name, category names/counts, requirement count, memberships and administrative settings. Never becomes a project member and never accesses requirement content. |
-| Requirements Engineer | Project-scoped        | Single fixed account role used for every project membership. Can read assigned project content; create/edit categories and requirements; review/comment/resolve; perform lifecycle transitions; and manage implementation tickets according to lifecycle rules.                                                                 |
-| Developer             | Project-scoped        | Single fixed account role used for every project membership. Can read assigned project content and create/update/remove implementation tickets while requirements are approved; cannot edit requirements/categories, review, or change lifecycle state.                                                                         |
-| Viewer                | Project-scoped        | Single fixed account role used for every project membership. Read-only access to assigned project content, including lifecycle metadata, reviews, tickets and revisions.                                                                                                                                                        |
+## Current baseline
 
-## High-priority implementation mismatches
-
-The previously listed lifecycle/revision P0 mismatches and the Administrator architecture migration have been resolved in the current source. Release 1.0.0 has already been created, so the remaining high-priority work is post-1.0.0 functional completion plus verification for the next release:
-
-- requirement deletion/recycle-bin behavior is no longer exposed by the current backend;
-- rejected requirements are terminal/read-only in the backend;
-- draft requirements intentionally cannot become obsolete; drafts may only be approved or rejected;
-- implementation-ticket create/update/remove intentionally creates a requirement revision and ticket snapshots remain part of revision history/comparison;
-- finalized revision actor/change-type/change-reason metadata and clean `/revisions` plus `/revisions/compare` backend endpoints exist;
-- substantive requirement content/metadata/category/owner edits require an explicit non-empty user-entered `changeReason`, while lifecycle and ticket operations use deterministic server-derived reasons.
-
-The Administrator architecture defined by WP2-WP6 is implemented: one-account/one-role authorization, Administrator membership prohibition, content denial, dedicated Administrator APIs/workspace, and removal of the obsolete mixed-workspace navigation are present. WP-E / US-VER-002 revision history and comparison presentation is now complete in the frontend against the generated revision API contract.
-
-## Recently covered / remove from old backlog
-
-| Requirement(s)                                        | Current status                                   | Reason                                                                                                                                                                                            |
-| ----------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-WF-001, US-REQ-003C/003D/003E                      | Covered for current lifecycle scope              | Requirements are retained, rejected requirements are terminal/read-only, drafts approve/reject only, and obsolescence is limited to approved/implemented requirements.                            |
-| US-VER-001 revision core                              | Covered for current backend scope                | Current-plus-archive storage, trusted revision actor metadata, explicit edit reasons, ticket-driven revisions/snapshots, and ordered history are implemented.                                     |
-| US-VER-002 revision history/comparison                | Covered                                          | `/revisions` and `/revisions/compare` are exposed through the frontend API layer; requirement details show history plus selectable field-level revision comparison.                                  |
-| US-SEC-001, US-SEC-002, US-SEC-005 through US-SEC-012 | Covered for current architecture scope           | One-account/one-role enforcement, Administrator membership prohibition, administration-only visibility, dedicated Administrator APIs/workspace, and project-scoped authorization are implemented. |
-| User administration frontend                          | Covered                                          | User/session administration is hosted in the dedicated Administrator workspace and uses the one-account/one-role model.                                                                           |
-| Project membership administration frontend            | Covered                                          | Membership management is under Administrator `Projects`, excludes Administrator accounts, and uses each account's fixed project role.                                                             |
-| Public account UI shell                               | Covered by new US-UI-001/002 scope               | Login, registration, and reset pages now share spacing/button/link behavior.                                                                                                                      |
-| Account menu UI shell                                 | Covered                                          | Cog-wheel menu and Logout exist; Administrator navigation is provided exclusively by the dedicated workspace.                                                                                     |
-| US-CAT-005                                            | Partially covered, no longer 0%                  | Category edit endpoint and frontend edit UI exist. Remaining concern is whether category key/type edits should be controlled after use.                                                           |
-| US-PRJ-001/002                                        | Covered for current project-administration scope | Administrator project management uses summary-only dedicated APIs/workspace while project-scoped accounts remain membership-filtered.                                                             |
-
-## Administrator architecture migration backlog
-
-| Work package | Scope                                           | Acceptance target                                                                                                                                                                                                                                            |
-| ------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| WP2          | Backend role model — complete                   | Every account has exactly one role; Administrator accounts cannot have project memberships; project-scoped accounts use one fixed role for all memberships; backend authorization denies Administrator project-content access.                               |
-| WP3          | Administrator REST API — complete               | Administrator-specific project summary/admin endpoints expose only project name, category names/counts, requirement count, memberships, and administrative project settings; project create/rename/delete and membership administration are available there. |
-| WP4          | Administrator workspace — complete              | Administrator login opens a dedicated workspace whose initial sidebar contains `Users & Sessions` and `Projects`; project-scoped roles keep the project workspace.                                                                                           |
-| WP5          | Administrator project administration — complete | `Projects` provides project creation, rename, deletion, membership administration, summary metadata, and administrative project settings without exposing requirement/category detail content.                                                               |
-| WP6          | Frontend cleanup — complete                     | Remove obsolete Administration menu navigation, old mixed-workspace administration routes/components, and stale permission assumptions.                                                                                                                      |
-| WP7          | Next-release verification                       | For each release after 1.0.0, regenerate derived API clients as required, run backend/frontend unit and E2E suites, verify OpenAPI contracts, migrations and authorization boundaries, and remove dead code after the selected release scope is complete.     |
+Release **1.0.0** has already been created.
 
-## Remaining functional backlog
+The release happened earlier than originally planned. Therefore, work that was previously described as required for the "first release" must no longer be treated as a prerequisite for Release 1.0.0.
 
-| Area                                       | Requirement keys                                                                                                                          |              Current coverage | Remaining work                                                                                                                                                                                                                   |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Requirement key stability/reclassification | US-ID-002, US-ID-004, US-ID-007, US-ID-008, US-ID-009, US-ID-010                                                                          |                       Partial | Preview visible keys, controlled reclassification, permanent previous-key aliasing/search, and import/export round-trip behavior are missing.                                                                                    |
-| Category lifecycle                         | US-CAT-005, US-CAT-006, US-CAT-007                                                                                                        |                       Partial | Category editing exists, but category deactivation and controlled key/type changes after use are not implemented.                                                                                                                |
-| Requirement fields/search                  | US-REQ-004, US-REQ-006, US-REQ-007, US-REQ-008, US-VIEW-001, US-VIEW-002, US-VIEW-003, US-VIEW-004, US-VIEW-005, US-VIEW-006, US-VIEW-007 |                  Partial/none | Missing full-text search, category-key/priority/metric/link filters, no-owner list, criticality, tags, attachments, saved views, graph view, and document/read view.                                                             |
-| Metrics                                    | US-MET-001 through US-MET-024                                                                                                             | Not covered in current source | No metric model, API, parser/linking, rendering, validation, usage view, deactivation, impact analysis, or metric export support exists in the inspected source.                                                                 |
-| Requirement links                          | US-REF-001 through US-REF-016                                                                                                             | Not covered in current source | No structured requirement-link model/API/UI/export support exists in the inspected source.                                                                                                                                       |
-| Review assignment/tasks                    | US-WF-006                                                                                                                                 |                   Not covered | Review comments/replies/resolution and approve/reject exist, but assigning review tasks to named users and personal pending-review lists are missing.                                                                            |
-| Revision history/comparison UI             | US-VER-002                                                                                                                                |                       Covered | Requirement details include revision history plus selectable from/to revision comparison using the backend `/revisions/compare` differences, including ticket snapshots and loading/error/empty states.                         |
-| Change requests                            | US-VER-003, US-VER-004                                                                                                                    |                   Not covered | No controlled change-request workflow for approved requirement changes exists.                                                                                                                                                   |
-| Import/export                              | US-IO-001 through US-IO-007, US-EXP-\* if retained                                                                                        | Not covered in current source | No CSV/Excel/JSON/YAML/XML/ReqIF/GitHub Markdown/AsciiDoc import/export controllers or adapters exist in the inspected source. PDF remains out of current scope unless explicitly reintroduced.                                  |
-| Traceability and impact analysis           | US-TRC-001 through US-TRC-003, US-REF-013, US-MET-015, US-MET-017, US-MET-020                                                             |                   Not covered | No traceability matrix, missing-traceability analysis, link-aware impact analysis, or baseline snapshots exist.                                                                                                                  |
-| Baselines/structure                        | US-STR-001 through US-STR-004                                                                                                             |                   Not covered | Parent-child hierarchy, packages/modules, baselines, and baseline comparison are missing.                                                                                                                                        |
-| Verification/validation                    | US-VAL-001 through US-VAL-005                                                                                                             |                   Not covered | No verification criteria, verification status, verification evidence, test coverage model/report, or NFR-specific measurable verification criteria exists.                                                                       |
-| Integrations                               | US-INT-001 through US-INT-004                                                                                                             |                   Not covered | No issue-system, commit/MR, test-management, or webhook/synchronization integration exists.                                                                                                                                      |
+Unfinished requirements remain unfinished and are tracked as post-1.0.0 work.
 
-## Catalogue revisions made
+---
 
-- Established one-account-one-role architecture: every account is exactly Administrator, Requirements Engineer, Developer, or Viewer; people needing multiple roles use separate accounts.
-- Replaced Administrator global project-content read access with administration-only project-summary visibility.
-- Defined the dedicated Administrator workspace (`Users & Sessions`, `Projects`) and removed the account-menu `Administration` navigation requirement.
-- Clarified that Administrator accounts never receive project memberships and project-scoped accounts use one fixed role for all memberships.
+## Completed post-1.0.0 work
 
-- Added explicit frontend UI requirements US-UI-001 through US-UI-004 for public account forms, login links, account menu behavior, and systemwide hover styling.
-- Clarified that `Project Manager` and `Tester` in story text are stakeholder personas, not current authorization roles.
-- Clarified that current project creation privileges belong to Administrator.
-- Added a conformance-review section to the requirements catalogue so mismatches are visible instead of hidden in backlog percentages.
-- Revised lifecycle semantics so drafts may only be approved or rejected; obsolescence begins only after approval.
-- Confirmed implementation-ticket changes as revision-producing operations with historical ticket snapshots.
-- Finalized change-reason policy: substantive requirement edits require explicit user reasons; lifecycle and ticket reasons are derived server-side.
+### WP-E — Revision history and comparison
+Status: **Completed**
 
-## Release baseline and recommended next work packages
+Covers the frontend part of revision/version history, especially US-VER-002, on top of the already existing backend revision functionality.
 
-**Release 1.0.0 has been created.** Its creation happened earlier than the backlog originally planned. Do not reinterpret unfinished items as part of 1.0.0 merely because the release exists; they remain outstanding and should be scheduled into subsequent releases.
+Implemented:
 
-Recommended execution order after the 1.0.0 baseline:
+- Revision history is shown inside the existing requirement detail page.
+- Revision history includes:
+  - revision number;
+  - change type;
+  - change reason;
+  - actor;
+  - timestamp.
+- Revision 1 is displayed as **Requirement created**.
+- The current revision is indicated through the normal selected-row highlight rather than a textual "Current" marker.
+- Revision-producing frontend mutations invalidate the revision-history cache.
+- Revision comparison uses the backend `/revisions/compare` functionality.
+- Comparison is opened through the requirement ActionBar.
+- The Compare action is available only when at least two revisions exist.
+- Revision comparison is displayed in a dialog.
+- Two revisions can be selected in the comparison dialog.
+- The description is displayed using a Git-style diff through `@git-diff-view/react`.
+- Other changed fields are displayed with a changed-field background.
+- The comparison defaults to changed fields only and can be toggled to show all fields.
 
-1. **WP-F1 — Metrics:** begin the post-1.0 functional expansion with the metric model/API/parser-linking/rendering package.
-2. **WP-F2 through WP-F5 — Remaining post-1.0 functional expansion:** structured Requirement Links; Search/Filtering/Views; Review Assignment Tasks; Export architecture/formats.
-3. **WP-G — Category/Requirement identity controls**: controlled category lifecycle and requirement reclassification/aliasing.
-4. **WP7 — Next-release verification**: migrations, generated-client synchronization, backend/frontend unit + E2E, OpenAPI verification, authorization boundaries, and dead-code cleanup after the functionality targeted for that release is complete.
+### WP-E3 — Interactive revision browsing and comparison selection
+Status: **Completed**
 
-**WP-E / US-VER-002 is complete:** WP-E1 added the in-place requirement revision history and synchronized frontend contract usage; WP-E2 adds revision selection and field-level comparison in the same requirement detail experience.
+Follow-up usability work for WP-E.
 
-## WP1 status
+Implemented:
 
-WP1A established the new Administrator architecture. WP1B completed the catalogue/backlog consistency pass. WP2 through WP6 and WP-E are complete. Release 1.0.0 has been created; execution now proceeds with WP-F and WP-G as post-1.0.0 product work, with WP7 used to verify whichever scope is selected for the next release.
+- Clicking a revision in the revision-history list selects it.
+- The selected revision is highlighted.
+- The requirement detail panel above the history displays the selected historical snapshot.
+- Selecting the current revision restores the current requirement representation.
+- Historical revisions are read-only and do not replace or mutate the current requirement entity.
+- `Ctrl + left click` can be used to select two revisions.
+- At most two comparison revisions are selected at once.
+- Right-clicking one of two selected revisions opens a context menu.
+- The context menu contains **Compare revisions**.
+- The existing comparison dialog opens with those two revisions preselected.
+- Comparison order is normalized from older revision to newer revision.
+- The normal ActionBar Compare action remains available.
 
-## Continuation handoff — 2026-09-18
+---
 
-This section is the continuation handoff for future implementation chats. If older scheduling/status text elsewhere in this backlog conflicts with this section, use this section for execution planning while continuing to treat `work/requirements.md` as the authoritative product specification.
+## Next work package
 
-### Repository and delivery workflow
+# WP-F — Metrics and related requirement functionality
 
-- Repository roots on the user's machine are `/home/node/backend` and `/home/node/frontend`.
-- Every implementation delivery should use the same three filenames: `backend.patch`, `frontend.patch`, and `apply-patches.sh`.
-- `apply-patches.sh` must target the repository roots above, preflight applicable patches with `git apply --check`, skip empty/already-applied patches, and avoid partial application when a preflight fails.
-- Patches should be repository-relative (`src/...`, `work/...`) because the wrapper applies them with `git -C /home/node/backend` or `git -C /home/node/frontend`.
-- New files must be included in Git before creating a commit diff; otherwise `git diff HEAD~1 HEAD` will not contain them. This previously caused `_Buttons.scss` and `_Icons.scss` to be omitted from a patch.
-- Both repositories contain mandatory `AGENTS.md` files. Read the applicable file before modifying either repository.
-- Frontend generated/derived files such as `src/api/generated`, `coverage`, Playwright reports, generated BDD tests, and `vitest-json-report.json` must not be manually edited.
-- When the backend OpenAPI contract changes, regenerate the frontend API client through the normal `pnpm api:generate` workflow rather than editing generated Orval output.
+The next product area is Metrics.
 
-### Completed correctness and architecture work
+The original WP-F1 scope was too large to implement safely as one increment. It was therefore split into smaller cumulative packages.
 
-- **WP-A — Lifecycle Integrity: complete.** Generic requirement PATCH cannot approve/reject; dedicated review decisions enforce review invariants. Approved content edits remain `approved`, preserve approval metadata, and create `content_changed` revisions with explicit change reasons. Backend unit and PostgreSQL E2E tests were reported green by the user after application.
-- **WP-B — Project deletion/retention semantics: complete.** Project deletion is allowed only for projects with zero requirements. Requirement-to-project deletion uses `RESTRICT`, preventing cascading destruction of retained requirement history. The frontend disables `Delete project` when `requirementCount > 0`.
-- **WP-C — Domain/authorization conformance regression coverage: complete.** API-level conformance coverage was added without changing WP-B files.
-- **WP-D — Administrator architecture reconciliation: complete.** One-account/one-role, Administrator membership prohibition, Administrator project-content denial, dedicated Administrator APIs/workspace, and cleanup of the old mixed Administration navigation are implemented.
-- **Frontend real-backend E2E retention regression: fixed in the current handoff.** The E2E reset helper must never try to delete projects that contain retained requirements. It deletes only zero-requirement projects; scenarios that create requirements use uniquely named persistent projects and isolate themselves by the created project id. Project-list assertions tolerate unrelated retained projects. The stale user-administration E2E expectation for `@username` in the user detail view was also removed because that field was intentionally removed from the detail layout. The uploaded failing report showed 31 scenarios blocked by the prohibited project deletion and one stale user-detail assertion.
-- **Release 1.0.0 is already established. WP7 remains a release-verification package for subsequent releases**, not a place to defer known feature work. For each release that follows 1.0.0, it should cover API regeneration, backend/frontend unit + E2E, migrations, OpenAPI contracts, authorization boundaries, and dead-code cleanup after the selected product scope is complete.
+WP-F1 is complete through WP-F1.5.
 
-### Administrator workspace — current behavior
+---
 
-- Administrator workspace navigation contains expandable `Users & Sessions` and `Projects` sections. Sidebar icons use the normal workspace sizing. Users/projects appear as children and route to their detail views.
-- User overview is a full-width table showing user, status, role, creation time, email-verification time, logged-in presence, and account/session actions. Physical user deletion is intentionally absent because accounts are retained/deactivated by requirements.
-- User detail no longer contains a Sessions history section or a separate role dropdown. The Role metadata value opens the role-change dialog.
-- Role-change workflow: an active logged-out target account is temporarily deactivated before role editing and restored after the dialog closes; a logged-in target cannot enter that workflow and receives an error toast. A previously pending/deactivated account retains its prior state. Promotion to Administrator is blocked while project memberships exist.
-- The signed-in Administrator cannot deactivate their own account or revoke their own session from administration; they must use the normal account-menu Logout action.
-- Project overview is a full-width table. Project detail has separate summary, Categories, Ticket URL template, and Project memberships panels.
-- Category administration summary shows each category and its requirement count.
-- Project actions (`New project`, `Rename project`, conditional `Delete project`, `Add membership`) are in the shared ActionBar. `Add membership` opens a dialog. Membership removal is an icon action.
+## WP-F1 — Metrics
 
-### Frontend SCSS/design-system restructuring
+### Agreed product decisions
 
-The frontend styling review intentionally borrows Bulma's compositional principle (base class plus stackable modifiers) without adding Bulma as a dependency; PrimeReact remains the UI component library.
+These decisions apply to all WP-F1 sub-packages.
 
-Completed restructuring steps:
+#### Metric identity
 
-1. **Buttons and icons — complete.** Shared `src/styles/_Buttons.scss` and `src/styles/_Icons.scss` provide composable classes such as `ui-button`, visual modifiers (`--primary`, `--outline`, `--danger`, `--ghost`, `--transparent`), context/size modifiers (`--action`, `--dialog`, `--form`), and composition modifiers (`--icon-only`, `--with-icon`). Repeated button-style mixins were removed. Page specs are part of the normal Vitest unit suite; there is no separate `test:pages` script.
-2. **Panels and native tables — complete.** Shared `src/styles/_Panels.scss` and `src/styles/_Tables.scss` centralize panel surfaces/layout modifiers and native-table wrapper/cell/header/action patterns. Administration tables/panels, category/requirement list/form/detail panels, requirement ticket detail tables, and implementation-ticket tables are migrated to the shared classes. PrimeReact DataTable-specific mixins remain because they are a separate low-duplication integration layer.
-3. **Forms and dialogs — complete.** Shared `src/styles/_Forms.scss` and `src/styles/_Dialogs.scss` now own reusable field, control, message, form-action, dialog shell/header/content/title/message/action patterns. Project/category/requirement forms and the project, membership, role, lifecycle, review, category-delete, unsaved-navigation, and implementation-ticket dialogs use the shared classes. The obsolete form/dialog mixins were removed from `_UiMixins.scss`.
-4. **Public account pages — complete.** Shared `src/styles/_PublicAccount.scss` centralizes the Login/PublicAccount/Bootstrap page shell, card widths, form controls, public-account buttons/loading state, action links, validation text, and feedback messages. The old page-specific Login/PublicAccount/Bootstrap SCSS files are removed.
-5. **Token cleanup — complete.** Repeated uses of the established spacing scale now use `--ui-space-*` tokens. Repeated non-spacing UI constants now have focused semantic tokens for border width, focus-ring width, button press offset, and standard control inline padding. Feature-specific widths/heights and genuinely one-off dimensions remain local instead of being promoted into global tokens.
+- Metrics belong to a project.
+- Metric-key uniqueness is **project-scoped**.
+- Metric keys are generated automatically by the backend.
+- Key format:
 
-The five-step frontend SCSS/design-system restructuring is complete. There is no remaining styling-refactor step in this sequence. Future styling work should preserve the established compositional `ui-*` primitives and only add shared tokens/classes when there is demonstrated reuse.
+  `MET-0001`
 
-Do not replace feature-specific BEM classes wholesale. Shared `ui-*` classes should own reusable visual primitives; feature SCSS should retain feature-specific layout, widths, grids, and exceptional states.
+- Metric keys are immutable after creation.
+- Metrics also have an immutable internal ID.
+- Relations use internal IDs rather than the human-readable metric key.
 
+#### Metric content
 
-### TanStack Query / TanStack DB boundary follow-up — 2026-09-19
+A metric has at least:
 
-The hybrid server-state architecture has been reviewed and tightened without replacing either library:
+- internal ID;
+- project ID;
+- immutable generated key;
+- non-empty string value;
+- description;
+- active/deactivated state.
 
-- React Query remains the remote request/cache/invalidation foundation. TanStack DB remains the reactive read model for projects, project categories and project requirements. Administration/session/review workflow datasets continue to use direct React Query where shared reactive entity identity is not useful.
-- Sidebar requirement counters now use `Project.requirementCount` from the projects collection. Do not restore one `list requirements` query per sidebar project; requirement creation must invalidate the projects query so the authoritative summary count refreshes.
-- Category requirement counters now use `Category.requirementCount` from the categories collection. Requirement create/update invalidates the category list so category moves and creations refresh those summary counts. Do not reload the entire requirements collection merely to calculate category counts.
-- Authentication-boundary clearing now explicitly cleans up the projects/categories/requirements TanStack DB collections before clearing the QueryClient cache. Scoped collection caches are discarded and the global projects collection is recreated, preventing rows from one authenticated account from surviving into the next session. Logout and HTTP 401 handling await this cleanup.
-- Review comment/summary Query keys are centralized in `reviewApi.ts`; reads and mutation invalidations must use those helpers rather than duplicating array literals.
-- `LoadingOverlay` intentionally remains a direct React Query consumer of the projects query because it needs request lifecycle/error/retry state rather than a domain projection. It shares the same query key/cache and is an explicit exception, not an alternate domain read model.
+Metric values are intentionally stored as a single non-empty string.
 
-### Product work still outstanding after Release 1.0.0
+Examples:
 
-Release 1.0.0 was created before the backlog's originally planned functional-completion point. The styling work does not replace product backlog implementation, and the items below were not retroactively completed by creating the release. The next product packages remain:
+- `2000 ms`
+- `99.9 %`
+- `50 requests/s`
 
-1. **WP-E / US-VER-002 frontend stage — complete:**
-   - **WP-E1 — complete:** the frontend revision contract is synchronized with the existing Orval-generated `/revisions` and `/revisions/compare` operations. Requirement details include an in-place revision-history panel showing revision number, change type, reason, actor, and timestamp with loading/error/empty states. Revision-producing frontend workflows invalidate the revision-history query together with current requirement data.
-   - **WP-E2 — complete:** requirement details provide From/To revision selection and render backend-computed field-level differences from `/revisions/compare`, including readable implementation-ticket snapshots plus comparison loading/error/no-difference states.
-2. **WP-F1 — next:** Metrics. Continue WP-F afterward with F2 structured Requirement Links; F3 Search/Filtering/Views; F4 Review Assignment Tasks; F5 Export architecture/formats.
-3. **WP-G Category/Requirement identity controls:** category deactivation/stability, controlled reclassification, permanent previous-key aliases/search, and related identity rules.
-4. **WP7 next-release verification** after the functionality selected for the next release is complete.
+The value and unit are not split into separate fields in WP-F1.
 
-The earlier exploratory implementation of WP-E/F in an assistant working tree was never delivered and must **not** be treated as part of the user's source. Only applied patches/user-provided current source count as implemented.
+#### Permissions
 
-### Validation/environment notes
+Requirements Engineer:
 
-- The user can run backend PostgreSQL E2E tests locally; the assistant environment generally cannot because no PostgreSQL service is available. Do not interpret unexecuted E2E as passing.
-- `pnpm` may be unavailable in the assistant runtime even when the uploaded dependency tree exists. When repository binaries are available, direct execution of those exact binaries has been accepted by the user as a fallback. Never use `npm`/`npx` in the frontend repository because `AGENTS.md` forbids them.
-- The frontend full Vitest suite has sometimes taken longer than the execution window even while continuously reporting passes. Distinguish targeted/build validation from complete-suite completion rather than overstating results.
-- Frontend E2E fixtures run against persistent backend state. Do not restore the old destructive `resetTestBackend()` behavior: projects with requirements are intentionally undeletable. New retained-data scenarios should create a unique project and navigate/assert through its id or resolved unique name instead of assuming the database can be emptied between scenarios.
-- E2E follow-up on 2026-09-18/19: `requirements.steps.ts` derives its project type from `createPersistentTestProject` (avoiding the `@typescript-eslint/consistent-type-imports` lint failure), and `resetTestBackend()` clears logical-to-unique project-name aliases between scenarios. The suite improved from 30/39 to 35/39 passing after fixing approval setup, project-name isolation, post-create/post-rename assertions, membership locator collisions, and the removed user-detail Sessions expectation. The final four reported failures were stale semantic locators: Administrator navigation exposes `Projects` as an expandable button, and project selection must be scoped to the `All projects` table rather than a removed `Administrative project list` region. Do not restore generic PATCH approval, old button-row locators, or the removed administration-list region.
-- The user reported all backend unit and E2E tests green after WP-A and subsequent backend application checkpoints.
+- create metrics;
+- edit metric value;
+- edit metric description;
+- deactivate metrics;
+- read metrics.
 
-### Unit/lint follow-up after TanStack boundary cleanup — 2026-09-19
+Developer:
 
-- The collection cleanup specs keep the cleanup spies in an explicitly typed `cleanupMocks` array owned by the hoisted test fixture. Do not inspect `createCollection.mock.results[*].value.cleanup`; Vitest exposes that path as `any`, which breaks both TypeScript and `@typescript-eslint/no-unsafe-*`.
-- `pnpm test:unit` runs `vitest run`, which includes all `test/**/*.spec.{ts,tsx}` files, including `test/pages`. The separate `test:pages` script has been removed; `pnpm test:unit:coverage` continues to run the same complete unit/component/page suite with coverage.
+- read metrics.
 
-- The user confirmed the frontend E2E suite is fully green after the previous locator/setup fixes. Preserve those E2E semantics; no E2E changes were required in this follow-up.
-- A regression caused by eager authentication-boundary imports was fixed: `authenticationFailure.ts` now loads `resetDomainCollections` lazily inside `clearUserScopedState()`. This prevents ordinary API/module tests that intentionally mock only `useLiveQuery`/`eq` or generated project helpers from instantiating unrelated TanStack DB collections at module-import time, while logout/401 cleanup behavior remains awaited and unchanged.
-- `projectsCollection.spec.ts` now recreates the resettable global projects collection in `beforeEach`, so collection-option assertions remain isolated after Vitest mock clearing. Collection cleanup assertions capture the Vitest cleanup spy from the mocked `createCollection` result and assert on that spy directly; they do not reach through the production `Collection.cleanup` type or pass an unbound method reference. The category and requirement collection cleanup specs use the same pattern, keeping both `pnpm typecheck` and `pnpm lint` satisfied.
-- Generated TypeDoc browser assets under `docs/assets/**` are excluded from ESLint's typed project-service pass. They are generated documentation output and are not part of the TypeScript source project; do not add them to application tsconfig files merely to satisfy lint.
+Viewer:
 
-### Frontend AGENTS compliance cleanup — 2026-09-19
+- read metrics.
 
-The first two packages from the frontend architecture/performance review are complete against the `frontend(2).zip` baseline.
+Administrator:
 
-1. **Architecture cleanup — complete.** Production code outside `src/api` no longer imports Orval-generated project query-key helpers directly; `projectsApi.ts` exposes the domain-facing query-key helper. Application/admin/authentication route construction and route matching are centralized under `src/router` (`applicationRoutes.ts`, `authenticationRoutes.ts`, `administrationRoutes.ts`, and `projectRoutes.ts`). The authentication helper module now contains only authentication return-state logic. The transient toast event bus was moved out of `src/stores` into `src/components/Feedback/toastEvents.ts`, leaving `src/stores` for TanStack Store state as required by `AGENTS.md`. Confirmed dead compatibility/duplicate files were removed: `src/pages/ProjectRequirements/ProjectRequirementsPage.tsx`, `src/pages/ProjectRequirements/List/CategoryTable.tsx`, `src/components/Feedback/toastMessages.ts`, and `src/e2eAuthenticationHarness.ts`.
-2. **E2E semantic-locator cleanup — complete.** Requirement/category PrimeReact tables have stable accessible names; requirement/category detail panels expose named regions; project summary/status groups have semantic accessible names; expandable navigation root buttons expose stable labels independent of badges. Playwright BDD step definitions now use roles, accessible names, labels, and visible semantic content instead of CSS class selectors/incidental PrimeReact DOM structure. Do not reintroduce `.p-datatable-*`, feature BEM class, or nth-cell locators when a semantic locator exists.
+- no project-content access, consistent with the existing project-content authorization model.
 
-The performance packages from that review are now complete:
+#### Deactivation
 
-3. **Route lazy loading — complete.** Route-level page modules are loaded through React Router route-object `lazy`; the application shell (`RootLayout`) and authorization guards remain eager so route matching and access control stay immediately available. Public-account, Administrator, project, category, requirement, form, and review pages are split behind dynamic route-module imports in `src/router/routeModules.ts`. Do not replace this with eager page imports in `src/router/index.tsx` unless a measured regression requires it.
-4. **Intent prefetching — complete.** Project sidebar hover/focus intent preloads the target route module and warms the matching TanStack Query cache using the same generated query keys that back the TanStack DB category/requirement collections. Project-overview intent warms both categories and requirements; Requirements and Categories subitems warm only their corresponding dataset. Administrator navigation preloads its target route modules on intent. Prefetching is event-driven, not render-driven, so rendering many projects must not issue per-project background requests. Speculative prefetch failures are intentionally swallowed; real navigation remains responsible for surfaced request errors.
+Metrics are deactivated rather than physically deleted.
 
-Packages 1–4 are architecture/performance work and must not be confused with WP-E product functionality.
+- Existing requirement references to a metric remain valid after deactivation.
+- Existing requirements continue to render the metric.
+- Historical revisions remain valid.
+- A deactivated metric cannot be introduced as a new reference.
+- Re-saving an existing requirement containing an already established reference to a subsequently deactivated metric must not destroy that relation merely because the metric is now inactive.
 
-### Architecture cleanup repair — 2026-09-19
+#### Requirement placeholder syntax
 
-The AGENTS compliance cleanup originally referenced new route/toast modules that were not tracked in Git, so the user's `git diff HEAD~1 HEAD` handoff omitted them. This caused 28 Vitest suites and the E2E Vite build to fail with unresolved imports. The repair adds the missing tracked files: `src/router/applicationRoutes.ts`, `src/router/authenticationRoutes.ts`, `src/router/administrationRoutes.ts`, `src/components/Feedback/toastEvents.ts`, and `test/router/administrationRoutes.spec.ts`. Future patches that introduce new files must ensure those files are added to Git before generating `git diff HEAD~1 HEAD`, otherwise the diff cannot contain them.
+Metric references use:
 
-### Architecture/E2E cleanup follow-up — 2026-09-19
+`[~MET-0001]`
 
-Typed ESLint exposed four stale type imports after route parsing moved into `src/router`: `ProjectNavigationList.tsx`, `useProjectNavigation.ts`, and their two component specs imported `ActiveProjectRoute` from `useActiveProjectRoute.ts`, which does not export that type. They now import the type directly from `src/router/projectRoutes.ts`, its owning module. This removes the resulting error-typed values and all nine reported `no-unsafe-*` lint failures without changing runtime behavior.
+Rules:
 
-The category-to-requirement E2E scenario also had an unscoped `page.getByLabel('Category')` locator. After the sidebar accessibility cleanup, the project navigation button (for example `Category BDD Project`) legitimately also matches that fuzzy label query. The step now scopes `Category` and `Priority` form controls to the named `Create requirement` form region and uses exact labels. Preserve that form-region scoping rather than weakening accessible names.
+- The raw placeholder remains stored in the current requirement description.
+- The backend does not replace the stored current requirement description with the metric value.
+- Syntactically valid metric placeholders are parsed and resolved.
+- Duplicate occurrences of the same metric in one requirement create only one logical relationship.
+- Editing a requirement recalculates its metric relationships.
+- Malformed metric-like text is not silently corrected.
 
-### Frontend route lazy loading / intent prefetch — 2026-09-19
+A syntactically valid but missing key such as:
 
-- `src/router/index.tsx` keeps only shell/guard components eager; route pages use lazy route modules from `src/router/routeModules.ts`, producing feature-oriented Vite chunks without manual chunk configuration.
-- `ExpandableNavigationItem` exposes optional parent/subitem intent callbacks and composes them with existing tooltip mouse/focus behavior. Preserve both mouse and keyboard intent paths.
-- `useProjectNavigation` owns project-navigation prefetch orchestration. Overview intent preloads the project-details route and warms categories + requirements; requirements/categories intent preloads only the matching list route and query.
-- `src/api/projectPrefetch.ts` uses `queryClient.prefetchQuery(...)` with the exact collection-backing query keys and domain-facing request wrappers. This is deliberate: React Query remains the transport/cache layer and TanStack DB consumes the warmed cache when its collection becomes active.
-- Administrator sidebar intent preloads the users/projects route modules. It does not add extra data prefetch because those administration queries are already active while that sidebar is mounted.
-- Do not prefetch every project during render. Hover/focus intent is the guard against N+1 speculative requests.
-- Unit coverage was added for intent callback wiring, project-prefetch routing, and query warming behavior. Full `pnpm format`, `pnpm lint`, `pnpm build`, `pnpm test:unit:coverage`, and `pnpm test:e2e` still require execution in the user's dependency-installed repository.
+`[~MET-9999]`
 
+is treated as an unresolved metric reference.
 
-### Frontend coverage strengthening — 2026-09-21
+Text such as:
 
-The current `coverage/clover.xml` was reviewed after all frontend tests were green. The report showed several meaningful hooks/routes/workflows at 0% or very low direct unit/component coverage because higher-level page specs intentionally mocked them. A targeted coverage pass was added rather than chasing trivial coverage:
+`[~UNKNOWN]`
 
-- Added direct permission-route coverage for `ProjectPermissionRoute`, including successful access plus read/manage redirects.
-- Added deterministic inactivity-window coverage for `sessionStatus.ts`.
-- Added focused hook coverage for Administrator project/user orchestration, user presence, project details statistics, review queries, review mutation execution, and implementation-ticket editing.
-- Added focused page coverage for requirement details and requirement review behavior, including ActionBar context, review redirects, approval navigation/invalidation, editable/read-only review behavior, and incomplete-route handling.
-- The coverage pass intentionally did not add low-value specs for glue-only files such as `App.tsx`, router wiring, tiny toast/event primitives, or thin API forwarding wrappers. Continue preferring behavior/business-rule coverage over a mechanical one-spec-per-file target.
-- No production behavior changed in this pass, so full Playwright E2E is not required solely for these test additions. The normal frontend finish gates still apply; run `pnpm format`, `pnpm lint`, `pnpm build`, and `pnpm test:unit:coverage` in the dependency-installed repository and inspect the regenerated coverage report.
+does not match the metric-key grammar and should not automatically become a metric reference.
+
+#### Approval validation
+
+A requirement with an unresolved syntactically valid metric reference cannot be approved.
+
+Existing references to metrics that were later deactivated remain valid and do not become unresolved merely because of the deactivation.
+
+#### Current rendering
+
+Current requirement views resolve `[~MET-####]` using the metric's current value.
+
+Rendered metric references should:
+
+- be visually distinguishable from ordinary description text;
+- retain their relationship to the referenced metric;
+- allow navigation to the metric where appropriate.
+
+#### Historical revisions
+
+Historical requirement revisions must **not resolve live metric data**.
+
+When a requirement revision is created, the metric value as it exists at that time is frozen into the revision snapshot.
+
+Example:
+
+Current description:
+
+`The response time shall be below [~MET-0001].`
+
+At revision creation time:
+
+`MET-0001 = 2000 ms`
+
+The historical revision must retain enough snapshot information to display:
+
+`The response time shall be below 2000 ms.`
+
+If `MET-0001` is later changed to `1000 ms`, that old requirement revision must continue to show `2000 ms`.
+
+Historical display therefore does not depend on the current metric record.
+
+---
+
+## WP-F1.1 — Metric domain and API
+Status: **Complete**
+
+Goal: establish the metric model and backend contract independently from requirement parsing.
+
+Implement:
+
+- Metric persistence model.
+- Project ownership.
+- Immutable internal metric ID.
+- Project-scoped generated metric keys.
+- Automatic next-key generation.
+- Immutable key after creation.
+- Non-empty string value.
+- Description.
+- Active/deactivated state.
+- Database migration.
+- Create metric endpoint.
+- List project metrics endpoint.
+- Get metric endpoint.
+- Update value/description endpoint.
+- Deactivate endpoint.
+- Correct project-role authorization.
+- OpenAPI DTOs and schema.
+- Backend unit tests.
+- Backend E2E tests.
+
+Acceptance criteria:
+
+- A Requirements Engineer can create a metric.
+- The backend assigns the next project-local `MET-####` key.
+- Two projects may independently contain `MET-0001`.
+- The same project cannot contain duplicate metric keys.
+- Clients cannot choose or change the key.
+- Empty metric values are rejected.
+- Value and description can be updated.
+- Deactivation does not delete the record.
+- Developer and Viewer can read metrics.
+- Developer and Viewer cannot mutate metrics.
+- Administrator cannot access project metric content.
+
+---
+
+## WP-F1.2 — Requirement metric references and validation
+Status: **Complete**
+
+Depends on WP-F1.1.
+
+Implement:
+
+- Parse `[~MET-####]` from requirement descriptions.
+- Resolve references inside the same project.
+- Persist requirement-to-metric relationships using internal IDs.
+- Deduplicate repeated references.
+- Recalculate relationships after description changes.
+- Detect unresolved references.
+- Preserve raw placeholders in stored requirement descriptions.
+- Preserve existing references when their metric is later deactivated.
+- Reject newly introduced references to deactivated metrics.
+- Expose resolution information through the backend where needed.
+- Block approval when unresolved references exist.
+- Backend tests for parsing, linking and validation.
+
+Acceptance criteria:
+
+- `[~MET-0001]` resolves to the matching metric in the same project.
+- The same key in another project does not resolve.
+- Repeating `[~MET-0001]` several times produces one logical relation.
+- Removing a placeholder removes the relation.
+- Adding another placeholder adds its relation.
+- Unknown valid metric keys are reported as unresolved.
+- Current raw requirement text still contains the placeholder.
+- Approval fails while unresolved references exist.
+- Existing references remain valid after metric deactivation.
+- A newly introduced reference to an already deactivated metric is rejected.
+
+---
+
+## WP-F1.3 — Historical metric snapshots
+Status: **Complete**
+
+Depends on WP-F1.1 and WP-F1.2.
+
+Implement:
+
+- Snapshot metric rendering information whenever a requirement revision is created.
+- Store enough revision-local data to reproduce the metric value from that point in time.
+- Historical requirement views use the revision snapshot rather than live metric data.
+- Revision comparison works with the frozen historical representation.
+- Ticket-driven or lifecycle-driven revisions preserve the correct metric snapshot too.
+- Backend and frontend tests for historical behavior.
+
+Acceptance criteria:
+
+- A revision created while `MET-0001 = 2000 ms` continues to display `2000 ms`.
+- Changing `MET-0001` to `1000 ms` does not alter old revisions.
+- Deactivating the metric does not alter old revisions.
+- Deleting/changing current requirement-to-metric links does not alter old revisions.
+- The current requirement continues to resolve the current metric value.
+- Revision comparison shows historically correct values.
+
+---
+
+## WP-F1.4 — Frontend metric management
+Status: **Complete**
+
+Depends primarily on WP-F1.1.
+
+Implement:
+
+- Synchronize/regenerate the frontend API contract from backend OpenAPI.
+- Add a project-sidebar **Metrics** entry alongside the existing project navigation.
+- Add a Metrics list page.
+- Show at least:
+  - key;
+  - value;
+  - description;
+  - active/deactivated state.
+- Requirements Engineer actions:
+  - create;
+  - edit;
+  - deactivate.
+- Developer/Viewer:
+  - read-only list/detail behavior.
+- Metric key is displayed but never editable.
+- Follow existing application dialog/list styling.
+- Frontend unit/component tests.
+- Permission-aware E2E coverage.
+
+Acceptance criteria:
+
+- Metrics can be opened from the project sidebar.
+- A Requirements Engineer can create a metric from the Metrics UI.
+- The generated key appears after creation.
+- Value and description can be edited.
+- Key cannot be edited.
+- Metric can be deactivated.
+- Developer and Viewer see metric data without mutation controls.
+- Administrator cannot access the project Metrics page.
+
+---
+
+## WP-F1.5 — Requirement rendering, metric navigation and integration
+Status: **Complete**
+
+Depends on WP-F1.1 through WP-F1.4.
+
+Implement:
+
+- Render current requirement metric placeholders with current metric values.
+- Visually distinguish rendered metric values.
+- Show unresolved metric references clearly.
+- Allow navigation from a rendered metric reference to its metric.
+- Metric detail shows:
+  - key;
+  - value;
+  - description;
+  - active state;
+  - referencing requirements;
+  - usage count.
+- Navigation from metric usage entries back to requirements.
+- Review UI exposes unresolved-reference state.
+- Final integration/E2E coverage.
+- Backlog update marking WP-F1 complete.
+
+Acceptance criteria:
+
+- A requirement containing `[~MET-0001]` displays the metric's current value.
+- Updating the metric value updates current requirement rendering.
+- Raw requirement text still contains `[~MET-0001]`.
+- Metric references are visually distinct.
+- Clicking/opening a metric reference navigates to that metric.
+- Unknown references are highlighted.
+- Review clearly shows unresolved metric references.
+- Metric detail lists every requirement referencing it.
+- Usage count matches the number of distinct referencing requirements.
+- Deactivated metrics already referenced by requirements continue to render.
+- Historical revisions use their frozen values from WP-F1.3.
+
+---
+
+## Deferred metric-related work
+
+### WP-F3 — Search / filtering / views
+Status: **Planned**
+
+Metric-related search/filter functionality belongs here rather than WP-F1.
+
+Includes, among other search/filter requirements:
+
+- filtering requirements that contain unresolved metric references;
+- broader requirement filtering/search functionality described by the relevant US-MET/search stories.
+
+### WP-F5 — Export
+Status: **Planned**
+
+Metric rendering in exports belongs here rather than WP-F1.
+
+Exports must eventually use the appropriate resolved/frozen representation required by the export and baseline semantics.
+
+---
+
+## Later WP-F packages
+
+### WP-F2 — Requirement links / traceability
+Status: **Implemented — validation pending**
+
+Implements the first-release requirement-link stories independently from metric references (US-REF-001, US-REF-002, US-REF-003, US-REF-004, US-REF-006, US-REF-007, US-REF-008, US-REF-009, US-REF-010, US-REF-011, and US-REF-012). Requirement-link export remains in WP-F5; broader search/filter work remains in WP-F3.
+
+Implemented:
+
+- project-scoped structured requirement-link records using internal source/target IDs;
+- fixed relationship type `references`;
+- many-to-many outgoing/incoming links across FR/NFR requirements and categories;
+- target selection by visible requirement key;
+- duplicate, unknown-target, cross-project, and self-link protection;
+- create, correct, list, and remove API operations;
+- Requirements Engineer mutation access; Developer/Viewer read access; Administrator denied project content;
+- incoming/outgoing requirement-detail overview with source/target key, linked requirement type, category, and status;
+- navigation between linked requirements;
+- source/target key filtering in the link overview;
+- requirement links remain independent from description text and do not create requirement revisions;
+- backend unit/E2E and frontend API/E2E coverage.
+
+Acceptance criteria:
+
+- A Requirements Engineer can create a structured link from one project requirement to another by visible key.
+- The stored link uses immutable internal source and target IDs and the fixed relationship type `references`.
+- One requirement can reference many requirements and can be referenced by many requirements.
+- Duplicate links, self-links, unknown targets, and cross-project targets are rejected.
+- Mentioning a visible requirement key in description text does not create a structured link.
+- Editing description text does not silently remove structured links.
+- Authorized users can correct or remove outgoing links without changing either requirement.
+- Requirement detail shows grouped outgoing and incoming links with source/target keys and linked requirement metadata.
+- Linked requirements can be opened from the overview.
+- The overview can be filtered by source or target key.
+- Developer and Viewer can read link data without mutation controls.
+- Administrator has no project-content access.
+
+### WP-F3 — Search / filtering / views
+Status: **Planned**
+
+### WP-F4 — Review assignment tasks
+Status: **Planned**
+
+### WP-F5 — Export
+Status: **Planned**
+
+---
+
+## WP-G — Identity / access-control follow-up
+Status: **Planned**
+
+Identity and access-control work that is not already covered by the current project-role model remains a later package.
+
+---
+
+## Recommended implementation order
+
+Proceed in this order:
+
+1. WP-F1.1 — Metric domain and API
+2. WP-F1.2 — Requirement metric references and validation
+3. WP-F1.3 — Historical metric snapshots
+4. WP-F1.4 — Frontend metric management
+5. WP-F1.5 — Requirement rendering/navigation/integration
+6. WP-F2 — Requirement links / traceability
+7. WP-F3 — Search / filtering / views
+8. WP-F4 — Review assignment tasks
+9. WP-F5 — Export
+10. WP-G — remaining identity/access-control work
+
+The immediate next step is **WP-F2 validation**. After it is green, the next implementation package is **WP-F3**.

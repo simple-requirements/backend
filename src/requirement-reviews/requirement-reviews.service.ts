@@ -6,6 +6,7 @@ import type { RequirementResponseDto } from '@/projects/dto/requirement-response
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import { Requirement } from '@/projects/requirements.entity';
 import { RequirementLifecycleService } from '@/projects/requirements/requirement-lifecycle.service';
+import { RequirementMetricReferenceService } from '@/projects/requirements/requirement-metric-reference.service';
 import { RequirementResponseMapper } from '@/projects/requirements/requirement-response.mapper';
 import { RequirementRevisionService } from '@/projects/requirements/requirement-revision.service';
 import {
@@ -41,6 +42,7 @@ export class RequirementReviewsService {
         private readonly lifecycle: RequirementLifecycleService,
         private readonly requirementMapper: RequirementResponseMapper,
         private readonly revisions: RequirementRevisionService,
+        private readonly metricReferences: RequirementMetricReferenceService,
     ) {}
 
     async findAllReviewComments(
@@ -162,6 +164,13 @@ export class RequirementReviewsService {
             throw new BadRequestException('Requirement cannot be approved while review comments are open.');
         }
 
+        const unresolvedMetricKeys = await this.metricReferences.unresolvedKeys(projectId, requirement.description);
+        if (unresolvedMetricKeys.length > 0) {
+            throw new BadRequestException(
+                `Requirement cannot be approved while metric references are unresolved: ${unresolvedMetricKeys.join(', ')}.`,
+            );
+        }
+
         const update = { status: RequirementStatus.Approved, reviewer: approveRequirementDto.reviewer };
         this.lifecycle.validateStatusChange(requirement, update);
         const revisionMetadata = {
@@ -173,11 +182,12 @@ export class RequirementReviewsService {
 
         requirement.revisionNumber += 1;
         this.lifecycle.applyStatusChange(requirement, update);
+        requirement.metricSnapshots = this.metricReferences.snapshot(requirement.description, requirement.metrics);
         this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
 
         const savedRequirement = await this.requirementsRepository.save(requirement);
 
-        return this.requirementMapper.fromRequirement(savedRequirement);
+        return this.mapCurrentRequirement(savedRequirement);
     }
 
     async rejectRequirement(
@@ -203,6 +213,7 @@ export class RequirementReviewsService {
 
         requirement.revisionNumber += 1;
         this.lifecycle.applyStatusChange(requirement, update);
+        requirement.metricSnapshots = this.metricReferences.snapshot(requirement.description, requirement.metrics);
         this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
 
         const savedRequirement = await this.requirementsRepository.save(requirement);
@@ -214,7 +225,12 @@ export class RequirementReviewsService {
             rejectRequirementDto.reviewer,
         );
 
-        return this.requirementMapper.fromRequirement(savedRequirement);
+        return this.mapCurrentRequirement(savedRequirement);
+    }
+
+    private async mapCurrentRequirement(requirement: Requirement): Promise<RequirementResponseDto> {
+        const references = await this.metricReferences.describe(requirement.projectId, requirement.description);
+        return this.requirementMapper.fromRequirement(requirement, references);
     }
 
     private async getReviewableDraftRequirement(projectId: string, requirementId: string): Promise<Requirement> {

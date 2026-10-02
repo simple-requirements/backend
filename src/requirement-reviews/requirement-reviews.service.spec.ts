@@ -7,6 +7,7 @@ import { RequirementRevision } from '@/projects/requirement-revisions.entity';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import { Requirement } from '@/projects/requirements.entity';
 import { RequirementLifecycleService } from '@/projects/requirements/requirement-lifecycle.service';
+import { RequirementMetricReferenceService } from '@/projects/requirements/requirement-metric-reference.service';
 import { RequirementResponseMapper } from '@/projects/requirements/requirement-response.mapper';
 import { RequirementRevisionService } from '@/projects/requirements/requirement-revision.service';
 import { RequirementReviewCommentCloseReason } from '@/requirement-reviews/requirement-review-comment-close-reason.enum';
@@ -55,6 +56,7 @@ function createRequirementEntity(overrides: Partial<Requirement> = {}): Requirem
     requirement.revisionNumber = 1;
     requirement.status = RequirementStatus.Draft;
     requirement.description = 'Users must sign in.';
+    requirement.metricSnapshots = [];
     requirement.priority = 'p1';
     requirement.owner = 'Product Owner';
     requirement.rationale = 'Protect data.';
@@ -72,6 +74,7 @@ function createRequirementEntity(overrides: Partial<Requirement> = {}): Requirem
     requirement.revisions = [];
     requirement.reviewComments = [];
     requirement.implementationTickets = [];
+    requirement.metrics = [];
 
     return Object.assign(requirement, overrides);
 }
@@ -103,6 +106,7 @@ describe('RequirementReviewsService', () => {
     let requirementRevisionsRepository: RequirementRevisionsRepositoryMock;
     let reviewCommentsRepository: ReviewCommentsRepositoryMock;
     let reviewCommentRepliesRepository: ReviewCommentRepliesRepositoryMock;
+    const metricReferences = { unresolvedKeys: vi.fn(), describe: vi.fn(), snapshot: vi.fn() };
 
     beforeAll(async () => {
         requirementsRepository = { findOne: vi.fn(), save: vi.fn() };
@@ -116,6 +120,7 @@ describe('RequirementReviewsService', () => {
                 RequirementLifecycleService,
                 RequirementResponseMapper,
                 RequirementRevisionService,
+                { provide: RequirementMetricReferenceService, useValue: metricReferences },
                 { provide: getRepositoryToken(Requirement), useValue: requirementsRepository },
                 { provide: getRepositoryToken(RequirementRevision), useValue: requirementRevisionsRepository },
                 { provide: getRepositoryToken(RequirementReviewComment), useValue: reviewCommentsRepository },
@@ -131,6 +136,9 @@ describe('RequirementReviewsService', () => {
 
     beforeEach(() => {
         vi.resetAllMocks();
+        metricReferences.unresolvedKeys.mockResolvedValue([]);
+        metricReferences.describe.mockResolvedValue([]);
+        metricReferences.snapshot.mockReturnValue([]);
     });
 
     it('derives the in-review and decision-pending states from main comment counts.', async () => {
@@ -149,6 +157,17 @@ describe('RequirementReviewsService', () => {
             openCommentCount: 0,
             state: RequirementReviewState.DecisionPending,
         });
+    });
+
+    it('blocks approval while syntactically valid metric references are unresolved.', async () => {
+        requirementsRepository.findOne.mockResolvedValue(createRequirementEntity({ description: 'Below [~MET-9999].' }));
+        reviewCommentsRepository.count.mockResolvedValue(0);
+        metricReferences.unresolvedKeys.mockResolvedValue(['MET-9999']);
+
+        await expect(
+            service.approveRequirement(PROJECT_ID, REQUIREMENT_ID, { reviewer: 'Requirements Engineer' }),
+        ).rejects.toThrow('Requirement cannot be approved while metric references are unresolved: MET-9999.');
+        expect(requirementsRepository.save).not.toHaveBeenCalled();
     });
 
     it('rejects replies to closed comments.', async () => {

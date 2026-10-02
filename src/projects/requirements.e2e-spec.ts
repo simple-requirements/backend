@@ -1,16 +1,31 @@
 import { randomUUID } from 'node:crypto';
 
+import type { APIRequestContext } from '@playwright/test';
+
 import { expect, test } from '@/projects/projects-api.e2e-fixtures';
 
 import { CategoryType } from '@/projects/category-type.enum';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import {
+    E2E_REQUIREMENTS_ENGINEER_HEADERS,
     expectErrorResponseBody,
     expectIsoDateString,
     expectRequirementResponseBody,
     type ErrorResponseBody,
     type RequirementResponseBody,
 } from '@/projects/projects-api.e2e-helpers';
+
+
+type MetricBody = Readonly<{ id: string; key: string; active: boolean }>;
+
+async function createMetric(request: APIRequestContext, projectId: string, value = '2000 ms'): Promise<MetricBody> {
+    const response = await request.post(`/projects/${projectId}/metrics`, {
+        headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+        data: { value, description: 'Requirement metric reference test' },
+    });
+    expect(response.status()).toBe(201);
+    return (await response.json()) as MetricBody;
+}
 
 test.describe('Requirements API - POST /projects/{projectId}/requirements', () => {
     test('creates draft requirements with generated visible keys.', async ({ api }) => {
@@ -61,6 +76,103 @@ test.describe('Requirements API - POST /projects/{projectId}/requirements', () =
             404,
             `Category with id "${category.id}" in project "${firstProject.id}" was not found.`,
             'Not Found',
+        );
+    });
+});
+
+test.describe('Requirement metric references', () => {
+    test('resolves project-local placeholders, deduplicates repeated references, and reports unknown keys.', async ({ request, api }) => {
+        const project = await api.createProject(`Requirement metrics ${randomUUID()}`);
+        const category = await api.createCategory(project.id, 'Performance', 'PERF', CategoryType.NFR);
+        const metric = await createMetric(request, project.id);
+
+        const requirement = await api.createRequirement(
+            project.id,
+            category.id,
+            'Below [~MET-0001], repeated [~MET-0001], unknown [~MET-9999], malformed [~UNKNOWN].',
+        );
+
+        expect(requirement.description).toContain('[~MET-0001]');
+        expect(requirement.metricReferences).toEqual([
+            { key: 'MET-0001', metricId: metric.id, value: '2000 ms', resolved: true, active: true },
+            { key: 'MET-9999', metricId: null, value: null, resolved: false, active: null },
+        ]);
+    });
+
+    test('does not resolve a same-key metric from another project.', async ({ request, api }) => {
+        const project = await api.createProject(`Requirement metric scope A ${randomUUID()}`);
+        const otherProject = await api.createProject(`Requirement metric scope B ${randomUUID()}`);
+        const category = await api.createCategory(project.id, 'Performance', 'PERF', CategoryType.NFR);
+        await createMetric(request, otherProject.id);
+
+        const requirement = await api.createRequirement(project.id, category.id, 'Below [~MET-0001].');
+        expect(requirement.metricReferences).toEqual([
+            { key: 'MET-0001', metricId: null, value: null, resolved: false, active: null },
+        ]);
+    });
+
+    test('recalculates links after edits and preserves existing links after deactivation.', async ({ request, api }) => {
+        const project = await api.createProject(`Requirement metric edits ${randomUUID()}`);
+        const category = await api.createCategory(project.id, 'Performance', 'PERF', CategoryType.NFR);
+        const firstMetric = await createMetric(request, project.id);
+        const secondMetric = await createMetric(request, project.id, '1000 ms');
+        const requirement = await api.createRequirement(project.id, category.id, 'Below [~MET-0001].');
+
+        const replaceResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            data: { description: 'Below [~MET-0002].', changeReason: 'Use the newer target.' },
+        });
+        expect(replaceResponse.status()).toBe(200);
+        expect(((await replaceResponse.json()) as RequirementResponseBody).metricReferences).toEqual([
+            { key: 'MET-0002', metricId: secondMetric.id, value: '1000 ms', resolved: true, active: true },
+        ]);
+
+        expect(
+            (await request.post(`/projects/${project.id}/metrics/${secondMetric.id}/deactivate`, {
+                headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            })).status(),
+        ).toBe(200);
+        const retainResponse = await request.patch(`/projects/${project.id}/requirements/${requirement.id}`, {
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            data: { description: 'Still below [~MET-0002].', changeReason: 'Clarify wording.' },
+        });
+        expect(retainResponse.status()).toBe(200);
+        expect(((await retainResponse.json()) as RequirementResponseBody).metricReferences).toEqual([
+            { key: 'MET-0002', metricId: secondMetric.id, value: '1000 ms', resolved: true, active: false },
+        ]);
+        expect(firstMetric.id).not.toBe(secondMetric.id);
+    });
+
+    test('rejects newly introduced references to already-deactivated metrics.', async ({ request, api }) => {
+        const project = await api.createProject(`Requirement metric inactive ${randomUUID()}`);
+        const category = await api.createCategory(project.id, 'Performance', 'PERF', CategoryType.NFR);
+        const metric = await createMetric(request, project.id);
+        await request.post(`/projects/${project.id}/metrics/${metric.id}/deactivate`, {
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+        });
+
+        const response = await request.post(`/projects/${project.id}/requirements`, {
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            data: { categoryId: category.id, description: 'Below [~MET-0001].' },
+        });
+        expect(response.status()).toBe(400);
+        expect(((await response.json()) as ErrorResponseBody).message).toContain(
+            'Metric reference "MET-0001" cannot be added because the metric is deactivated.',
+        );
+    });
+
+    test('blocks approval while unresolved valid metric references remain.', async ({ request, api }) => {
+        const project = await api.createProject(`Requirement metric approval ${randomUUID()}`);
+        const category = await api.createCategory(project.id, 'Performance', 'PERF', CategoryType.NFR);
+        const requirement = await api.createRequirement(project.id, category.id, 'Below [~MET-9999].');
+
+        const response = await request.post(`/projects/${project.id}/requirements/${requirement.id}/review/approve`, {
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            data: { reviewer: 'Requirements Engineer' },
+        });
+        expect(response.status()).toBe(400);
+        expect(((await response.json()) as ErrorResponseBody).message).toContain(
+            'Requirement cannot be approved while metric references are unresolved: MET-9999.',
         );
     });
 });

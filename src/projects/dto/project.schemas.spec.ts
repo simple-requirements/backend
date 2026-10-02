@@ -4,10 +4,12 @@ import { CategoryType } from '@/projects/category-type.enum';
 import {
     createCategorySchema,
     createProjectSchema,
+    createMetricSchema,
     createRequirementSchema,
     implementationTicketSchema,
     updateCategorySchema,
     updateProjectSchema,
+    updateMetricSchema,
     updateRequirementSchema,
 } from '@/projects/dto/project.schemas';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
@@ -82,6 +84,25 @@ describe('project request schemas', () => {
         }
 
         expect(result.error.issues[0]?.message).toBe('Category key must contain 2 to 4 uppercase letters.');
+    });
+
+    it('normalizes metric values and descriptions.', () => {
+        expect(createMetricSchema.parse({ value: '  2000 ms  ', description: '  Response time target  ' })).toEqual({
+            value: '2000 ms',
+            description: 'Response time target',
+        });
+    });
+
+    it('rejects empty metric values and client-supplied keys.', () => {
+        expect(createMetricSchema.safeParse({ value: '   ' }).success).toBe(false);
+        expect(createMetricSchema.parse({ value: '1 s', key: 'MET-9999' })).toEqual({ value: '1 s' });
+    });
+
+    it('rejects an empty metric patch.', () => {
+        const result = updateMetricSchema.safeParse({});
+        expect(result.success).toBe(false);
+        if (result.success) throw new Error('Expected Zod parsing to fail.');
+        expect(result.error.issues[0]?.message).toBe('At least one metric field must be provided.');
     });
 
     it('normalizes a requirement creation body.', () => {

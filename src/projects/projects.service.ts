@@ -19,6 +19,7 @@ import { RequirementStatus } from '@/projects/requirement-status.enum';
 import { Requirement } from '@/projects/requirements.entity';
 import { RequirementImplementationTicket } from '@/projects/requirement-implementation-ticket.entity';
 import { RequirementLifecycleService } from '@/projects/requirements/requirement-lifecycle.service';
+import { RequirementMetricReferenceService } from '@/projects/requirements/requirement-metric-reference.service';
 import { RequirementResponseMapper } from '@/projects/requirements/requirement-response.mapper';
 import { RequirementRevisionService } from '@/projects/requirements/requirement-revision.service';
 import {
@@ -89,6 +90,7 @@ export class ProjectsService {
         private readonly lifecycle: RequirementLifecycleService,
         private readonly requirementMapper: RequirementResponseMapper,
         private readonly revisions: RequirementRevisionService,
+        private readonly metricReferences: RequirementMetricReferenceService,
     ) {}
 
     async findAll(projectIds?: string[]): Promise<ProjectResponseDto[]> {
@@ -210,7 +212,7 @@ export class ProjectsService {
             order: { visibleKey: 'ASC' },
         });
 
-        return requirements.map((requirement) => this.requirementMapper.fromRequirement(requirement));
+        return Promise.all(requirements.map((requirement) => this.mapCurrentRequirement(requirement)));
     }
 
     async findRequirement(projectId: string, requirementId: string): Promise<RequirementResponseDto> {
@@ -218,7 +220,7 @@ export class ProjectsService {
 
         const requirement = await this.getRequirementOrThrow(projectId, requirementId);
 
-        return this.requirementMapper.fromRequirement(requirement);
+        return this.mapCurrentRequirement(requirement);
     }
 
     async createRequirement(
@@ -257,11 +259,15 @@ export class ProjectsService {
             obsolescenceReason: null,
             obsoleteAt: null,
             implementationTickets: [],
+            metrics: [],
+            metricSnapshots: [],
         });
+        requirement.metrics = await this.metricReferences.prepareForDescription(requirement, requirement.description);
+        requirement.metricSnapshots = this.metricReferences.snapshot(requirement.description, requirement.metrics);
         const savedRequirement = await this.requirementsRepository.save(requirement);
         savedRequirement.implementationTickets = [];
 
-        return this.requirementMapper.fromRequirement(savedRequirement);
+        return this.mapCurrentRequirement(savedRequirement);
     }
 
     async updateRequirement(
@@ -277,6 +283,10 @@ export class ProjectsService {
         this.ensureGenericStatusChangeAllowed(updateRequirementDto);
 
         const categoryChange = await this.prepareRequirementContentChange(projectId, requirement, updateRequirementDto);
+        const nextMetrics =
+            updateRequirementDto.description === undefined ?
+                undefined
+            :   await this.metricReferences.prepareForDescription(requirement, updateRequirementDto.description);
 
         if (updateRequirementDto.status !== undefined) {
             this.lifecycle.validateStatusChange(requirement, updateRequirementDto);
@@ -291,12 +301,14 @@ export class ProjectsService {
             this.lifecycle.applyStatusChange(requirement, updateRequirementDto);
         } else {
             this.applyRequirementContentChange(requirement, updateRequirementDto, categoryChange);
+            if (nextMetrics !== undefined) requirement.metrics = nextMetrics;
         }
+        requirement.metricSnapshots = this.metricReferences.snapshot(requirement.description, requirement.metrics);
         this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
 
         const savedRequirement = await this.requirementsRepository.save(requirement);
 
-        return this.requirementMapper.fromRequirement(savedRequirement);
+        return this.mapCurrentRequirement(savedRequirement);
     }
 
     async listImplementationTickets(
@@ -339,6 +351,7 @@ export class ProjectsService {
         const savedTicket = await this.implementationTicketsRepository.save(ticket);
         requirement.implementationTickets = [...requirement.implementationTickets, savedTicket];
         requirement.revisionNumber += 1;
+        requirement.metricSnapshots = this.metricReferences.snapshot(requirement.description, requirement.metrics);
         this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
         await this.requirementsRepository.save(requirement);
         return this.requirementMapper.fromImplementationTicket(savedTicket, project.ticketUrlTemplate);
@@ -368,6 +381,7 @@ export class ProjectsService {
             item.id === savedTicket.id ? savedTicket : item,
         );
         requirement.revisionNumber += 1;
+        requirement.metricSnapshots = this.metricReferences.snapshot(requirement.description, requirement.metrics);
         this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
         await this.requirementsRepository.save(requirement);
         return this.requirementMapper.fromImplementationTicket(savedTicket, project.ticketUrlTemplate);
@@ -394,6 +408,7 @@ export class ProjectsService {
             (item) => item.id !== ticketRecordId,
         );
         requirement.revisionNumber += 1;
+        requirement.metricSnapshots = this.metricReferences.snapshot(requirement.description, requirement.metrics);
         this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
         await this.requirementsRepository.save(requirement);
     }
@@ -403,10 +418,16 @@ export class ProjectsService {
         const requirement = await this.getRequirementOrThrow(projectId, requirementId);
         const history = await this.revisions.findHistory(projectId, requirement);
 
-        return history.map((revision) =>
-            revision instanceof Requirement ?
-                this.requirementMapper.fromRequirement(revision)
-            :   this.requirementMapper.fromRevision(revision),
+        return Promise.all(
+            history.map(async (revision) =>
+                revision instanceof Requirement ?
+                    this.requirementMapper.fromRequirement(
+                        revision,
+                        undefined,
+                        await this.metricReferences.renderCurrent(revision.projectId, revision.description),
+                    )
+                :   this.requirementMapper.fromRevision(revision),
+            ),
         );
     }
 
@@ -457,8 +478,12 @@ export class ProjectsService {
             fromRevision,
             toRevision,
             differences: comparedFields
-                .filter((field) => JSON.stringify(from[field]) !== JSON.stringify(to[field]))
-                .map((field) => ({ field, from: from[field], to: to[field] })),
+                .map((field) => ({
+                    field,
+                    from: field === 'description' ? (from.renderedDescription ?? from.description) : from[field],
+                    to: field === 'description' ? (to.renderedDescription ?? to.description) : to[field],
+                }))
+                .filter((difference) => JSON.stringify(difference.from) !== JSON.stringify(difference.to)),
         };
     }
 
@@ -520,6 +545,11 @@ export class ProjectsService {
         }
 
         return requirement;
+    }
+
+    private async mapCurrentRequirement(requirement: Requirement): Promise<RequirementResponseDto> {
+        const references = await this.metricReferences.describe(requirement.projectId, requirement.description);
+        return this.requirementMapper.fromRequirement(requirement, references);
     }
 
     private async ensureCategoryNameAvailable(

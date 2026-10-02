@@ -17,6 +17,7 @@ import { RequirementImplementationTicket } from '@/projects/requirement-implemen
 import { ProjectsService } from '@/projects/projects.service';
 import { CategoryType } from '@/projects/category-type.enum';
 import { RequirementLifecycleService } from '@/projects/requirements/requirement-lifecycle.service';
+import { RequirementMetricReferenceService } from '@/projects/requirements/requirement-metric-reference.service';
 import { RequirementResponseMapper } from '@/projects/requirements/requirement-response.mapper';
 import { RequirementRevisionService } from '@/projects/requirements/requirement-revision.service';
 import { RequirementRevisionChangeType } from '@/projects/requirements/requirement-revision-metadata';
@@ -113,6 +114,7 @@ function createRequirementEntity(overrides: Partial<Requirement> = {}): Requirem
     requirement.changedByDisplayName = 'System';
     requirement.status = RequirementStatus.Draft;
     requirement.description = 'Users must sign in.';
+    requirement.metricSnapshots = [];
     requirement.priority = 'p1';
     requirement.owner = 'Product Owner';
     requirement.rationale = 'Protect data.';
@@ -129,6 +131,7 @@ function createRequirementEntity(overrides: Partial<Requirement> = {}): Requirem
     requirement.updatedAt = new Date('2026-06-28T10:00:00.000Z');
     requirement.revisions = [];
     requirement.implementationTickets = [];
+    requirement.metrics = [];
     requirement.project = createProjectEntity();
 
     return Object.assign(requirement, overrides);
@@ -151,6 +154,7 @@ function createRequirementRevisionEntity(overrides: Partial<RequirementRevision>
     revision.changedByDisplayName = 'System';
     revision.status = RequirementStatus.Draft;
     revision.description = 'Users must sign in.';
+    revision.metricSnapshots = [];
     revision.priority = 'p1';
     revision.owner = 'Product Owner';
     revision.rationale = 'Protect data.';
@@ -189,6 +193,12 @@ describe('ProjectsService', () => {
     let requirementsRepository: RequirementsRepositoryMock;
     let requirementRevisionsRepository: RequirementRevisionsRepositoryMock;
     let implementationTicketsRepository: ImplementationTicketsRepositoryMock;
+    const metricReferences = {
+        prepareForDescription: vi.fn(),
+        describe: vi.fn(),
+        snapshot: vi.fn(),
+        renderCurrent: vi.fn(),
+    };
 
     beforeAll(async () => {
         projectsRepository = { create: vi.fn(), delete: vi.fn(), find: vi.fn(), findOne: vi.fn(), save: vi.fn() };
@@ -217,6 +227,7 @@ describe('ProjectsService', () => {
                 RequirementLifecycleService,
                 RequirementResponseMapper,
                 RequirementRevisionService,
+                { provide: RequirementMetricReferenceService, useValue: metricReferences },
                 { provide: getRepositoryToken(Project), useValue: projectsRepository },
                 { provide: getRepositoryToken(Category), useValue: categoriesRepository },
                 { provide: getRepositoryToken(Requirement), useValue: requirementsRepository },
@@ -234,6 +245,10 @@ describe('ProjectsService', () => {
     beforeEach(() => {
         vi.resetAllMocks();
         requirementsRepository.countBy.mockResolvedValue(0);
+        metricReferences.prepareForDescription.mockResolvedValue([]);
+        metricReferences.describe.mockResolvedValue([]);
+        metricReferences.snapshot.mockReturnValue([]);
+        metricReferences.renderCurrent.mockImplementation(async (_projectId: string, description: string | null) => description);
     });
 
     describe('finds', () => {
@@ -892,6 +907,8 @@ describe('ProjectsService', () => {
                     obsolescenceReason: null,
                     obsoleteAt: null,
                     implementationTickets: [],
+                    metrics: [],
+                    metricSnapshots: [],
                 });
                 expect(requirementsRepository.save).toHaveBeenCalledWith(createdRequirement);
                 expect(result.visibleKey).toBe('NFR-PERF-0001');

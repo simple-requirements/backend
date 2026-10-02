@@ -1,7 +1,10 @@
+import { randomUUID } from 'node:crypto';
+
 import { expect, test } from '@/projects/projects-api.e2e-fixtures';
 
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import {
+    E2E_REQUIREMENTS_ENGINEER_HEADERS,
     expectErrorResponseBody,
     type ErrorResponseBody,
     type RequirementResponseBody,
@@ -149,6 +152,119 @@ test.describe('Requirement revisions API', () => {
 
         const body = (await compareResponse.json()) as { readonly differences: readonly { readonly field: string }[] };
         expect(body.differences.map((difference) => difference.field)).toContain('implementationTickets');
+    });
+
+    test('freezes metric values when revisions are created and compares the frozen rendering.', async ({
+        request,
+        api,
+    }) => {
+        const project = await api.createProject(`Metric revision snapshots ${randomUUID()}`);
+        const category = await api.createCategory(project.id, 'Performance', 'PERF');
+        const metricResponse = await request.post(`/projects/${project.id}/metrics`, {
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            data: { value: '2000 ms', description: 'Response-time target' },
+        });
+        expect(metricResponse.status()).toBe(201);
+        const metric = (await metricResponse.json()) as { readonly id: string };
+        const requirement = await api.createRequirement(
+            project.id,
+            category.id,
+            'The response time shall be below [~MET-0001].',
+        );
+
+        const metricUpdateResponse = await request.patch(`/projects/${project.id}/metrics/${metric.id}`, {
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            data: { value: '1000 ms', description: 'Tighter response-time target' },
+        });
+        expect(metricUpdateResponse.status()).toBe(200);
+
+        const requirementUpdateResponse = await request.patch(
+            `/projects/${project.id}/requirements/${requirement.id}`,
+            {
+                data: { owner: 'Performance team', changeReason: 'Assigned an owner.' },
+                headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            },
+        );
+        expect(requirementUpdateResponse.status()).toBe(200);
+
+        const deactivateResponse = await request.post(`/projects/${project.id}/metrics/${metric.id}/deactivate`, {
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+        });
+        expect(deactivateResponse.status()).toBe(200);
+
+        const removeReferenceResponse = await request.patch(
+            `/projects/${project.id}/requirements/${requirement.id}`,
+            {
+                data: { description: 'The response time target is documented elsewhere.', changeReason: 'Removed metric reference.' },
+                headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            },
+        );
+        expect(removeReferenceResponse.status()).toBe(200);
+
+        const revisionsResponse = await request.get(`/projects/${project.id}/requirements/${requirement.id}/revisions`);
+        expect(revisionsResponse.status()).toBe(200);
+        const revisions = (await revisionsResponse.json()) as readonly RequirementResponseBody[];
+
+        expect(revisions.map((revision) => revision.renderedDescription)).toEqual([
+            'The response time shall be below 2000 ms.',
+            'The response time shall be below 1000 ms.',
+            'The response time target is documented elsewhere.',
+        ]);
+        expect(revisions[0].description).toBe('The response time shall be below [~MET-0001].');
+        expect(revisions[1].description).toBe('The response time shall be below [~MET-0001].');
+
+        const compareResponse = await request.get(
+            `/projects/${project.id}/requirements/${requirement.id}/revisions/compare?from=1&to=2`,
+        );
+        expect(compareResponse.status()).toBe(200);
+        const comparison = (await compareResponse.json()) as {
+            readonly differences: readonly { readonly field: string; readonly from: unknown; readonly to: unknown }[];
+        };
+        expect(comparison.differences).toContainEqual({
+            field: 'description',
+            from: 'The response time shall be below 2000 ms.',
+            to: 'The response time shall be below 1000 ms.',
+        });
+    });
+
+    test('captures current metric values for lifecycle and implementation-ticket revisions.', async ({ request, api }) => {
+        const project = await api.createProject(`Metric lifecycle snapshots ${randomUUID()}`);
+        const category = await api.createCategory(project.id, 'Performance', 'PERF');
+        const metricResponse = await request.post(`/projects/${project.id}/metrics`, {
+            headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+            data: { value: '2000 ms', description: 'Response-time target' },
+        });
+        const metric = (await metricResponse.json()) as { readonly id: string };
+        const requirement = await api.createRequirement(project.id, category.id, 'Below [~MET-0001].');
+
+        expect(
+            (
+                await request.patch(`/projects/${project.id}/metrics/${metric.id}`, {
+                    headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+                    data: { value: '1000 ms', description: 'Updated target' },
+                })
+            ).status(),
+        ).toBe(200);
+        await api.approveRequirement(project.id, requirement.id);
+
+        expect(
+            (
+                await request.patch(`/projects/${project.id}/metrics/${metric.id}`, {
+                    headers: E2E_REQUIREMENTS_ENGINEER_HEADERS,
+                    data: { value: '500 ms', description: 'Final target' },
+                })
+            ).status(),
+        ).toBe(200);
+        await api.createImplementationTicket(project.id, requirement.id, 'PERF-42');
+
+        const revisionsResponse = await request.get(`/projects/${project.id}/requirements/${requirement.id}/revisions`);
+        expect(revisionsResponse.status()).toBe(200);
+        const revisions = (await revisionsResponse.json()) as readonly RequirementResponseBody[];
+        expect(revisions.map((revision) => revision.renderedDescription)).toEqual([
+            'Below 2000 ms.',
+            'Below 1000 ms.',
+            'Below 500 ms.',
+        ]);
     });
 
     test('rejects invalid revision comparison parameters.', async ({ request, draftRequirement }) => {

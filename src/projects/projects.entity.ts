@@ -1,5 +1,6 @@
 import { Category } from '@/projects/categories.entity';
 import { Requirement } from '@/projects/requirements.entity';
+import { Metric } from '@/projects/metrics.entity';
 import {
     Column,
     CreateDateColumn,
@@ -33,4 +34,7 @@ export class Project {
 
     @OneToMany(() => Requirement, (requirement) => requirement.project)
     requirements!: Relation<Requirement>[];
+
+    @OneToMany(() => Metric, (metric) => metric.project)
+    metrics!: Relation<Metric>[];
 }

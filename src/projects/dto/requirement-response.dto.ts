@@ -3,6 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VISIBLE_KEY_OPENAPI_PATTERN } from '@/projects/requirement.constants';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import { ImplementationTicketResponseDto } from '@/projects/dto/implementation-ticket.dto';
+import { RequirementMetricReferenceDto } from '@/projects/dto/requirement-metric-reference.dto';
 
 export class RequirementResponseDto {
     @ApiProperty({ example: '9d9a0e08-9e30-4f0a-8c65-8f5d7c1f3a2b', description: 'Stable requirement identifier.' })
@@ -49,6 +50,22 @@ export class RequirementResponseDto {
 
     @ApiPropertyOptional({ example: 'Users must sign in with their username and password.', nullable: true })
     description!: string | null;
+
+    @ApiPropertyOptional({
+        example: 'The response time shall be below 2000 ms.',
+        nullable: true,
+        description:
+            'Rendered description for revision-history responses. Archived revisions use their frozen metric snapshot; the current revision uses live metric values.',
+    })
+    renderedDescription?: string | null;
+
+    @ApiPropertyOptional({
+        type: RequirementMetricReferenceDto,
+        isArray: true,
+        description:
+            'Resolution details for metric placeholders in the current requirement description. Historical revisions omit this live resolution data.',
+    })
+    metricReferences?: RequirementMetricReferenceDto[];
 
     @ApiPropertyOptional({ example: 'p1', enum: ['p1', 'p2', 'p3'], nullable: true })
     priority!: string | null;

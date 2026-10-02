@@ -1,5 +1,6 @@
 import { Requirement } from '@/projects/requirements.entity';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
+import type { RequirementMetricSnapshot } from '@/projects/requirements/requirement-metric-snapshot';
 import { Check, Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, type Relation } from 'typeorm';
 
 @Entity({ name: 'requirement_revisions' })
@@ -53,6 +54,9 @@ export class RequirementRevision {
 
     @Column({ type: 'text', nullable: true })
     description!: string | null;
+
+    @Column({ type: 'jsonb', name: 'metric_snapshots', default: () => "'[]'::jsonb" })
+    metricSnapshots!: RequirementMetricSnapshot[];
 
     @Column({ type: 'varchar', length: 5, nullable: true })
     priority!: string | null;

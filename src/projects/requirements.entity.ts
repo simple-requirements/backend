@@ -1,9 +1,11 @@
 import { Category } from '@/projects/categories.entity';
+import { Metric } from '@/projects/metrics.entity';
 import { Project } from '@/projects/projects.entity';
 import { RequirementRevision } from '@/projects/requirement-revisions.entity';
 import { RequirementImplementationTicket } from '@/projects/requirement-implementation-ticket.entity';
 import { RequirementStatus } from '@/projects/requirement-status.enum';
 import { RequirementReviewComment } from '@/requirement-reviews/requirement-review-comment.entity';
+import type { RequirementMetricSnapshot } from '@/projects/requirements/requirement-metric-snapshot';
 import {
     Check,
     Column,
@@ -11,6 +13,8 @@ import {
     Entity,
     Index,
     JoinColumn,
+    JoinTable,
+    ManyToMany,
     ManyToOne,
     OneToMany,
     PrimaryGeneratedColumn,
@@ -21,6 +25,7 @@ import {
 @Entity({ name: 'requirements' })
 @Index('IDX_requirements_project_id', ['projectId'])
 @Index('IDX_requirements_category_id', ['categoryId'])
+@Index('UQ_requirements_id_project_id', ['id', 'projectId'], { unique: true })
 @Index('UQ_requirements_project_key', ['projectId', 'visibleKey'], { unique: true })
 @Index('UQ_requirements_category_sequence', ['categoryId', 'sequenceNumber'], { unique: true })
 @Check('CHK_requirements_status', `"status" IN ('draft', 'approved', 'implemented', 'obsolete', 'rejected')`)
@@ -67,6 +72,9 @@ export class Requirement {
 
     @Column({ type: 'text', nullable: true })
     description!: string | null;
+
+    @Column({ type: 'jsonb', name: 'metric_snapshots', default: () => "'[]'::jsonb" })
+    metricSnapshots!: RequirementMetricSnapshot[];
 
     @Column({ type: 'varchar', length: 5, nullable: true })
     priority!: string | null;
@@ -123,6 +131,14 @@ export class Requirement {
 
     @OneToMany(() => RequirementReviewComment, (comment) => comment.requirement)
     reviewComments!: Relation<RequirementReviewComment>[];
+
+    @ManyToMany(() => Metric, (metric) => metric.requirements, { eager: true })
+    @JoinTable({
+        name: 'requirement_metric_references',
+        joinColumn: { name: 'requirement_id', referencedColumnName: 'id' },
+        inverseJoinColumn: { name: 'metric_id', referencedColumnName: 'id' },
+    })
+    metrics!: Relation<Metric>[];
     @OneToMany(() => RequirementImplementationTicket, (ticket) => ticket.requirement, { eager: true })
     implementationTickets!: Relation<RequirementImplementationTicket>[];
 }
