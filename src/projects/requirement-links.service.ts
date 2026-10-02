@@ -63,10 +63,11 @@ export class RequirementLinksService {
         const target = await this.getRequirementByKeyOrThrow(projectId, targetKey);
         this.assertNotSelf(link.sourceRequirement, target);
         if (link.targetRequirementId !== target.id) await this.assertAvailable(sourceRequirementId, target.id);
-        link.targetRequirementId = target.id;
-        link.targetRequirement = target;
-        const saved = await this.linksRepository.save(link);
-        return this.map(saved);
+        await this.linksRepository.update(
+            { id: link.id, projectId, sourceRequirementId },
+            { targetRequirementId: target.id },
+        );
+        return this.map(await this.getLinkOrThrow(projectId, sourceRequirementId, linkId));
     }
 
     async remove(projectId: string, sourceRequirementId: string, linkId: string): Promise<void> {

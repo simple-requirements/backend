@@ -55,6 +55,7 @@ describe('RequirementLinksService', () => {
         existsBy: vi.fn(),
         create: vi.fn((value) => value),
         save: vi.fn(),
+        update: vi.fn(),
         delete: vi.fn(),
     };
     const requirementsRepository = { findOne: vi.fn() };
@@ -100,13 +101,18 @@ describe('RequirementLinksService', () => {
 
     it('corrects an existing outgoing link without mutating either requirement.', async () => {
         const existing = link(source, target);
-        linksRepository.findOne.mockResolvedValue(existing);
+        const corrected = link(source, secondTarget);
+        linksRepository.findOne.mockResolvedValueOnce(existing).mockResolvedValueOnce(corrected);
         requirementsRepository.findOne.mockResolvedValue(secondTarget);
         linksRepository.existsBy.mockResolvedValue(false);
-        linksRepository.save.mockImplementation((value) => Promise.resolve(value));
+        linksRepository.update.mockResolvedValue({ affected: 1 });
 
         const result = await service.update(PROJECT_ID, SOURCE_ID, existing.id, secondTarget.visibleKey);
 
+        expect(linksRepository.update).toHaveBeenCalledWith(
+            { id: existing.id, projectId: PROJECT_ID, sourceRequirementId: SOURCE_ID },
+            { targetRequirementId: SECOND_TARGET_ID },
+        );
         expect(result.target.requirementId).toBe(SECOND_TARGET_ID);
         expect(source.visibleKey).toBe('FR-FUNC-0001');
         expect(target.visibleKey).toBe('NFR-PERF-0001');
