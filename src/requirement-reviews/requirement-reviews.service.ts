@@ -27,6 +27,7 @@ import { RequirementReviewCommentStatus } from '@/requirement-reviews/requiremen
 import { RequirementReviewComment } from '@/requirement-reviews/requirement-review-comment.entity';
 import { RequirementReviewCommentReply } from '@/requirement-reviews/requirement-review-comment-reply.entity';
 import { RequirementReviewState } from '@/requirement-reviews/requirement-review-state.enum';
+import { RequirementReviewTasksService } from '@/requirement-reviews/requirement-review-tasks.service';
 
 @Injectable()
 export class RequirementReviewsService {
@@ -43,6 +44,7 @@ export class RequirementReviewsService {
         private readonly requirementMapper: RequirementResponseMapper,
         private readonly revisions: RequirementRevisionService,
         private readonly metricReferences: RequirementMetricReferenceService,
+        private readonly reviewTasks: RequirementReviewTasksService,
     ) {}
 
     async findAllReviewComments(
@@ -186,6 +188,7 @@ export class RequirementReviewsService {
         this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
 
         const savedRequirement = await this.requirementsRepository.save(requirement);
+        await this.reviewTasks.completePendingForRequirement(projectId, requirementId);
 
         return this.mapCurrentRequirement(savedRequirement);
     }
@@ -217,6 +220,7 @@ export class RequirementReviewsService {
         this.revisions.applyCurrentMetadata(requirement, revisionMetadata);
 
         const savedRequirement = await this.requirementsRepository.save(requirement);
+        await this.reviewTasks.completePendingForRequirement(projectId, requirementId);
 
         await this.closeOpenCommentsAfterRejection(
             projectId,

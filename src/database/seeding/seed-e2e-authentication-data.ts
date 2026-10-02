@@ -14,6 +14,8 @@ import {
     E2E_LOGIN_PASSWORD,
     E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN,
     E2E_REQUIREMENTS_ENGINEER_USER_ID,
+    E2E_REVIEWER_ACCESS_TOKEN,
+    E2E_REVIEWER_USER_ID,
     E2E_VIEWER_ACCESS_TOKEN,
     E2E_VIEWER_USER_ID,
 } from '@/database/seeding/seed-e2e-authentication';
@@ -30,7 +32,12 @@ type SeedUser = Readonly<{
 
 type DemoProjectMembership = Readonly<{ projectId: string; userId: string }>;
 
-const SEEDED_MEMBER_USER_IDS = [E2E_REQUIREMENTS_ENGINEER_USER_ID, E2E_DEVELOPER_USER_ID, E2E_VIEWER_USER_ID] as const;
+const SEEDED_MEMBER_USER_IDS = [
+    E2E_REQUIREMENTS_ENGINEER_USER_ID,
+    E2E_REVIEWER_USER_ID,
+    E2E_DEVELOPER_USER_ID,
+    E2E_VIEWER_USER_ID,
+] as const;
 
 const DEMO_PROJECT_IDS = demoProjects.map(({ id }) => id);
 
@@ -55,6 +62,14 @@ const E2E_USERS: readonly SeedUser[] = [
         email: 'requirementsengineer@example.invalid',
         displayName: 'Requirements Engineer',
         token: E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN,
+        role: AccountRole.RequirementsEngineer,
+    },
+    {
+        id: E2E_REVIEWER_USER_ID,
+        username: 'reviewengineer',
+        email: 'reviewengineer@example.invalid',
+        displayName: 'Review Engineer',
+        token: E2E_REVIEWER_ACCESS_TOKEN,
         role: AccountRole.RequirementsEngineer,
     },
     {

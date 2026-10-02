@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 
 export const E2E_ADMIN_USER_ID = '10000000-0000-4000-8000-000000000001';
 export const E2E_REQUIREMENTS_ENGINEER_USER_ID = '10000000-0000-4000-8000-000000000002';
+export const E2E_REVIEWER_USER_ID = '10000000-0000-4000-8000-000000000005';
 export const E2E_DEVELOPER_USER_ID = '10000000-0000-4000-8000-000000000003';
 export const E2E_VIEWER_USER_ID = '10000000-0000-4000-8000-000000000004';
 
@@ -11,6 +12,7 @@ export const E2E_USER_ID = E2E_ADMIN_USER_ID;
 
 export const E2E_ADMIN_ACCESS_TOKEN = 'e2e-authentication-token';
 export const E2E_REQUIREMENTS_ENGINEER_ACCESS_TOKEN = 'e2e-requirements-engineer-token';
+export const E2E_REVIEWER_ACCESS_TOKEN = 'e2e-reviewer-token';
 export const E2E_DEVELOPER_ACCESS_TOKEN = 'e2e-developer-token';
 export const E2E_VIEWER_ACCESS_TOKEN = 'e2e-viewer-token';
 

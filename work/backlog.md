@@ -397,7 +397,7 @@ Acceptance criteria:
 ## Deferred metric-related work
 
 ### WP-F3 — Search / filtering / views
-Status: **Implemented — validation pending**
+Status: **Complete**
 
 Implements the first-release search/filter/view stories US-VIEW-001, US-VIEW-002, US-VIEW-003, US-VIEW-005, and US-VIEW-006 plus the unresolved-metric filter deferred from WP-F1.
 
@@ -460,10 +460,34 @@ Acceptance criteria:
 - Administrator has no project-content access.
 
 ### WP-F3 — Search / filtering / views
-Status: **Implemented — validation pending**
+Status: **Complete**
 
 ### WP-F4 — Review assignment tasks
-Status: **Planned**
+Status: **Implemented — validation pending**
+
+Implements US-WF-006 for first-release personal review-task assignment.
+
+Implemented:
+
+- Requirements Engineers can assign a draft requirement review to another active Requirements Engineer with membership in the same project;
+- self-assignment, inactive/non-engineer assignees, non-members, and duplicate pending assignments are rejected;
+- review tasks have `pending` and `completed` status and preserve assignee/assigner identity;
+- assigned Requirements Engineers have a project-scoped personal review-task list;
+- the assignee can complete or reopen a task while the requirement remains a draft;
+- approving or rejecting the requirement completes any still-pending review tasks;
+- assignment/status changes and review comments do not create requirement revisions;
+- requirement review UI shows assignments and lets Requirements Engineers assign eligible reviewers;
+- the project sidebar exposes a personal Review tasks view only to Requirements Engineers;
+- backend unit/E2E and frontend API/E2E coverage are included.
+
+Acceptance criteria:
+
+- Only active Requirements Engineers with membership in the same project are assignable.
+- The assigning engineer cannot assign the task to themselves.
+- Assigned engineers can see pending tasks for the current project.
+- Review-task status is persisted independently from requirement revision history.
+- Assignment and task-status changes do not create requirement revisions.
+- Developer/Viewer cannot create or mutate review tasks; Administrator has no project-content access.
 
 ### WP-F5 — Export
 Status: **Planned**
@@ -492,4 +516,4 @@ Proceed in this order:
 9. WP-F5 — Export
 10. WP-G — remaining identity/access-control work
 
-WP-F2 validation is green. The immediate next step is **WP-F3 validation**. After it is green, the next implementation package is **WP-F4**.
+WP-F2 and WP-F3 validation are green. The immediate next step is **WP-F4 validation**. After it is green, the next implementation package is **WP-F5**.

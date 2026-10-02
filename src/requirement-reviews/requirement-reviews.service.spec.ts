@@ -15,6 +15,7 @@ import { RequirementReviewCommentStatus } from '@/requirement-reviews/requiremen
 import { RequirementReviewComment } from '@/requirement-reviews/requirement-review-comment.entity';
 import { RequirementReviewCommentReply } from '@/requirement-reviews/requirement-review-comment-reply.entity';
 import { RequirementReviewState } from '@/requirement-reviews/requirement-review-state.enum';
+import { RequirementReviewTasksService } from '@/requirement-reviews/requirement-review-tasks.service';
 import { RequirementReviewsService } from '@/requirement-reviews/requirement-reviews.service';
 
 interface RequirementsRepositoryMock {
@@ -107,6 +108,7 @@ describe('RequirementReviewsService', () => {
     let reviewCommentsRepository: ReviewCommentsRepositoryMock;
     let reviewCommentRepliesRepository: ReviewCommentRepliesRepositoryMock;
     const metricReferences = { unresolvedKeys: vi.fn(), describe: vi.fn(), snapshot: vi.fn() };
+    const reviewTasks = { completePendingForRequirement: vi.fn() };
 
     beforeAll(async () => {
         requirementsRepository = { findOne: vi.fn(), save: vi.fn() };
@@ -121,6 +123,7 @@ describe('RequirementReviewsService', () => {
                 RequirementResponseMapper,
                 RequirementRevisionService,
                 { provide: RequirementMetricReferenceService, useValue: metricReferences },
+                { provide: RequirementReviewTasksService, useValue: reviewTasks },
                 { provide: getRepositoryToken(Requirement), useValue: requirementsRepository },
                 { provide: getRepositoryToken(RequirementRevision), useValue: requirementRevisionsRepository },
                 { provide: getRepositoryToken(RequirementReviewComment), useValue: reviewCommentsRepository },
@@ -139,6 +142,7 @@ describe('RequirementReviewsService', () => {
         metricReferences.unresolvedKeys.mockResolvedValue([]);
         metricReferences.describe.mockResolvedValue([]);
         metricReferences.snapshot.mockReturnValue([]);
+        reviewTasks.completePendingForRequirement.mockResolvedValue(undefined);
     });
 
     it('derives the in-review and decision-pending states from main comment counts.', async () => {
