@@ -396,25 +396,21 @@ Acceptance criteria:
 
 ## Deferred metric-related work
 
-### WP-F3 — Search / filtering / views
-Status: **Complete**
+### WP-F3 — Requirements table
+Status: **Complete (scope reduced during cleanup)**
 
-Implements the first-release search/filter/view stories US-VIEW-001, US-VIEW-002, US-VIEW-003, US-VIEW-005, and US-VIEW-006 plus the unresolved-metric filter deferred from WP-F1.
+The first-release search/filter/document-view scope was removed after WP-F5. US-VIEW-001, US-VIEW-002, US-VIEW-003, and US-VIEW-005 are no longer product requirements.
 
-Implemented:
+Current scope:
 
-- project-local search by visible key, description, source, owner, and status;
-- rejected/obsolete requirements hidden from the normal active view and explicitly includable/filterable;
-- combinable filters for category-derived type, category, category key, status, priority, owner, metric, linked requirement, and unresolved metric references;
-- exact visible-key matches remain directly openable from filtered results;
-- sortable requirement-table columns and user-selectable column visibility;
-- readable specification/document view with visible keys, derived type/category, rendered metric references, and structured outgoing requirement links;
-- unit coverage for filter semantics and frontend E2E coverage for search/filter/document switching.
+- requirements are presented in one fixed sortable table;
+- the table shows key, description, derived type, category, status, priority, owner, reviewer, updated time, and a personal pending-review action;
+- there is no requirements search/filter toolbar, document/table switch, or configurable-column control.
 
-Saved custom views (US-VIEW-004) and relationship graph visualization (US-VIEW-007) remain backlog work.
+Relationship graph visualization (US-VIEW-007) remains backlog work.
 
 ### WP-F5 — Export
-Status: **Implemented — validation pending**
+Status: **Complete**
 
 Implements the first-release export stories US-EXP-001 through US-EXP-006, US-EXP-009 through US-EXP-014, and US-EXP-016.
 
@@ -439,7 +435,7 @@ YAML (US-EXP-007), XML (US-EXP-008), guarded full-database export (US-EXP-015), 
 ### WP-F2 — Requirement links / traceability
 Status: **Complete**
 
-Implements the first-release requirement-link stories independently from metric references (US-REF-001, US-REF-002, US-REF-003, US-REF-004, US-REF-006, US-REF-007, US-REF-008, US-REF-009, US-REF-010, US-REF-011, and US-REF-012). Requirement-link export remains in WP-F5; broader search/filter work remains in WP-F3.
+Implements the first-release requirement-link stories independently from metric references (US-REF-001, US-REF-002, US-REF-003, US-REF-004, US-REF-006, US-REF-007, US-REF-008, US-REF-009, US-REF-010, US-REF-011, and US-REF-012). Requirement-link export remains in WP-F5; the requirement overview remains in WP-F3.
 
 Implemented:
 
@@ -471,8 +467,10 @@ Acceptance criteria:
 - Developer and Viewer can read link data without mutation controls.
 - Administrator has no project-content access.
 
-### WP-F3 — Search / filtering / views
-Status: **Complete**
+### WP-F3 — Requirements table
+Status: **Complete (scope reduced during cleanup)**
+
+See the reduced WP-F3 scope above.
 
 ### WP-F4 — Review assignment tasks
 Status: **Complete**
@@ -484,25 +482,24 @@ Implemented:
 - Requirements Engineers can assign a draft requirement review to another active Requirements Engineer with membership in the same project;
 - self-assignment, inactive/non-engineer assignees, non-members, and duplicate pending assignments are rejected;
 - review tasks have `pending` and `completed` status and preserve assignee/assigner identity;
-- assigned Requirements Engineers have a project-scoped personal review-task list;
-- the assignee can complete or reopen a task while the requirement remains a draft;
+- assigned Requirements Engineers see a personal pending-review action directly in the requirements table;
 - approving or rejecting the requirement completes any still-pending review tasks;
 - assignment/status changes and review comments do not create requirement revisions;
 - requirement review UI shows assignments and lets Requirements Engineers assign eligible reviewers;
-- the project sidebar exposes a personal Review tasks view only to Requirements Engineers;
+- no separate Review tasks sidebar/page is used; the requirements table is the personal review-task entry point;
 - backend unit/E2E and frontend API/E2E coverage are included.
 
 Acceptance criteria:
 
 - Only active Requirements Engineers with membership in the same project are assignable.
 - The assigning engineer cannot assign the task to themselves.
-- Assigned engineers can see pending tasks for the current project.
+- Assigned engineers see pending tasks for the current project as review actions in the requirements table.
 - Review-task status is persisted independently from requirement revision history.
 - Assignment and task-status changes do not create requirement revisions.
 - Developer/Viewer cannot create or mutate review tasks; Administrator has no project-content access.
 
 ### WP-F5 — Export
-Status: **Implemented — validation pending**
+Status: **Complete**
 
 See the implemented WP-F5 scope above.
 
@@ -525,9 +522,9 @@ Proceed in this order:
 4. WP-F1.4 — Frontend metric management
 5. WP-F1.5 — Requirement rendering/navigation/integration
 6. WP-F2 — Requirement links / traceability
-7. WP-F3 — Search / filtering / views
+7. WP-F3 — Requirements table
 8. WP-F4 — Review assignment tasks
 9. WP-F5 — Export
 10. WP-G — remaining identity/access-control work
 
-WP-F1 through WP-F4 are complete. WP-F5 is the final WP-F package and is implemented pending validation. After WP-F5 validation is green, the next package is **WP-G**.
+WP-F1 through WP-F5 are complete. WP-F5 is the final WP-F package. The next package is **WP-G**.
