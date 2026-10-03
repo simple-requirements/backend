@@ -36,7 +36,7 @@ export default defineConfig({
             undefined
         :   {
                 command:
-                    'INITIAL_ADMIN_BOOTSTRAP_SECRET=test-only-bootstrap-secret-with-32-characters NODE_ENV=test PORT=3001 pnpm start',
+                    'INITIAL_ADMIN_BOOTSTRAP_SECRET=test-only-bootstrap-secret-with-32-characters OPERATIONAL_EXPORT_SECRET=test-only-operational-export-secret NODE_ENV=test PORT=3001 pnpm start',
                 url: `${baseURL}/`,
                 reuseExistingServer: !process.env.CI,
                 timeout: 60_000,

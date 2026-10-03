@@ -414,11 +414,23 @@ Implemented:
 Saved custom views (US-VIEW-004) and relationship graph visualization (US-VIEW-007) remain backlog work.
 
 ### WP-F5 — Export
-Status: **Planned**
+Status: **Implemented — validation pending**
 
-Metric rendering in exports belongs here rather than WP-F1.
+Implements the first-release export stories US-EXP-001 through US-EXP-006, US-EXP-009 through US-EXP-014, and US-EXP-016.
 
-Exports must eventually use the appropriate resolved/frozen representation required by the export and baseline semantics.
+Implemented:
+
+- format-independent canonical export bundle with schema version, metadata, warnings, project bundles, categories, requirements, complete revision history, metrics, requirement-metric links, and structured requirement links;
+- adapter registry with JSON, GitHub-flavored Markdown, and AsciiDoc adapters plus capability discovery;
+- current requirement descriptions render current metric values while archived revisions render their frozen metric snapshots; original placeholders remain available in the canonical/data representation and readable document exports;
+- unresolved metric placeholders produce non-fatal structured export warnings;
+- Requirements Engineers can export one project or a UUID-selected set of requirements; Developer/Viewer and Administrator accounts cannot use project-content export endpoints;
+- operational all-project export uses a dedicated `X-Operational-Export-Secret` / `OPERATIONAL_EXPORT_SECRET` boundary and does not grant application Administrators project-content access;
+- `GET /export/formats`, `GET /export/projects`, `GET /export/projects/{projectId}`, and `GET /export/requirements?id=<ids>` endpoints with format selection and download metadata;
+- frontend project context-menu export flow with format selection for Requirements Engineers;
+- adapter, query-validation, backend E2E, and frontend component coverage.
+
+YAML (US-EXP-007), XML (US-EXP-008), guarded full-database export (US-EXP-015), and import preparation (US-EXP-017) remain backlog work.
 
 ---
 
@@ -463,7 +475,7 @@ Acceptance criteria:
 Status: **Complete**
 
 ### WP-F4 — Review assignment tasks
-Status: **Implemented — validation pending**
+Status: **Complete**
 
 Implements US-WF-006 for first-release personal review-task assignment.
 
@@ -490,7 +502,9 @@ Acceptance criteria:
 - Developer/Viewer cannot create or mutate review tasks; Administrator has no project-content access.
 
 ### WP-F5 — Export
-Status: **Planned**
+Status: **Implemented — validation pending**
+
+See the implemented WP-F5 scope above.
 
 ---
 
@@ -516,4 +530,4 @@ Proceed in this order:
 9. WP-F5 — Export
 10. WP-G — remaining identity/access-control work
 
-WP-F2 and WP-F3 validation are green. The immediate next step is **WP-F4 validation**. After it is green, the next implementation package is **WP-F5**.
+WP-F1 through WP-F4 are complete. WP-F5 is the final WP-F package and is implemented pending validation. After WP-F5 validation is green, the next package is **WP-G**.

@@ -8,6 +8,7 @@ import { TypeOrmModule, type TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 import { ProjectsModule } from '@/projects/projects.module';
 import { RequirementReviewsModule } from '@/requirement-reviews/requirement-reviews.module';
+import { ExportModule } from '@/export/export.module';
 
 @Module({
     imports: [
@@ -39,6 +40,7 @@ import { RequirementReviewsModule } from '@/requirement-reviews/requirement-revi
         }),
         ProjectsModule,
         RequirementReviewsModule,
+        ExportModule,
         AuthModule,
     ],
     controllers: [AppController],
