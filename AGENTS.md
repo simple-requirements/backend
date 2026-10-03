@@ -4,17 +4,16 @@
 
 1. Inspect the existing repository and all applicable `AGENTS.md` files before making changes.
 2. Follow the existing NestJS, TypeORM, Zod validation, DTO, Swagger/OpenAPI, authorization, migration, exception-handling, and testing conventions.
-3. Use `pnpm` only.
-
-   * Do not use `npm`.
-   * Do not use `npx`; use `pnpm exec` when a binary must be invoked directly.
-4. Use the `@/` alias for imports from `src`.
-5. Implement only the requested scope or work package.
+3. Use `pnpm` for package scripts and dependency operations.
+4. Do not use `npx`; use `pnpm exec` when a binary must be invoked directly.
+5. If `pnpm` does not exist in your environment use `npm` or `npx`.
+6. Use the `@/` alias for imports from `src`.
+7. Implement only the requested scope or work package.
 
    * Do not implement later backlog items pre-emptively.
    * Do not introduce abstractions solely for hypothetical future requirements.
-6. Preserve existing public API behavior unless changing that behavior is explicitly part of the task.
-7. Prefer small, domain-focused changes over broad refactorings unrelated to the requested work.
+8. Preserve existing public API behavior unless changing that behavior is explicitly part of the task.
+9. Prefer small, domain-focused changes over broad refactorings unrelated to the requested work.
 
 ## Source code documentation
 
@@ -333,3 +332,18 @@ At the end, report:
 5. commands run and their results;
 6. noteworthy complexity changes;
 7. assumptions or unresolved concerns.
+## Patch delivery script
+
+When delivering repository patches, include an executable `apply-patches.sh` (and `patch.sh` may be provided as an alias) with these rules:
+
+1. Treat `/home/node/frontend` and `/home/node/backend` as the repository locations.
+2. Resolve `frontend.patch` and `backend.patch` relative to the script directory.
+3. Detect whether each patch file exists and is non-empty before attempting to apply it.
+4. Attempt frontend and backend patches independently so one failure does not hide the other result.
+5. Print these status lines in this order:
+   - `Frontend patch: Yes` or `Frontend patch: No`
+   - `Backend patch: Yes` or `Backend patch: No`
+   - `Frontend patch applied: Yes`, `Frontend patch applied: No`, or `Frontend patch applied: Error: <git apply error>`
+   - `Backend patch applied: Yes`, `Backend patch applied: No`, or `Backend patch applied: Error: <git apply error>`
+6. When a requested patch fails, include the actual `git apply` stderr text in the corresponding `Error:` status and exit with a non-zero status after reporting both repositories.
+7. Do not interpret positional arguments as repository paths.
