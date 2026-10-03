@@ -116,13 +116,7 @@ export interface ExportRequirementLink {
 }
 
 export interface ExportProjectBundle {
-    project: {
-        id: string;
-        name: string;
-        ticketUrlTemplate: string | null;
-        createdAt: string;
-        updatedAt: string;
-    };
+    project: { id: string; name: string; ticketUrlTemplate: string | null; createdAt: string; updatedAt: string };
     categories: ExportCategory[];
     metrics: ExportMetric[];
     requirements: ExportRequirement[];

@@ -20,12 +20,7 @@ import { Requirement } from '@/projects/requirements.entity';
         TypeOrmModule.forFeature([Project, Category, Requirement, RequirementRevision, Metric, RequirementLink]),
     ],
     controllers: [ExportController],
-    providers: [
-        ExportAdapterRegistryService,
-        ExportBundleBuilderService,
-        ExportService,
-        OperationalExportGuard,
-    ],
+    providers: [ExportAdapterRegistryService, ExportBundleBuilderService, ExportService, OperationalExportGuard],
 })
 // Nest modules are declarative; the decorator contains the module configuration.
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class

@@ -71,10 +71,12 @@ export class ExportController {
         @Query(new ZodValidationPipe(exportFormatQuerySchema)) query: ExportFormatQuery,
         @Req() request: AuthenticatedRequest,
     ): Promise<StreamableFile> {
-        return this.asFile(await this.exportService.project(projectId, query.format, {
-            userId: request.authentication.user.id,
-            role: request.authentication.role,
-        }));
+        return this.asFile(
+            await this.exportService.project(projectId, query.format, {
+                userId: request.authentication.user.id,
+                role: request.authentication.role,
+            }),
+        );
     }
 
     @Get('requirements')

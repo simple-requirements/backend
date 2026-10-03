@@ -4,9 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { OperationalExportGuard } from '@/export/operational-export.guard';
 
 function context(secret?: string) {
-    return {
-        switchToHttp: () => ({ getRequest: () => ({ header: () => secret }) }),
-    } as never;
+    return { switchToHttp: () => ({ getRequest: () => ({ header: () => secret }) }) } as never;
 }
 
 describe('OperationalExportGuard', () => {

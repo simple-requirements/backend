@@ -82,11 +82,18 @@ export class ExportBundleBuilderService {
     }
 
     private async fullProjectSelection(project: Project): Promise<ProjectSelection> {
-        const requirements = await this.requirements.find({ where: { projectId: project.id }, order: { visibleKey: 'ASC' } });
+        const requirements = await this.requirements.find({
+            where: { projectId: project.id },
+            order: { visibleKey: 'ASC' },
+        });
         return { project, requirements, allRequirements: requirements, selectionOnly: false };
     }
 
-    private async build(scope: ExportScope, formatId: string, selections: ProjectSelection[]): Promise<CanonicalExportBundle> {
+    private async build(
+        scope: ExportScope,
+        formatId: string,
+        selections: ProjectSelection[],
+    ): Promise<CanonicalExportBundle> {
         const warnings: ExportWarning[] = [];
         const projects: ExportProjectBundle[] = [];
         for (const selection of selections) projects.push(await this.buildProject(selection, warnings));
@@ -104,25 +111,44 @@ export class ExportBundleBuilderService {
 
     private async buildProject(selection: ProjectSelection, warnings: ExportWarning[]): Promise<ExportProjectBundle> {
         const requirementIds = selection.requirements.map(({ id }) => id);
-        const revisions = requirementIds.length === 0 ? [] : await this.revisions.find({
-            where: { requirementId: In(requirementIds) },
-            order: { requirementId: 'ASC', revisionNumber: 'ASC' },
+        const revisions =
+            requirementIds.length === 0 ?
+                []
+            :   await this.revisions.find({
+                    where: { requirementId: In(requirementIds) },
+                    order: { requirementId: 'ASC', revisionNumber: 'ASC' },
+                });
+        const projectMetrics = await this.metrics.find({
+            where: { projectId: selection.project.id },
+            order: { key: 'ASC' },
         });
-        const projectMetrics = await this.metrics.find({ where: { projectId: selection.project.id }, order: { key: 'ASC' } });
-        const allCategories = await this.categories.find({ where: { projectId: selection.project.id }, order: { type: 'ASC', key: 'ASC' } });
-        const allLinks = await this.requirementLinks.find({ where: { projectId: selection.project.id }, order: { createdAt: 'ASC', id: 'ASC' } });
-        const requirementKeyById = new Map(selection.allRequirements.map((requirement) => [requirement.id, requirement.visibleKey]));
+        const allCategories = await this.categories.find({
+            where: { projectId: selection.project.id },
+            order: { type: 'ASC', key: 'ASC' },
+        });
+        const allLinks = await this.requirementLinks.find({
+            where: { projectId: selection.project.id },
+            order: { createdAt: 'ASC', id: 'ASC' },
+        });
+        const requirementKeyById = new Map(
+            selection.allRequirements.map((requirement) => [requirement.id, requirement.visibleKey]),
+        );
         const selectedIds = new Set(requirementIds);
 
-        const categories = selection.selectionOnly
-            ? this.filterCategories(allCategories, selection.requirements, revisions)
-            : allCategories;
-        const metrics = selection.selectionOnly
-            ? this.filterMetrics(projectMetrics, selection.requirements, revisions)
-            : projectMetrics;
-        const links = selection.selectionOnly
-            ? allLinks.filter((link) => selectedIds.has(link.sourceRequirementId) || selectedIds.has(link.targetRequirementId))
-            : allLinks;
+        const categories =
+            selection.selectionOnly ?
+                this.filterCategories(allCategories, selection.requirements, revisions)
+            :   allCategories;
+        const metrics =
+            selection.selectionOnly ?
+                this.filterMetrics(projectMetrics, selection.requirements, revisions)
+            :   projectMetrics;
+        const links =
+            selection.selectionOnly ?
+                allLinks.filter(
+                    (link) => selectedIds.has(link.sourceRequirementId) || selectedIds.has(link.targetRequirementId),
+                )
+            :   allLinks;
 
         const revisionsByRequirement = this.groupRevisionsByRequirement(revisions);
         const requirements = selection.requirements.map((requirement) =>
@@ -151,7 +177,6 @@ export class ExportBundleBuilderService {
         };
     }
 
-
     private groupRequirementsByProject(requirements: Requirement[]): Map<string, Requirement[]> {
         const grouped = new Map<string, Requirement[]>();
         for (const requirement of requirements) {
@@ -172,7 +197,11 @@ export class ExportBundleBuilderService {
         return grouped;
     }
 
-    private filterCategories(categories: Category[], requirements: Requirement[], revisions: RequirementRevision[]): Category[] {
+    private filterCategories(
+        categories: Category[],
+        requirements: Requirement[],
+        revisions: RequirementRevision[],
+    ): Category[] {
         const usedIds = new Set([
             ...requirements.map(({ categoryId }) => categoryId),
             ...revisions.map(({ categoryId }) => categoryId),
@@ -323,11 +352,12 @@ export class ExportBundleBuilderService {
         revisionNumber?: number,
     ): void {
         const resolved = new Set(resolvedKeys);
+        const revisionLabel = revisionNumber === undefined ? '' : ` revision ${String(revisionNumber)}`;
         for (const key of parseMetricReferenceKeys(description)) {
             if (resolved.has(key)) continue;
             warnings.push({
                 code: 'unresolved_metric_reference',
-                message: `Requirement ${requirementKey}${revisionNumber === undefined ? '' : ` revision ${String(revisionNumber)}`} contains unresolved metric reference ${key}.`,
+                message: `Requirement ${requirementKey}${revisionLabel} contains unresolved metric reference ${key}.`,
                 projectId,
                 requirementId,
                 requirementKey,
@@ -347,25 +377,32 @@ export class ExportBundleBuilderService {
                     metricKey: metric.key,
                 })),
             )
-            .sort((left, right) =>
-                left.requirementKey.localeCompare(right.requirementKey) || left.metricKey.localeCompare(right.metricKey),
+            .sort(
+                (left, right) =>
+                    left.requirementKey.localeCompare(right.requirementKey)
+                    || left.metricKey.localeCompare(right.metricKey),
             );
     }
 
-    private mapRequirementLink(link: RequirementLink, requirementKeyById: Map<string, string>): ExportRequirementLink[] {
+    private mapRequirementLink(
+        link: RequirementLink,
+        requirementKeyById: Map<string, string>,
+    ): ExportRequirementLink[] {
         const sourceRequirementKey = requirementKeyById.get(link.sourceRequirementId);
         const targetRequirementKey = requirementKeyById.get(link.targetRequirementId);
         if (sourceRequirementKey === undefined || targetRequirementKey === undefined) return [];
-        return [{
-            id: link.id,
-            relationshipType: link.relationshipType,
-            sourceRequirementId: link.sourceRequirementId,
-            sourceRequirementKey,
-            targetRequirementId: link.targetRequirementId,
-            targetRequirementKey,
-            createdAt: link.createdAt.toISOString(),
-            updatedAt: link.updatedAt.toISOString(),
-        }];
+        return [
+            {
+                id: link.id,
+                relationshipType: link.relationshipType,
+                sourceRequirementId: link.sourceRequirementId,
+                sourceRequirementKey,
+                targetRequirementId: link.targetRequirementId,
+                targetRequirementKey,
+                createdAt: link.createdAt.toISOString(),
+                updatedAt: link.updatedAt.toISOString(),
+            },
+        ];
     }
 
     private mapCategory(category: Category): ExportCategory {

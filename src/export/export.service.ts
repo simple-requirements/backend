@@ -54,9 +54,8 @@ export class ExportService {
         projectName?: string,
     ): RenderedExport {
         const adapter = this.registry.get(formatId);
-        const stem = scope === 'project' && projectName !== undefined
-            ? this.filenameStem(projectName)
-            : scope.replace('_', '-');
+        const stem =
+            scope === 'project' && projectName !== undefined ? this.filenameStem(projectName) : scope.replace('_', '-');
         return {
             content: adapter.render(bundle),
             mediaType: adapter.mediaType,
@@ -68,11 +67,11 @@ export class ExportService {
         requirementIds: string[],
         actor: { userId: string; role: AccountRole },
     ): Promise<void> {
-        if (actor.role !== AccountRole.RequirementsEngineer) throw new ForbiddenException('Export access is not permitted.');
-        const requirements = await this.dataSource.getRepository(Requirement).find({
-            select: { id: true, projectId: true },
-            where: { id: In([...new Set(requirementIds)]) },
-        });
+        if (actor.role !== AccountRole.RequirementsEngineer)
+            throw new ForbiddenException('Export access is not permitted.');
+        const requirements = await this.dataSource
+            .getRepository(Requirement)
+            .find({ select: { id: true, projectId: true }, where: { id: In([...new Set(requirementIds)]) } });
         const projectIds = [...new Set(requirements.map(({ projectId }) => projectId))];
         await this.requireProjectExportAccess(projectIds, actor);
     }
@@ -81,16 +80,21 @@ export class ExportService {
         projectIds: string[],
         actor: { userId: string; role: AccountRole },
     ): Promise<void> {
-        if (actor.role !== AccountRole.RequirementsEngineer) throw new ForbiddenException('Export access is not permitted.');
+        if (actor.role !== AccountRole.RequirementsEngineer)
+            throw new ForbiddenException('Export access is not permitted.');
         if (projectIds.length === 0) return;
-        const memberships = await this.dataSource.getRepository(ProjectMembership).find({
-            where: { userId: actor.userId, projectId: In(projectIds) },
-        });
+        const memberships = await this.dataSource
+            .getRepository(ProjectMembership)
+            .find({ where: { userId: actor.userId, projectId: In(projectIds) } });
         if (memberships.length !== projectIds.length) throw new ForbiddenException('Export access is not permitted.');
     }
 
     private filenameStem(value: string): string {
-        const normalized = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const normalized = value
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
         return normalized.length === 0 ? 'project-export' : normalized;
     }
 }

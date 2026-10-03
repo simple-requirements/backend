@@ -1,13 +1,26 @@
-import type { CanonicalExportBundle, ExportFormatAdapter, ExportProjectBundle, ExportRequirement } from '@/export/export.types';
-import { displayValue, metricLinks, outgoingLinks, requirementCategory, revisionCategory } from '@/export/adapters/document-export.helpers';
+import type {
+    CanonicalExportBundle,
+    ExportFormatAdapter,
+    ExportProjectBundle,
+    ExportRequirement,
+} from '@/export/export.types';
+import {
+    displayValue,
+    metricLinks,
+    outgoingLinks,
+    requirementCategory,
+    revisionCategory,
+} from '@/export/adapters/document-export.helpers';
 
 function linesForRequirement(project: ExportProjectBundle, requirement: ExportRequirement): string[] {
     const category = requirementCategory(project, requirement);
+    const categoryLabel =
+        category === undefined ? requirement.categoryId : `${category.type} / ${category.name} (${category.key})`;
     const lines = [
         `[[${requirement.visibleKey.toLowerCase()}]]`,
         `=== ${requirement.visibleKey}`,
         '',
-        `*Category:* ${category === undefined ? requirement.categoryId : `${category.type} / ${category.name} (${category.key})`}`,
+        `*Category:* ${categoryLabel}`,
         `*Status:* ${requirement.status}`,
         `*Priority:* ${displayValue(requirement.priority)}`,
         `*Owner:* ${displayValue(requirement.owner)}`,
@@ -23,9 +36,19 @@ function linesForRequirement(project: ExportProjectBundle, requirement: ExportRe
         lines.push('', '==== Original description', '', displayValue(requirement.description));
     }
     const metrics = metricLinks(project, requirement.id);
-    lines.push('', '==== Metrics', '', metrics.length === 0 ? 'None.' : metrics.map((link) => `* ${link.metricKey}`).join('\n'));
+    lines.push(
+        '',
+        '==== Metrics',
+        '',
+        metrics.length === 0 ? 'None.' : metrics.map((link) => `* ${link.metricKey}`).join('\n'),
+    );
     const links = outgoingLinks(project, requirement.id);
-    lines.push('', '==== References', '', links.length === 0 ? 'None.' : links.map((link) => `* ${link.targetRequirementKey}`).join('\n'));
+    lines.push(
+        '',
+        '==== References',
+        '',
+        links.length === 0 ? 'None.' : links.map((link) => `* ${link.targetRequirementKey}`).join('\n'),
+    );
     lines.push('', '==== Revision history', '');
     for (const revision of requirement.revisions) {
         const revisionCategoryValue = revisionCategory(project, revision);

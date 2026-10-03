@@ -1,12 +1,25 @@
-import type { CanonicalExportBundle, ExportFormatAdapter, ExportProjectBundle, ExportRequirement } from '@/export/export.types';
-import { displayValue, metricLinks, outgoingLinks, requirementCategory, revisionCategory } from '@/export/adapters/document-export.helpers';
+import type {
+    CanonicalExportBundle,
+    ExportFormatAdapter,
+    ExportProjectBundle,
+    ExportRequirement,
+} from '@/export/export.types';
+import {
+    displayValue,
+    metricLinks,
+    outgoingLinks,
+    requirementCategory,
+    revisionCategory,
+} from '@/export/adapters/document-export.helpers';
 
 function linesForRequirement(project: ExportProjectBundle, requirement: ExportRequirement): string[] {
     const category = requirementCategory(project, requirement);
+    const categoryLabel =
+        category === undefined ? requirement.categoryId : `${category.type} / ${category.name} (${category.key})`;
     const lines = [
         `### ${requirement.visibleKey}`,
         '',
-        `- **Category:** ${category === undefined ? requirement.categoryId : `${category.type} / ${category.name} (${category.key})`}`,
+        `- **Category:** ${categoryLabel}`,
         `- **Status:** ${requirement.status}`,
         `- **Priority:** ${displayValue(requirement.priority)}`,
         `- **Owner:** ${displayValue(requirement.owner)}`,
